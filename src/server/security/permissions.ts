@@ -158,3 +158,4 @@ export function assertCan(
     throw new Error(`FORBIDDEN: Role ${ctx.role} cannot perform ${action}`);
   }
 }
+

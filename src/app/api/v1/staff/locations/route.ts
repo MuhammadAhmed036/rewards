@@ -28,3 +28,4 @@ export async function GET(request: NextRequest) {
   const list = await query;
   return NextResponse.json({ data: list });
 }
+

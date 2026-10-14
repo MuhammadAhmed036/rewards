@@ -41,3 +41,4 @@ export function formatPence(pence: number): string {
   const remainder = pence % 100;
   return `£${pounds}.${remainder.toString().padStart(2, "0")}`;
 }
+

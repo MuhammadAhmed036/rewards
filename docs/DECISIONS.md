@@ -49,3 +49,8 @@ Record of architectural decisions and defaults chosen per Section 2 & 22 of the 
 11. **Local Ports**:
     - Docker compose Postgres mapped to port `5434:5432` locally to prevent conflicts with pre-existing local databases on port 5432.
 
+12. **Owner Reports & Session Invalidation on Team Revocation**:
+    - CSV exports (`ledger`, `members`, `redemptions`) are strictly permission-gated to owner/manager and write immutable audit log events (`reports.exported`) recording actor, report type, and date range parameters.
+    - Staff member role modification or revocation immediately triggers active session termination (`invalidateUserSessions`) ensuring revoked credentials cannot continue making staff terminal requests.
+    - Manual balance adjustments require an explicit reason code and operational note, logging an attributable audit event and creating an attributable ledger entry. Reversals are floor-constrained at 0 per Decision 8.
+

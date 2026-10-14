@@ -70,3 +70,4 @@ describe("QR Tokens & Cryptographic Verification (M3)", () => {
     expect(hashRedemptionCode(code.toLowerCase())).toBe(codeHash);
   });
 });
+

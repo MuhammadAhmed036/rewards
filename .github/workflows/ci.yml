@@ -68,3 +68,4 @@ jobs:
           QR_SIGNING_SECRET: dev_qr_signing_secret_must_be_at_least_32_characters_12345
           CRON_SECRET: dev_cron_secret_must_be_at_least_32_characters_long_12345
         run: pnpm build
+

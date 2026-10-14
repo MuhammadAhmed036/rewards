@@ -65,3 +65,4 @@ export function CardContent({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={twMerge(clsx("pt-0", className))} {...props} />;
 }
+

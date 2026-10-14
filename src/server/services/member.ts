@@ -294,3 +294,4 @@ export async function revokeMemberQr(ctx: RequestContext, membershipId: string) 
     qrDataUrl: newQrDataUrl,
   };
 }
+

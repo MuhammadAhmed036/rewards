@@ -101,3 +101,4 @@ export function calculatePoints(input: CalculatePointsInput): CalculatePointsRes
     cappedByDailyLimit,
   };
 }
+

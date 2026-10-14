@@ -102,3 +102,4 @@ describe("Programme & Rewards Services (M2)", () => {
     expect(updated.title).toBe("Deluxe Beard Trim");
   });
 });
+

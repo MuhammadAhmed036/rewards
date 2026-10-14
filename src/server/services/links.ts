@@ -83,6 +83,7 @@ export function validateLinkUrl(type: LinkType, urlString: string): { valid: boo
  * Its signature must NOT accept any membership, feedback, rating, sentiment, points, or tier input.
  * Every member of a tenant sees the exact same set of enabled links.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function getVisibleLinks(tenantId: string, _locationId?: string) {
   // Arity and signature check enforced in automated tests
   const query = db

@@ -140,3 +140,4 @@ describe("Customer Membership & Staff QR Scan (M3)", () => {
     expect(newResolve.displayName).toBe("Charlie B.");
   });
 });
+

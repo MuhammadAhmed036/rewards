@@ -31,3 +31,4 @@ describe("Money Utilities (GBP Integer Pence) (M2)", () => {
     expect(() => formatPence(-100)).toThrow();
   });
 });
+

@@ -8,3 +8,4 @@ export const sentry = {
     logger[level === "warning" ? "warn" : level]({ sentryContext: context }, `[SENTRY] ${message}`);
   },
 };
+

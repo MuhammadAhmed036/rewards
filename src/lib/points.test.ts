@@ -122,3 +122,4 @@ describe("Points Calculation Pure Function (M2)", () => {
     expect(result.points).toBe(1);
   });
 });
+
