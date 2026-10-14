@@ -11,3 +11,4 @@ export async function GET(request: NextRequest) {
   const health = await getSystemHealth(guard.ctx);
   return NextResponse.json({ data: health });
 }
+

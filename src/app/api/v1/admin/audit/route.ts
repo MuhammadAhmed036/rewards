@@ -16,3 +16,4 @@ export async function GET(request: NextRequest) {
   const logs = await getPlatformAuditLogs(guard.ctx, { tenantId, action, limit });
   return NextResponse.json({ data: logs });
 }
+

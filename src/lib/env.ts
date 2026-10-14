@@ -14,6 +14,8 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional().default("mock-google-client-secret"),
   RESEND_API_KEY: z.string().optional().default("re_mock_api_key"),
   EMAIL_FROM_TRANSACTIONAL: z.string().optional().default("no-reply@app.example.com"),
+  SMTP_HOST: z.string().default("localhost"),
+  SMTP_PORT: z.coerce.number().default(1025),
   UPSTASH_REDIS_REST_URL: z.string().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   BLOB_READ_WRITE_TOKEN: z.string().optional(),

@@ -15,7 +15,7 @@ import { calculatePoints, RuleConfig } from "@/lib/points";
 import { hashRedemptionCode, generateRedemptionCode } from "../qr";
 import { logAuditEvent } from "./audit";
 import { sentry } from "@/lib/sentry";
-import { eq, and, sql, desc, gte } from "drizzle-orm";
+import { eq, and, sql, desc, gte, lt } from "drizzle-orm";
 
 export interface EarnParams {
   membershipId: string;
@@ -756,13 +756,14 @@ export async function reverseTransaction(
       .for("update");
 
     // Offsetting points delta
-    const reversalDelta = -original.pointsDelta;
-    let newBalance = lockedBalance.balance + reversalDelta;
+    let effectiveDelta = -original.pointsDelta;
+    let newBalance = lockedBalance.balance + effectiveDelta;
     let shortfallNote = params.note;
 
-    // Per Section 8.5 & Decision 8: Balance must never go below 0
+    // Per Section 8.5 & Decision 8: Balance must never go below 0 (clamp reduction to current balance)
     if (newBalance < 0) {
-      shortfallNote = `${params.note} [Shortfall capped: original reversal of ${reversalDelta} points adjusted to -${lockedBalance.balance}]`;
+      shortfallNote = `${params.note} [Shortfall capped: original reversal of ${effectiveDelta} points clamped to -${lockedBalance.balance}]`;
+      effectiveDelta = -lockedBalance.balance;
       newBalance = 0;
     }
 
@@ -772,7 +773,7 @@ export async function reverseTransaction(
         tenantId: ctx.tenantId!,
         membershipId: original.membershipId,
         type: "reverse",
-        pointsDelta: reversalDelta,
+        pointsDelta: effectiveDelta,
         relatedEntryId: original.id,
         locationId: original.locationId,
         actorUserId: ctx.userId,
@@ -882,7 +883,7 @@ export async function expirePendingRedemptions(executor: DbExecutor = db) {
     .where(
       and(
         eq(redemptions.status, "pending"),
-        sql`${redemptions.expiresAt} < ${now}`
+        lt(redemptions.expiresAt, now)
       )
     )
     .returning({ id: redemptions.id });

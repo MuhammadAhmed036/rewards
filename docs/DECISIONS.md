@@ -60,3 +60,10 @@ Record of architectural decisions and defaults chosen per Section 2 & 22 of the 
     - Tenant suspension requires a mandatory non-empty audit reason, terminates all active staff/owner sessions of the suspended tenant (`invalidateUserSessions`), and prevents all earn, preview-earn, and redemption activities with a `TENANT_SUSPENDED` error.
     - Historical ledger entries, balances, audit logs, and member profiles remain permanently preserved to satisfy UK accounting and compliance retention rules.
 
+14. **UK GDPR Privacy Compliance, Email Outbox & Scheduled Maintenance**:
+    - Customer Subject Access Request (SAR) export generates complete GDPR Article 15 JSON including profile, active memberships, balances, ledger history, consent records, and redemptions.
+    - Granular consent management provides opt-in/opt-out toggles for marketing and analytics with append-only audit trail in `consent_records`.
+    - Account deletion (Right to Erasure) pseudonymises PII (`[DELETED]`, `deleted-{id}@privacy.local`), immediately purges active sessions, soft-deletes memberships, and preserves financial transaction history in append-only `ledger_entries` for legal and tax compliance.
+    - Transactional emails are written to an atomic `email_outbox` table and dispatched reliably via SMTP (Nodemailer) with exponential backoff retry.
+    - Maintenance crons (`expire-redemptions`, `send-outbox`, `reconcile-balances`, `retention`) are secured with a shared `CRON_SECRET` bearer token.
+
