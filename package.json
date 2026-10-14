@@ -1,0 +1,52 @@
+{
+  "name": "loyalty-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/server/db/migrate.ts",
+    "db:push": "drizzle-kit push",
+    "db:seed": "tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@date-fns/tz": "^1.2.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "drizzle-orm": "^0.40.0",
+    "lucide-react": "^1.16.0",
+    "next": "15.5.27",
+    "pino": "^9.6.0",
+    "postgres": "^3.4.5",
+    "qrcode": "^1.5.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "recharts": "^2.15.1",
+    "sonner": "^2.0.1",
+    "tailwind-merge": "^3.0.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^22.13.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv": "^16.4.7",
+    "drizzle-kit": "^0.30.5",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.27",
+    "pino-pretty": "^13.0.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.19.3",
+    "typescript": "^5",
+    "vitest": "^3.0.7"
+  }
+}

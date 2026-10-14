@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: loyalty_app
+          POSTGRES_PASSWORD: loyalty_password
+          POSTGRES_DB: loyalty_db
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Approve build scripts
+        run: pnpm approve-builds --all
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgres://loyalty_app:loyalty_password@localhost:5434/loyalty_db
+          APP_URL: http://localhost:3000
+          AUTH_SECRET: dev_auth_secret_must_be_at_least_32_characters_long_12345
+          QR_SIGNING_SECRET: dev_qr_signing_secret_must_be_at_least_32_characters_12345
+          CRON_SECRET: dev_cron_secret_must_be_at_least_32_characters_long_12345
+        run: pnpm test
+
+      - name: Build
+        env:
+          DATABASE_URL: postgres://loyalty_app:loyalty_password@localhost:5434/loyalty_db
+          APP_URL: http://localhost:3000
+          AUTH_SECRET: dev_auth_secret_must_be_at_least_32_characters_long_12345
+          QR_SIGNING_SECRET: dev_qr_signing_secret_must_be_at_least_32_characters_12345
+          CRON_SECRET: dev_cron_secret_must_be_at_least_32_characters_long_12345
+        run: pnpm build

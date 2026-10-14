@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: loyalty-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: loyalty_app
+      POSTGRES_PASSWORD: loyalty_password
+      POSTGRES_DB: loyalty_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - loyalty_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loyalty_app -d loyalty_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: loyalty-mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025" # Web UI
+      - "1025:1025" # SMTP port
+    environment:
+      MP_MAX_MESSAGES: 500
+
+volumes:
+  loyalty_pgdata:
+
