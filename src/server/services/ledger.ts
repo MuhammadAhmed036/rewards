@@ -824,7 +824,7 @@ export async function reverseTransaction(
 // ==========================================
 
 export async function reconcileBalances(tenantId?: string) {
-  const query = db
+  const baseQuery = db
     .select({
       membershipId: ledgerEntries.membershipId,
       calculatedSum: sql<number>`SUM(points_delta)::int`,
@@ -835,14 +835,18 @@ export async function reconcileBalances(tenantId?: string) {
     .innerJoin(
       membershipBalances,
       eq(ledgerEntries.membershipId, membershipBalances.membershipId)
-    )
-    .groupBy(
-      ledgerEntries.membershipId,
-      membershipBalances.balance,
-      ledgerEntries.tenantId
     );
 
-  const rows = await query;
+  const query = tenantId
+    ? baseQuery.where(eq(ledgerEntries.tenantId, tenantId))
+    : baseQuery;
+
+  const rows = await query.groupBy(
+    ledgerEntries.membershipId,
+    membershipBalances.balance,
+    ledgerEntries.tenantId
+  );
+
   const discrepancies: Array<{
     membershipId: string;
     calculated: number;
@@ -851,7 +855,6 @@ export async function reconcileBalances(tenantId?: string) {
   }> = [];
 
   for (const row of rows) {
-    if (tenantId && row.tenantId !== tenantId) continue;
     if (row.calculatedSum !== row.recordedBalance) {
       discrepancies.push({
         membershipId: row.membershipId,

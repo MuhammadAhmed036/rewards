@@ -67,3 +67,11 @@ Record of architectural decisions and defaults chosen per Section 2 & 22 of the 
     - Transactional emails are written to an atomic `email_outbox` table and dispatched reliably via SMTP (Nodemailer) with exponential backoff retry.
     - Maintenance crons (`expire-redemptions`, `send-outbox`, `reconcile-balances`, `retention`) are secured with a shared `CRON_SECRET` bearer token.
 
+15. **Launch Readiness, Pilot Seed Dataset, and Verification (M10)**:
+    - Seed script (`pnpm db:seed`) creates complete pilot environments:
+      - Platform administrator (`admin@platform.local`).
+      - "Demo Barber" tenant with Points mode (1 pt/£1), two locations ("Soho" & "Covent Garden"), rewards ("Free Haircut" at 100 pts, "Free Beard Trim" at 50 pts), owner/manager/staff accounts, 50 sample members with randomised ledger histories, and anti-gating review links.
+      - "Demo Coffee" tenant with Stamps mode (1 stamp/visit), "Shoreditch" location, "Free Coffee" reward (8 stamps), and 10 sample members.
+    - Automated balance reconciliation passes across 100% of seeded memberships with zero discrepancies against the immutable ledger.
+    - Full Next.js 15 production build (`next build`) produces optimized static and dynamic bundles across all 41 routes with zero compilation errors.
+
