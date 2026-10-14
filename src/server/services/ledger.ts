@@ -465,7 +465,7 @@ export async function confirmRedemption(
   const hash = hashRedemptionCode(params.code);
 
   return await db.transaction(async (tx) => {
-    // 1. Find redemption by code hash
+    // 1. Find redemption by code hash with row-level lock FOR UPDATE to prevent race conditions
     const [redemption] = await tx
       .select()
       .from(redemptions)
@@ -475,6 +475,7 @@ export async function confirmRedemption(
           eq(redemptions.tenantId, ctx.tenantId!)
         )
       )
+      .for("update")
       .limit(1);
 
     if (!redemption) {
