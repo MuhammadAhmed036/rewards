@@ -7,6 +7,7 @@ export interface LogAuditParams {
   action: string;
   targetType: string;
   targetId: string;
+  tenantId?: string;
   reason?: string;
   metadata?: Record<string, unknown>;
 }
@@ -17,8 +18,13 @@ export async function logAuditEvent(
   executor: DbExecutor = db
 ): Promise<void> {
   try {
+    const effectiveTenantId =
+      params.tenantId ||
+      ctx.tenantId ||
+      (params.targetType === "tenant" ? params.targetId : null);
+
     await executor.insert(auditEvents).values({
-      tenantId: ctx.tenantId || null,
+      tenantId: effectiveTenantId,
       actorUserId: ctx.userId || null,
       action: params.action,
       targetType: params.targetType,
@@ -34,7 +40,7 @@ export async function logAuditEvent(
         action: params.action,
         targetType: params.targetType,
         targetId: params.targetId,
-        tenantId: ctx.tenantId,
+        tenantId: effectiveTenantId,
         actorUserId: ctx.userId,
       },
       `Audit: ${params.action}`

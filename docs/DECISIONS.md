@@ -54,3 +54,9 @@ Record of architectural decisions and defaults chosen per Section 2 & 22 of the 
     - Staff member role modification or revocation immediately triggers active session termination (`invalidateUserSessions`) ensuring revoked credentials cannot continue making staff terminal requests.
     - Manual balance adjustments require an explicit reason code and operational note, logging an attributable audit event and creating an attributable ledger entry. Reversals are floor-constrained at 0 per Decision 8.
 
+13. **Platform Admin Operations & Tenant Suspension Guarantees**:
+    - Platform admin endpoints are protected by `isPlatformAdmin: true` and `role: "platform_admin"`.
+    - Any inspection of tenant resources by platform admin records an attributable audit event (`admin.tenant_viewed`).
+    - Tenant suspension requires a mandatory non-empty audit reason, terminates all active staff/owner sessions of the suspended tenant (`invalidateUserSessions`), and prevents all earn, preview-earn, and redemption activities with a `TENANT_SUSPENDED` error.
+    - Historical ledger entries, balances, audit logs, and member profiles remain permanently preserved to satisfy UK accounting and compliance retention rules.
+

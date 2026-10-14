@@ -8,6 +8,7 @@ import {
   rewards,
   rewardLocations,
   redemptions,
+  tenants,
 } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
 import { calculatePoints, RuleConfig } from "@/lib/points";
@@ -39,6 +40,16 @@ export async function previewEarn(
 ) {
   assertCan(ctx, "ledger.earn", { locationId: params.locationId });
   if (!ctx.tenantId) throw new Error("tenantId required");
+
+  const [tenant] = await db
+    .select({ id: tenants.id, status: tenants.status })
+    .from(tenants)
+    .where(eq(tenants.id, ctx.tenantId))
+    .limit(1);
+
+  if (!tenant || tenant.status !== "active") {
+    throw new Error("TENANT_SUSPENDED: Business account is suspended");
+  }
 
   const [prog] = await db
     .select()
@@ -106,6 +117,17 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
   if (!ctx.tenantId) throw new Error("tenantId required");
 
   return await db.transaction(async (tx) => {
+    // 0. Verify tenant is active (Section 19: Suspended tenant cannot earn/redeem)
+    const [tenant] = await tx
+      .select({ id: tenants.id, status: tenants.status })
+      .from(tenants)
+      .where(eq(tenants.id, ctx.tenantId!))
+      .limit(1);
+
+    if (!tenant || tenant.status !== "active") {
+      throw new Error("TENANT_SUSPENDED: Business account is suspended");
+    }
+
     // 1. Idempotency check: if entry already exists with this idempotency key for this tenant, return it safely
     const [existingEntry] = await tx
       .select()
@@ -300,6 +322,17 @@ export async function requestRedemption(
   assertCan(ctx, "customer.redeem");
   if (!ctx.tenantId) throw new Error("tenantId required");
 
+  // Verify tenant is active
+  const [tenant] = await db
+    .select({ id: tenants.id, status: tenants.status })
+    .from(tenants)
+    .where(eq(tenants.id, ctx.tenantId))
+    .limit(1);
+
+  if (!tenant || tenant.status !== "active") {
+    throw new Error("TENANT_SUSPENDED: Business account is suspended");
+  }
+
   // Validate member & reward
   const [membership] = await db
     .select()
@@ -465,6 +498,17 @@ export async function confirmRedemption(
   const hash = hashRedemptionCode(params.code);
 
   return await db.transaction(async (tx) => {
+    // 0. Verify tenant is active
+    const [tenant] = await tx
+      .select({ id: tenants.id, status: tenants.status })
+      .from(tenants)
+      .where(eq(tenants.id, ctx.tenantId!))
+      .limit(1);
+
+    if (!tenant || tenant.status !== "active") {
+      throw new Error("TENANT_SUSPENDED: Business account is suspended");
+    }
+
     // 1. Find redemption by code hash with row-level lock FOR UPDATE to prevent race conditions
     const [redemption] = await tx
       .select()
