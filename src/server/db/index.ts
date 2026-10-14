@@ -26,6 +26,10 @@ if (process.env.NODE_ENV !== "production") {
 
 export const db = drizzle(queryClient, { schema });
 
+export type DbClient = typeof db;
+export type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type DbExecutor = DbClient | DbTransaction;
+
 /**
  * Executes a callback within a transaction scoping the PostgreSQL session to the specified tenant.
  * Sets `app.tenant_id` which enforces Row Level Security (RLS) policies.
