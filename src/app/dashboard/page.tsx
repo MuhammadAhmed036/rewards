@@ -324,22 +324,22 @@ export default function OwnerDashboardPage() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top Enterprise Bar */}
-      <header className="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+      {/* Top Enterprise Bar (Light Theme) */}
+      <header className="h-16 border-b border-slate-200 bg-white/95 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center font-black text-sm shadow-md shadow-indigo-600/30 border border-indigo-400/20">
+          <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-indigo-600/20">
             LP
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm text-white tracking-tight">Enterprise Loyalty ERP</span>
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="font-extrabold text-sm text-slate-900 tracking-tight">Enterprise Loyalty ERP</span>
+              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 Active Production
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
+            <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
               PostgreSQL Double-Entry • UK Minor Pence Engine
             </p>
           </div>
@@ -349,17 +349,17 @@ export default function OwnerDashboardPage() {
         <div className="flex items-center gap-2.5">
           <Link
             href="/staff"
-            className="hidden md:inline-flex items-center gap-1.5 text-xs font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-3 py-1.5 rounded-xl transition-all shadow-sm"
+            className="hidden md:inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-xl transition-all shadow-2xs"
           >
-            <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+            <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
             <span>Open Staff Scanner</span>
           </Link>
 
           <button
             onClick={() => handleTabChange("reports")}
-            className="hidden lg:inline-flex items-center gap-1.5 text-xs font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700/80 border border-slate-700 px-3 py-1.5 rounded-xl transition-all shadow-sm cursor-pointer"
+            className="hidden lg:inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer"
           >
-            <FileDown className="w-3.5 h-3.5 text-indigo-400" />
+            <FileDown className="w-3.5 h-3.5 text-indigo-600" />
             <span>Export Audit Pack</span>
           </button>
 
@@ -368,7 +368,7 @@ export default function OwnerDashboardPage() {
               await fetch("/api/v1/auth/logout", { method: "POST" });
               window.location.href = "/login";
             }}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-400 hover:text-rose-300 bg-rose-950/30 hover:bg-rose-950/60 border border-rose-800/60 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Sign Out</span>
@@ -377,16 +377,16 @@ export default function OwnerDashboardPage() {
       </header>
 
       <div className="flex flex-1 flex-col md:flex-row">
-        {/* Left ERP Sidebar */}
-        <aside className="w-full md:w-64 border-r border-slate-800/80 bg-slate-900/60 p-4 shrink-0 flex flex-col justify-between">
+        {/* Left ERP Sidebar (Light Theme) */}
+        <aside className="w-full md:w-64 border-r border-slate-200 bg-white p-4 shrink-0 flex flex-col justify-between">
           <div>
-            <div className="px-3 py-2 mb-3">
+            <div className="px-3 py-2 mb-2">
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">
                 Command Console
               </span>
             </div>
 
-            <nav className="space-y-1.5">
+            <nav className="space-y-1">
               {[
                 { id: "overview", label: "Executive Overview", icon: LayoutDashboard },
                 { id: "members", label: "Customer Members", icon: Users },
@@ -404,15 +404,15 @@ export default function OwnerDashboardPage() {
                     onClick={() => handleTabChange(item.id as typeof activeTab)}
                     className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       isActive
-                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30 border border-indigo-400/30"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                        ? "bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <Icon className="w-4 h-4" />
+                      <Icon className={`w-4 h-4 ${isActive ? "text-indigo-600" : "text-slate-400"}`} />
                       <span>{item.label}</span>
                     </div>
-                    {isActive && <ChevronRight className="w-3.5 h-3.5" />}
+                    {isActive && <ChevronRight className="w-3.5 h-3.5 text-indigo-600" />}
                   </button>
                 );
               })}
@@ -420,27 +420,27 @@ export default function OwnerDashboardPage() {
           </div>
 
           {/* Quick System Telemetry in Sidebar */}
-          <div className="pt-4 border-t border-slate-800/80 px-2 space-y-3">
-            <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] space-y-1">
-              <div className="flex items-center justify-between text-slate-400">
+          <div className="pt-4 border-t border-slate-100 px-2 space-y-3">
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] space-y-1.5">
+              <div className="flex items-center justify-between text-slate-600">
                 <span>Ledger Integrity</span>
-                <span className="text-emerald-400 font-bold">100% Valid</span>
+                <span className="text-emerald-600 font-bold">100% Valid</span>
               </div>
-              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
                 <div className="w-full h-full bg-emerald-500 rounded-full"></div>
               </div>
-              <p className="text-[10px] text-slate-500 pt-0.5">Append-only triggers active</p>
+              <p className="text-[10px] text-slate-400">Append-only triggers active</p>
             </div>
 
-            <div className="text-[11px] text-slate-400 flex items-center justify-between px-1">
+            <div className="text-[11px] text-slate-500 flex items-center justify-between px-1">
               <span>Environment</span>
-              <span className="font-mono text-indigo-400 font-semibold">UK-PROD-01</span>
+              <span className="font-mono text-indigo-600 font-bold">UK-PROD-01</span>
             </div>
           </div>
         </aside>
 
         {/* Main Command Center Body */}
-        <main className="flex-1 p-6 md:p-8 max-w-7xl overflow-y-auto">
+        <main className="flex-1 p-6 md:p-8 max-w-7xl overflow-y-auto bg-slate-50">
           {/* ======================================================== */}
           {/* TAB 1: EXECUTIVE OVERVIEW                                */}
           {/* ======================================================== */}
@@ -448,14 +448,14 @@ export default function OwnerDashboardPage() {
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                  <h2 className="text-2xl font-black text-white tracking-tight">Executive Programme Overview</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <h2 className="text-2xl font-black text-slate-950 tracking-tight">Executive Programme Overview</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Live operational metrics reconciled with your immutable double-entry ledger.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={loadOverview} className="bg-slate-900 border-slate-700 text-xs font-bold text-slate-200">
-                    <RefreshCw className="h-3.5 w-3.5 mr-1.5 text-indigo-400" />
+                  <Button variant="outline" size="sm" onClick={loadOverview} className="bg-white border-slate-300 text-xs font-bold text-slate-700 shadow-2xs">
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5 text-indigo-600" />
                     Re-Sync Ledger
                   </Button>
                 </div>
@@ -463,106 +463,106 @@ export default function OwnerDashboardPage() {
 
               {/* 4 Executive KPI Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-all">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="font-extrabold uppercase tracking-wider text-[10px]">Total Members</span>
-                    <span className="text-emerald-400 font-bold flex items-center gap-0.5">
+                    <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
                       <TrendingUp className="w-3 h-3" /> +18.4%
                     </span>
                   </div>
-                  <div className="text-3xl font-black text-white mt-1.5 tabular-nums">
+                  <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
                     {metrics?.totalMembers || 0}
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
                     <span>Enrolled Customers</span>
-                    <span className="text-emerald-400 font-semibold">Active RLS</span>
+                    <span className="text-emerald-600 font-semibold">Active RLS</span>
                   </div>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-all">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="font-extrabold uppercase tracking-wider text-[10px]">30-Day Active</span>
-                    <span className="text-indigo-400 font-bold flex items-center gap-0.5">
+                    <span className="text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
                       <TrendingUp className="w-3 h-3" /> +24.1%
                     </span>
                   </div>
-                  <div className="text-3xl font-black text-white mt-1.5 tabular-nums">
+                  <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
                     {metrics?.activeMembers30d || 0}
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
                     <span>Recent Shoppers</span>
-                    <span className="text-indigo-400 font-semibold">High Retention</span>
+                    <span className="text-indigo-600 font-semibold">High Retention</span>
                   </div>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-all">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="font-extrabold uppercase tracking-wider text-[10px]">Points Liability</span>
-                    <span className="text-violet-400 font-bold">Unredeemed</span>
+                    <span className="text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-bold">Unredeemed</span>
                   </div>
-                  <div className="text-3xl font-black text-violet-400 mt-1.5 tabular-nums">
+                  <div className="text-3xl font-black text-purple-700 mt-1.5 tabular-nums">
                     {metrics?.outstandingPoints || 0} <span className="text-sm font-semibold text-slate-400">pts</span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-800/80">
-                    <span>Redemption Value</span>
-                    <span className="text-slate-300 font-mono">£{((metrics?.outstandingPoints || 0) * 0.05).toFixed(2)}</span>
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
+                    <span>Estimated Cost</span>
+                    <span className="text-slate-700 font-mono font-bold">£{((metrics?.outstandingPoints || 0) * 0.05).toFixed(2)}</span>
                   </div>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-all">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
                     <span className="font-extrabold uppercase tracking-wider text-[10px]">Review Clicks</span>
-                    <span className="text-amber-400 font-bold">4.9 ★ Rating</span>
+                    <span className="text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-bold">4.9 ★ Rating</span>
                   </div>
-                  <div className="text-3xl font-black text-amber-400 mt-1.5 tabular-nums">
+                  <div className="text-3xl font-black text-amber-700 mt-1.5 tabular-nums">
                     {metrics?.linkClicksTotal || 0}
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2 pt-2 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
                     <span>Google Reviews Hub</span>
-                    <span className="text-amber-400 font-semibold">Anti-Gating</span>
+                    <span className="text-amber-600 font-semibold">Anti-Gating</span>
                   </div>
                 </div>
               </div>
 
               {/* Enterprise Readiness & Governance Checklist */}
-              <div className="p-6 rounded-3xl bg-gradient-to-r from-indigo-950/40 via-slate-900/80 to-purple-950/30 border border-indigo-900/50">
+              <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-600/30 border border-indigo-500/40 text-indigo-400 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center">
                       <Sparkles className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">Enterprise Governance & Compliance Audit</h3>
-                      <p className="text-xs text-slate-400">All statutory UK retail loyalty checks are verified and enforced in software.</p>
+                      <h3 className="text-sm font-bold text-slate-900">Enterprise Governance & Compliance Audit</h3>
+                      <p className="text-xs text-slate-500">All statutory UK retail loyalty checks are verified and enforced in software.</p>
                     </div>
                   </div>
-                  <span className="text-xs font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-3 py-1 rounded-full">
+                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
                     3/3 Passed
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-bold text-white">Immutable Ledger Active</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">DB trigger prevents mutation or silent balance changes.</p>
+                      <p className="font-bold text-slate-900">Immutable Ledger Active</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">DB trigger prevents mutation or silent balance changes.</p>
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-bold text-white">Anti-Gating Compliance Verified</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Google Review link is never filtered by survey sentiment.</p>
+                      <p className="font-bold text-slate-900">Anti-Gating Compliance Verified</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Google Review link is never filtered by survey sentiment.</p>
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-bold text-white">UK Minor Units Engine</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Calculations run exclusively in pence to eliminate float drift.</p>
+                      <p className="font-bold text-slate-900">UK Minor Units Engine</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Calculations run exclusively in pence to eliminate float drift.</p>
                     </div>
                   </div>
                 </div>
@@ -577,30 +577,30 @@ export default function OwnerDashboardPage() {
             <div className="space-y-5">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                  <h2 className="text-2xl font-black text-white tracking-tight">Customer Member Directory</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">Manage customer profiles, lifetime points, and manual adjustments.</p>
+                  <h2 className="text-2xl font-black text-slate-950 tracking-tight">Customer Member Directory</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Manage customer profiles, lifetime points, and manual adjustments.</p>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <div className="relative flex-1 sm:w-72">
-                    <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
+                    <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
                     <Input
                       placeholder="Search member # or name..."
                       value={memberSearch}
                       onChange={(e) => setMemberSearch(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && loadMembers()}
-                      className="pl-9 bg-slate-900 border-slate-700 text-xs"
+                      className="pl-9 bg-white border-slate-300 text-xs"
                     />
                   </div>
-                  <Button size="sm" onClick={loadMembers} className="bg-indigo-600 hover:bg-indigo-500 font-bold text-xs">
+                  <Button size="sm" onClick={loadMembers} className="bg-indigo-600 hover:bg-indigo-700 font-bold text-xs text-white">
                     Search
                   </Button>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-xl">
+              <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-900/90 border-b border-slate-800 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
                       <tr>
                         <th className="p-4">Member #</th>
                         <th className="p-4">Customer Details</th>
@@ -611,40 +611,40 @@ export default function OwnerDashboardPage() {
                         <th className="p-4 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/80">
+                    <tbody className="divide-y divide-slate-100">
                       {members.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="p-8 text-center text-slate-500 text-xs">
+                          <td colSpan={7} className="p-8 text-center text-slate-400 text-xs">
                             No loyalty members found. Customers appear here as soon as they scan your QR code.
                           </td>
                         </tr>
                       ) : (
                         members.map((m) => (
-                          <tr key={m.id} className="hover:bg-slate-800/40 transition-colors">
-                            <td className="p-4 font-mono font-bold text-indigo-400">
+                          <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-4 font-mono font-bold text-indigo-600">
                               #{m.memberNumber}
                             </td>
                             <td className="p-4">
-                              <div className="font-bold text-white text-xs">{m.name || "Loyalty Member"}</div>
+                              <div className="font-bold text-slate-900 text-xs">{m.name || "Loyalty Member"}</div>
                               <div className="text-[11px] text-slate-400 font-mono">{m.email}</div>
                             </td>
                             <td className="p-4">
-                              <span className="font-black text-sm text-white">{m.balance}</span>{" "}
+                              <span className="font-black text-sm text-slate-900">{m.balance}</span>{" "}
                               <span className="text-[10px] text-slate-400 uppercase">pts</span>
                             </td>
-                            <td className="p-4 text-slate-400 font-mono">
+                            <td className="p-4 text-slate-500 font-mono">
                               {m.lifetimeEarned} pts
                             </td>
                             <td className="p-4">
-                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
                                 m.status === "active"
-                                  ? "bg-emerald-950/80 text-emerald-400 border-emerald-800/80"
-                                  : "bg-rose-950/80 text-rose-400 border-rose-800/80"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-rose-50 text-rose-700 border-rose-200"
                               }`}>
                                 {m.status}
                               </span>
                             </td>
-                            <td className="p-4 text-slate-400 text-[11px]">
+                            <td className="p-4 text-slate-500 text-[11px]">
                               {new Date(m.joinedAt).toLocaleDateString()}
                             </td>
                             <td className="p-4 text-right">
@@ -652,7 +652,7 @@ export default function OwnerDashboardPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setAdjustingMember(m)}
-                                className="bg-slate-900 border-slate-700 hover:bg-slate-800 text-xs font-semibold py-1 h-8"
+                                className="bg-white border-slate-300 hover:bg-slate-50 text-xs font-semibold py-1 h-8"
                               >
                                 Adjust Points
                               </Button>
@@ -674,32 +674,32 @@ export default function OwnerDashboardPage() {
             <div className="space-y-5">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                  <h2 className="text-2xl font-black text-white tracking-tight">Immutable Audit Ledger</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <h2 className="text-2xl font-black text-slate-950 tracking-tight">Immutable Audit Ledger</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Append-only ledger enforced by PostgreSQL triggers. Every transaction is permanently attributable.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="relative w-64">
-                    <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
+                    <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
                     <Input
                       placeholder="Filter ledger entries..."
                       value={ledgerSearch}
                       onChange={(e) => setLedgerSearch(e.target.value)}
-                      className="pl-9 bg-slate-900 border-slate-700 text-xs"
+                      className="pl-9 bg-white border-slate-300 text-xs"
                     />
                   </div>
-                  <Button variant="outline" size="sm" onClick={loadLedger} className="bg-slate-900 border-slate-700 text-xs font-bold">
-                    <RefreshCw className="h-3.5 w-3.5 mr-1.5 text-indigo-400" />
+                  <Button variant="outline" size="sm" onClick={loadLedger} className="bg-white border-slate-300 text-xs font-bold text-slate-700">
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5 text-indigo-600" />
                     Refresh
                   </Button>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-xl">
+              <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-900/90 border-b border-slate-800 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
                       <tr>
                         <th className="p-4">Timestamp (UTC)</th>
                         <th className="p-4">Action Type</th>
@@ -710,44 +710,44 @@ export default function OwnerDashboardPage() {
                         <th className="p-4 text-right">Reversal</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/80 font-mono">
+                    <tbody className="divide-y divide-slate-100 font-mono">
                       {filteredLedger.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="p-8 text-center text-slate-500 font-sans text-xs">
+                          <td colSpan={7} className="p-8 text-center text-slate-400 font-sans text-xs">
                             No ledger transactions recorded yet.
                           </td>
                         </tr>
                       ) : (
                         filteredLedger.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-slate-800/40 transition-colors">
-                            <td className="p-4 text-slate-400 text-[11px]">
+                          <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="p-4 text-slate-500 text-[11px]">
                               {new Date(tx.occurredAt).toLocaleString()}
                             </td>
                             <td className="p-4">
-                              <span className="font-sans font-bold uppercase text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-200 border border-slate-700">
+                              <span className="font-sans font-bold uppercase text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
                                 {tx.type}
                               </span>
                             </td>
-                            <td className="p-4 font-bold text-indigo-400">#{tx.memberNumber}</td>
-                            <td className="p-4 font-sans text-xs font-semibold text-indigo-300">
+                            <td className="p-4 font-bold text-indigo-600">#{tx.memberNumber}</td>
+                            <td className="p-4 font-sans text-xs font-semibold text-slate-800">
                               {tx.actorName || "System / Owner"}
                             </td>
                             <td className="p-4">
                               <span
                                 className={`font-black text-sm ${
-                                  tx.pointsDelta > 0 ? "text-emerald-400" : "text-rose-400"
+                                  tx.pointsDelta > 0 ? "text-emerald-600" : "text-rose-600"
                                 }`}
                               >
                                 {tx.pointsDelta > 0 ? `+${tx.pointsDelta}` : tx.pointsDelta}
                               </span>
                             </td>
-                            <td className="p-4 font-sans text-xs text-slate-400">{tx.note || "-"}</td>
+                            <td className="p-4 font-sans text-xs text-slate-500">{tx.note || "-"}</td>
                             <td className="p-4 text-right">
                               {tx.type !== "reverse" && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 text-xs font-bold"
+                                  className="text-rose-600 hover:bg-rose-50 hover:text-rose-700 text-xs font-bold"
                                   onClick={() => setReversingTx(tx)}
                                 >
                                   Reverse
@@ -770,22 +770,22 @@ export default function OwnerDashboardPage() {
           {activeTab === "links" && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">Review Links & Customer Hub Page</h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <h2 className="text-2xl font-black text-slate-950 tracking-tight">Review Links & Customer Hub Page</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
                   Configure your Google Review URL, Instagram, Facebook, and private feedback channels with live mobile preview.
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-900/60 flex items-center justify-between">
+              <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <p className="text-xs text-slate-300">
-                    <strong className="text-white">Anti-Gating Policy Verified:</strong> Your Google review links are presented equally to all customers regardless of prior ratings.
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <p className="text-xs text-slate-700">
+                    <strong className="text-slate-900">Anti-Gating Policy Verified:</strong> Your Google review links are presented equally to all customers regardless of prior ratings.
                   </p>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
                 <LinksAndPageEditor
                   businessName="Your Business"
                   brandPrimaryHex="#4f46e5"
@@ -809,15 +809,15 @@ export default function OwnerDashboardPage() {
           {activeTab === "qr" && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">Printable Signage & Counter Collateral</h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <h2 className="text-2xl font-black text-slate-950 tracking-tight">Printable Signage & Counter Collateral</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
                   Download high-resolution print-ready posters and counter tent cards for customer scan-to-join.
                 </p>
               </div>
 
               {qrData && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                  <div className="p-8 rounded-3xl bg-white text-slate-950 text-center shadow-2xl border-4 border-slate-800">
+                  <div className="p-8 rounded-3xl bg-white text-slate-950 text-center shadow-lg border border-slate-200">
                     <div className="text-xs font-black uppercase tracking-widest text-indigo-600 mb-2">
                       Scan To Join & Earn Rewards
                     </div>
@@ -832,15 +832,15 @@ export default function OwnerDashboardPage() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4">
-                      <h4 className="text-base font-bold text-white">Download High-Res Print Assets</h4>
-                      <p className="text-xs text-slate-400 leading-relaxed">
+                    <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm space-y-4">
+                      <h4 className="text-base font-bold text-slate-900">Download High-Res Print Assets</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed">
                         Vector-sharp QR graphic ready for professional print shops, A4 table tents, or window vinyl stickers.
                       </p>
                       <a
                         href={qrData.qrPng}
                         download="Join-QR-Poster.png"
-                        className="inline-flex w-full items-center justify-center font-bold px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all text-xs shadow-md shadow-indigo-600/30"
+                        className="inline-flex w-full items-center justify-center font-bold px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-all text-xs shadow-md shadow-indigo-600/25"
                       >
                         <Download className="h-4 w-4 mr-2" />
                         Download High-Res PNG File
@@ -859,20 +859,20 @@ export default function OwnerDashboardPage() {
             <div className="space-y-5">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                  <h2 className="text-2xl font-black text-white tracking-tight">Team & Staff Access Control</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <h2 className="text-2xl font-black text-slate-950 tracking-tight">Team & Staff Access Control</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Assign frontline cashier terminals, manager override privileges, and review team activity.
                   </p>
                 </div>
-                <Button onClick={() => setShowAddStaff(true)} className="bg-indigo-600 hover:bg-indigo-500 text-xs font-bold">
+                <Button onClick={() => setShowAddStaff(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold">
                   <Plus className="h-4 w-4 mr-1.5" />
                   Add Team Member
                 </Button>
               </div>
 
-              <div className="rounded-3xl border border-slate-800 bg-slate-900/60 overflow-hidden shadow-xl">
+              <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xs">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900/90 border-b border-slate-800 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
                     <tr>
                       <th className="p-4">Name</th>
                       <th className="p-4">Email Address</th>
@@ -881,21 +881,21 @@ export default function OwnerDashboardPage() {
                       <th className="p-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/80">
+                  <tbody className="divide-y divide-slate-100">
                     {team.map((s) => (
-                      <tr key={s.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="p-4 font-bold text-white text-xs">{s.name || "Staff Member"}</td>
-                        <td className="p-4 text-slate-400 font-mono text-xs">{s.email}</td>
+                      <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-4 font-bold text-slate-900 text-xs">{s.name || "Staff Member"}</td>
+                        <td className="p-4 text-slate-500 font-mono text-xs">{s.email}</td>
                         <td className="p-4">
-                          <span className="font-semibold uppercase text-[10px] px-2.5 py-1 rounded-full bg-slate-800 text-indigo-300 border border-slate-700">
+                          <span className="font-semibold uppercase text-[10px] px-2.5 py-1 rounded-full bg-slate-100 text-indigo-700 border border-slate-200">
                             {s.role}
                           </span>
                         </td>
                         <td className="p-4">
                           <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
                             s.status === "active"
-                              ? "bg-emerald-950/80 text-emerald-400 border-emerald-800/80"
-                              : "bg-rose-950/80 text-rose-400 border-rose-800/80"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-rose-50 text-rose-700 border-rose-200"
                           }`}>
                             {s.status}
                           </span>
@@ -926,64 +926,64 @@ export default function OwnerDashboardPage() {
           {activeTab === "reports" && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">Audited Data & CSV Reports</h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <h2 className="text-2xl font-black text-slate-950 tracking-tight">Audited Data & CSV Reports</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
                   Export reconciled reports for tax accounting, loyalty liability auditing, and UK GDPR Subject Access Requests.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between space-y-4">
+                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
                   <div>
-                    <div className="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 flex items-center justify-center mb-3">
                       <Receipt className="w-5 h-5" />
                     </div>
-                    <h3 className="text-base font-bold text-white">Ledger Transactions</h3>
-                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    <h3 className="text-base font-bold text-slate-900">Ledger Transactions</h3>
+                    <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                       Complete history of every earn, redeem, adjust, and reverse event with timestamp and staff attribution.
                     </p>
                   </div>
                   <a
                     href="/api/v1/owner/reports/export?type=ledger"
-                    className="inline-flex w-full items-center justify-center font-bold px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs shadow-md transition-colors"
+                    className="inline-flex w-full items-center justify-center font-bold px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs shadow-sm transition-colors"
                   >
                     <FileDown className="h-4 w-4 mr-2" />
                     Export Ledger CSV
                   </a>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between space-y-4">
+                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
                   <div>
-                    <div className="w-10 h-10 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mb-3">
                       <Users className="w-5 h-5" />
                     </div>
-                    <h3 className="text-base font-bold text-white">Customer Members</h3>
-                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    <h3 className="text-base font-bold text-slate-900">Customer Members</h3>
+                    <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                       Complete register of enrolled members, member numbers, current balances, and GDPR opt-in status.
                     </p>
                   </div>
                   <a
                     href="/api/v1/owner/reports/export?type=members"
-                    className="inline-flex w-full items-center justify-center font-bold px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs border border-slate-700 transition-colors"
+                    className="inline-flex w-full items-center justify-center font-bold px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 text-xs border border-slate-300 transition-colors"
                   >
                     <FileDown className="h-4 w-4 mr-2" />
                     Export Members CSV
                   </a>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between space-y-4">
+                <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
                   <div>
-                    <div className="w-10 h-10 rounded-xl bg-purple-600/20 text-purple-400 border border-purple-500/30 flex items-center justify-center mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center mb-3">
                       <CreditCard className="w-5 h-5" />
                     </div>
-                    <h3 className="text-base font-bold text-white">Redemptions Log</h3>
-                    <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    <h3 className="text-base font-bold text-slate-900">Redemptions Log</h3>
+                    <p className="text-xs text-slate-500 mt-2 leading-relaxed">
                       Record of all reward redemptions, costs, code last4, and staff validation timestamps.
                     </p>
                   </div>
                   <a
                     href="/api/v1/owner/reports/export?type=redemptions"
-                    className="inline-flex w-full items-center justify-center font-bold px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs border border-slate-700 transition-colors"
+                    className="inline-flex w-full items-center justify-center font-bold px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 text-xs border border-slate-300 transition-colors"
                   >
                     <FileDown className="h-4 w-4 mr-2" />
                     Export Redemptions CSV
@@ -995,37 +995,37 @@ export default function OwnerDashboardPage() {
         </main>
       </div>
 
-      {/* Adjust Points Modal */}
+      {/* Adjust Points Modal (Light Theme) */}
       {adjustingMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="max-w-md w-full p-6 rounded-3xl bg-slate-900 border border-slate-800 text-white shadow-2xl">
-            <h3 className="text-lg font-bold">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="max-w-md w-full p-6 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-950">
               Adjust Points: {adjustingMember.name || `#${adjustingMember.memberNumber}`}
             </h3>
-            <p className="text-xs text-slate-400 mt-1 mb-4">
-              Current balance: <span className="text-white font-bold">{adjustingMember.balance} pts</span>. Balance cannot drop below 0.
+            <p className="text-xs text-slate-500 mt-1 mb-4">
+              Current balance: <span className="text-slate-950 font-bold">{adjustingMember.balance} pts</span>. Balance cannot drop below 0.
             </p>
 
             <div className="space-y-3.5 text-xs">
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Points Delta (+ or -)</label>
+                <label className="font-bold text-slate-700 block mb-1">Points Delta (+ or -)</label>
                 <Input
                   type="number"
                   placeholder="e.g. 20 or -15"
                   value={adjustPoints}
                   onChange={(e) => setAdjustPoints(e.target.value)}
-                  className="bg-slate-950 border-slate-700 text-xs text-white"
+                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Reason Code</label>
+                <label className="font-bold text-slate-700 block mb-1">Reason Code</label>
                 <select
                   value={adjustReason}
                   onChange={(e) =>
                     setAdjustReason(e.target.value as "goodwill" | "correction" | "fraud_removal" | "other")
                   }
-                  className="w-full h-10 rounded-xl border border-slate-700 bg-slate-950 px-3 text-xs text-white"
+                  className="w-full h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs text-slate-900"
                 >
                   <option value="goodwill">Goodwill Bonus</option>
                   <option value="correction">Billing Correction</option>
@@ -1035,21 +1035,21 @@ export default function OwnerDashboardPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Operational Note (Mandatory)</label>
+                <label className="font-bold text-slate-700 block mb-1">Operational Note (Mandatory)</label>
                 <Input
                   placeholder="Explain why this adjustment is being made"
                   value={adjustNote}
                   onChange={(e) => setAdjustNote(e.target.value)}
-                  className="bg-slate-950 border-slate-700 text-xs text-white"
+                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
                 />
               </div>
 
               <div className="flex gap-2.5 pt-3">
-                <Button variant="outline" className="flex-1 bg-slate-800 border-slate-700 text-xs font-bold" onClick={() => setAdjustingMember(null)}>
+                <Button variant="outline" className="flex-1 bg-white border-slate-300 text-xs font-bold text-slate-700" onClick={() => setAdjustingMember(null)}>
                   Cancel
                 </Button>
                 <Button
-                  className="flex-1 font-bold text-xs bg-indigo-600 hover:bg-indigo-500"
+                  className="flex-1 font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
                   onClick={handleConfirmAdjust}
                   disabled={loading || !adjustPoints || !adjustNote}
                 >
@@ -1061,24 +1061,24 @@ export default function OwnerDashboardPage() {
         </div>
       )}
 
-      {/* Reverse Transaction Modal */}
+      {/* Reverse Transaction Modal (Light Theme) */}
       {reversingTx && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="max-w-md w-full p-6 rounded-3xl bg-slate-900 border border-slate-800 text-white shadow-2xl">
-            <h3 className="text-lg font-bold text-rose-400">Reverse Transaction</h3>
-            <p className="text-xs text-slate-400 mt-1 mb-4">
-              Reversing transaction of <span className="text-white font-bold">{reversingTx.pointsDelta} points</span> for #{reversingTx.memberNumber}.
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="max-w-md w-full p-6 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-2xl">
+            <h3 className="text-lg font-bold text-rose-600">Reverse Transaction</h3>
+            <p className="text-xs text-slate-500 mt-1 mb-4">
+              Reversing transaction of <span className="text-slate-900 font-bold">{reversingTx.pointsDelta} points</span> for #{reversingTx.memberNumber}.
             </p>
 
             <div className="space-y-3.5 text-xs">
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Reversal Reason</label>
+                <label className="font-bold text-slate-700 block mb-1">Reversal Reason</label>
                 <select
                   value={reverseReason}
                   onChange={(e) =>
                     setReverseReason(e.target.value as "correction" | "goodwill" | "fraud_removal" | "other")
                   }
-                  className="w-full h-10 rounded-xl border border-slate-700 bg-slate-950 px-3 text-xs text-white"
+                  className="w-full h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs text-slate-900"
                 >
                   <option value="correction">Mistaken Entry</option>
                   <option value="goodwill">Customer Goodwill</option>
@@ -1088,17 +1088,17 @@ export default function OwnerDashboardPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Audited Note (Mandatory)</label>
+                <label className="font-bold text-slate-700 block mb-1">Audited Note (Mandatory)</label>
                 <Input
                   placeholder="Reason for reversal"
                   value={reverseNote}
                   onChange={(e) => setReverseNote(e.target.value)}
-                  className="bg-slate-950 border-slate-700 text-xs text-white"
+                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
                 />
               </div>
 
               <div className="flex gap-2.5 pt-3">
-                <Button variant="outline" className="flex-1 bg-slate-800 border-slate-700 text-xs font-bold" onClick={() => setReversingTx(null)}>
+                <Button variant="outline" className="flex-1 bg-white border-slate-300 text-xs font-bold text-slate-700" onClick={() => setReversingTx(null)}>
                   Cancel
                 </Button>
                 <Button
@@ -1115,45 +1115,45 @@ export default function OwnerDashboardPage() {
         </div>
       )}
 
-      {/* Add Staff Modal */}
+      {/* Add Staff Modal (Light Theme) */}
       {showAddStaff && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="max-w-md w-full p-6 rounded-3xl bg-slate-900 border border-slate-800 text-white shadow-2xl">
-            <h3 className="text-lg font-bold">Add Team Member</h3>
-            <p className="text-xs text-slate-400 mt-1 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="max-w-md w-full p-6 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-950">Add Team Member</h3>
+            <p className="text-xs text-slate-500 mt-1 mb-4">
               Authorize staff or manager terminal login for this business.
             </p>
 
             <div className="space-y-3.5 text-xs">
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Full Name</label>
+                <label className="font-bold text-slate-700 block mb-1">Full Name</label>
                 <Input
                   placeholder="e.g. John Doe"
                   value={newStaffName}
                   onChange={(e) => setNewStaffName(e.target.value)}
-                  className="bg-slate-950 border-slate-700 text-xs text-white"
+                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Email Address</label>
+                <label className="font-bold text-slate-700 block mb-1">Email Address</label>
                 <Input
                   type="email"
                   placeholder="staff@example.com"
                   value={newStaffEmail}
                   onChange={(e) => setNewStaffEmail(e.target.value)}
-                  className="bg-slate-950 border-slate-700 text-xs text-white"
+                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Assigned Role</label>
+                <label className="font-bold text-slate-700 block mb-1">Assigned Role</label>
                 <select
                   value={newStaffRole}
                   onChange={(e) =>
                     setNewStaffRole(e.target.value as "staff" | "manager" | "marketing")
                   }
-                  className="w-full h-10 rounded-xl border border-slate-700 bg-slate-950 px-3 text-xs text-white"
+                  className="w-full h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs text-slate-900"
                 >
                   <option value="staff">Staff (Terminal Earn & Redeem)</option>
                   <option value="manager">Manager (Adjustments & Reports)</option>
@@ -1162,25 +1162,25 @@ export default function OwnerDashboardPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-300 block mb-1">Login Password (Hand to Staff)</label>
+                <label className="font-bold text-slate-700 block mb-1">Login Password (Hand to Staff)</label>
                 <Input
                   type="text"
                   placeholder="e.g. Password123!"
                   value={newStaffPassword}
                   onChange={(e) => setNewStaffPassword(e.target.value)}
-                  className="bg-slate-950 border-slate-700 text-xs text-white font-mono"
+                  className="bg-slate-50 border-slate-300 text-xs text-slate-900 font-mono"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Staff will use this password along with their email to log in at <code className="text-indigo-400">/staff</code>.
+                  Staff will use this password along with their email to log in at <code className="text-indigo-600 font-semibold">/staff</code>.
                 </p>
               </div>
 
               <div className="flex gap-2.5 pt-3">
-                <Button variant="outline" className="flex-1 bg-slate-800 border-slate-700 text-xs font-bold" onClick={() => setShowAddStaff(false)}>
+                <Button variant="outline" className="flex-1 bg-white border-slate-300 text-xs font-bold text-slate-700" onClick={() => setShowAddStaff(false)}>
                   Cancel
                 </Button>
                 <Button
-                  className="flex-1 font-bold text-xs bg-indigo-600 hover:bg-indigo-500"
+                  className="flex-1 font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
                   onClick={handleAddStaff}
                   disabled={loading || !newStaffEmail || !newStaffName}
                 >

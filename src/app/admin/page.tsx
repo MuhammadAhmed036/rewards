@@ -290,28 +290,28 @@ export default function PlatformAdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
       {/* Top Header */}
-      <header className="border-b border-slate-800 bg-slate-900/70 backdrop-blur sticky top-0 z-30">
+      <header className="border-b border-slate-200 bg-white/95 backdrop-blur sticky top-0 z-30 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded-xl">
+            <div className="p-2 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-xl">
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-base font-bold text-white leading-tight">Platform Admin Console</h1>
-              <p className="text-xs text-slate-400">UK Loyalty Platform System Management</p>
+              <h1 className="text-base font-bold text-slate-950 leading-tight">Platform Admin Console</h1>
+              <p className="text-xs text-slate-500">UK Loyalty Platform System Management</p>
             </div>
           </div>
 
           {/* Navigation Tabs */}
-          <nav className="flex space-x-1 p-1 bg-slate-800/80 rounded-xl border border-slate-700">
+          <nav className="flex space-x-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
             <button
               onClick={() => setTab("tenants")}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 tab === "tenants"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-white text-indigo-700 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <Building2 className="w-4 h-4" />
@@ -319,10 +319,10 @@ export default function PlatformAdminPage() {
             </button>
             <button
               onClick={() => setTab("health")}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 tab === "health"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-white text-indigo-700 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <Activity className="w-4 h-4" />
@@ -330,10 +330,10 @@ export default function PlatformAdminPage() {
             </button>
             <button
               onClick={() => setTab("audit")}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 tab === "audit"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-white"
+                  ? "bg-white text-indigo-700 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <History className="w-4 h-4" />
@@ -347,7 +347,7 @@ export default function PlatformAdminPage() {
               window.location.href = "/login";
             }}
             title="Sign Out"
-            className="flex items-center space-x-1.5 text-xs text-rose-400 hover:text-rose-300 font-semibold px-3 py-1.5 rounded-lg border border-rose-500/30 hover:bg-rose-500/10 transition-colors ml-3 cursor-pointer"
+            className="flex items-center space-x-1.5 text-xs text-rose-600 hover:text-rose-700 font-semibold px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 transition-colors ml-3 cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Sign Out</span>
@@ -362,65 +362,65 @@ export default function PlatformAdminPage() {
           <div className="space-y-6">
             {/* Enterprise Platform Overview KPIs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                <div className="flex items-center justify-between text-xs text-slate-500">
                   <span className="font-extrabold uppercase tracking-wider text-[10px]">Total Businesses</span>
-                  <span className="text-emerald-400 font-bold">{tenants.filter((t) => t.status === "active").length} Active</span>
+                  <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-bold">{tenants.filter((t) => t.status === "active").length} Active</span>
                 </div>
-                <div className="text-3xl font-black text-white mt-1.5 tabular-nums">
+                <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
                   {tenants.length}
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">Multi-tenant database isolates</p>
+                <p className="text-[11px] text-slate-400 mt-1">Multi-tenant database isolates</p>
               </div>
 
-              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                <div className="flex items-center justify-between text-xs text-slate-500">
                   <span className="font-extrabold uppercase tracking-wider text-[10px]">Active Locations</span>
-                  <span className="text-indigo-400 font-bold">UK Network</span>
+                  <span className="text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded font-bold">UK Network</span>
                 </div>
-                <div className="text-3xl font-black text-white mt-1.5 tabular-nums">
+                <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
                   {tenants.reduce((acc, t) => acc + (t.stats?.locationCount || 0), 0)}
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">Cashier terminal branches</p>
+                <p className="text-[11px] text-slate-400 mt-1">Cashier terminal branches</p>
               </div>
 
-              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                <div className="flex items-center justify-between text-xs text-slate-500">
                   <span className="font-extrabold uppercase tracking-wider text-[10px]">Platform Members</span>
-                  <span className="text-violet-400 font-bold">Cross-Tenant</span>
+                  <span className="text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded font-bold">Cross-Tenant</span>
                 </div>
-                <div className="text-3xl font-black text-white mt-1.5 tabular-nums">
+                <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
                   {tenants.reduce((acc, t) => acc + (t.stats?.memberCount || 0), 0).toLocaleString()}
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">Enrolled customer passes</p>
+                <p className="text-[11px] text-slate-400 mt-1">Enrolled customer passes</p>
               </div>
 
-              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
-                <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                <div className="flex items-center justify-between text-xs text-slate-500">
                   <span className="font-extrabold uppercase tracking-wider text-[10px]">Ledger Points Liability</span>
-                  <span className="text-amber-400 font-bold">Audited</span>
+                  <span className="text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-bold">Audited</span>
                 </div>
-                <div className="text-3xl font-black text-amber-400 mt-1.5 tabular-nums">
+                <div className="text-3xl font-black text-amber-700 mt-1.5 tabular-nums">
                   {tenants.reduce((acc, t) => acc + (t.stats?.outstandingPoints || 0), 0).toLocaleString()} <span className="text-sm font-semibold text-slate-400">pts</span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">Total points outstanding</p>
+                <p className="text-[11px] text-slate-400 mt-1">Total points outstanding</p>
               </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
               <div className="flex items-center space-x-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-80">
-                  <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-500" />
+                  <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-400" />
                   <Input
                     placeholder="Search by business name or slug..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && fetchTenants()}
-                    className="pl-9 bg-slate-900 border-slate-800 text-slate-200"
+                    className="pl-9 bg-white border-slate-300 text-slate-900"
                   />
                 </div>
-                <Button variant="outline" onClick={fetchTenants} className="border-slate-800">
-                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                <Button variant="outline" onClick={fetchTenants} className="border-slate-300 bg-white">
+                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-indigo-600" : ""}`} />
                 </Button>
               </div>
 
@@ -428,7 +428,7 @@ export default function PlatformAdminPage() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 min-h-[40px]"
+                  className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-700 min-h-[40px]"
                 >
                   <option value="">All Statuses</option>
                   <option value="active">Active Only</option>
@@ -438,7 +438,7 @@ export default function PlatformAdminPage() {
 
                 <Button
                   onClick={() => setShowAddModal(true)}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs min-h-[40px] px-4 rounded-xl flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 cursor-pointer"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs min-h-[40px] px-4 rounded-xl flex items-center gap-1.5 shadow-md shadow-indigo-600/25 cursor-pointer"
                 >
                   <PlusCircle className="w-4 h-4" />
                   <span>+ Add Business</span>
@@ -447,36 +447,36 @@ export default function PlatformAdminPage() {
             </div>
 
             {/* Tenants Table */}
-            <Card className="bg-slate-900 border-slate-800 overflow-hidden shadow-2xl rounded-3xl">
+            <Card className="bg-white border-slate-200 overflow-hidden shadow-xs rounded-3xl">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-300">
-                  <thead className="bg-slate-800/60 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <table className="w-full text-left text-sm text-slate-900">
+                  <thead className="bg-slate-50 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="px-6 py-3">Business</th>
-                      <th className="px-6 py-3">Slug</th>
-                      <th className="px-6 py-3">Plan</th>
-                      <th className="px-6 py-3">Members</th>
-                      <th className="px-6 py-3">Locations</th>
-                      <th className="px-6 py-3">Liability</th>
-                      <th className="px-6 py-3">Status</th>
-                      <th className="px-6 py-3 text-right">Actions</th>
+                      <th className="px-6 py-3.5">Business</th>
+                      <th className="px-6 py-3.5">Slug</th>
+                      <th className="px-6 py-3.5">Plan</th>
+                      <th className="px-6 py-3.5">Members</th>
+                      <th className="px-6 py-3.5">Locations</th>
+                      <th className="px-6 py-3.5">Liability</th>
+                      <th className="px-6 py-3.5">Status</th>
+                      <th className="px-6 py-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-slate-100">
                     {tenants.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-6 py-12 text-center text-slate-500">
+                        <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
                           {loading ? "Loading tenants..." : "No tenants found."}
                         </td>
                       </tr>
                     ) : (
                       tenants.map((t) => (
-                        <tr key={t.id} className="hover:bg-slate-800/40 transition">
-                          <td className="px-6 py-4 font-semibold text-white">
+                        <tr key={t.id} className="hover:bg-slate-50 transition">
+                          <td className="px-6 py-4 font-semibold text-slate-900">
                             <div>{t.name}</div>
-                            <div className="text-xs text-slate-500">{t.industry || "General"}</div>
+                            <div className="text-xs text-slate-400">{t.industry || "General"}</div>
                           </td>
-                          <td className="px-6 py-4 font-mono text-xs text-indigo-400">
+                          <td className="px-6 py-4 font-mono text-xs text-indigo-600 font-bold">
                             /b/{t.slug}
                           </td>
                           <td className="px-6 py-4">
@@ -484,25 +484,25 @@ export default function PlatformAdminPage() {
                               variant="outline"
                               className={
                                 t.plan === "pro"
-                                  ? "border-amber-500/50 text-amber-400 bg-amber-500/10"
-                                  : "border-slate-700 text-slate-400"
+                                  ? "border-amber-300 text-amber-700 bg-amber-50"
+                                  : "border-slate-200 text-slate-600 bg-slate-50"
                               }
                             >
                               {t.plan.toUpperCase()}
                             </Badge>
                           </td>
-                          <td className="px-6 py-4 text-slate-300">{t.stats.memberCount}</td>
-                          <td className="px-6 py-4 text-slate-300">{t.stats.locationCount}</td>
-                          <td className="px-6 py-4 font-mono text-xs text-slate-300">
+                          <td className="px-6 py-4 text-slate-700 font-bold">{t.stats.memberCount}</td>
+                          <td className="px-6 py-4 text-slate-700">{t.stats.locationCount}</td>
+                          <td className="px-6 py-4 font-mono text-xs text-slate-700 font-semibold">
                             {t.stats.outstandingPoints.toLocaleString()} pts
                           </td>
                           <td className="px-6 py-4">
                             {t.status === "active" ? (
-                              <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                              <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 Active
                               </Badge>
                             ) : t.status === "suspended" ? (
-                              <Badge className="bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                              <Badge className="bg-rose-50 text-rose-700 border border-rose-200">
                                 Suspended
                               </Badge>
                             ) : (
@@ -573,60 +573,60 @@ export default function PlatformAdminPage() {
             {health && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Database Card */}
-                <Card className="bg-slate-900 border-slate-800 p-6 space-y-4">
+                <Card className="bg-white border-slate-200 p-6 space-y-4 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       Database Health
                     </span>
-                    <Server className="w-5 h-5 text-indigo-400" />
+                    <Server className="w-5 h-5 text-indigo-600" />
                   </div>
                   <div className="flex items-center space-x-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    <span className="text-xl font-bold text-white capitalize">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <span className="text-xl font-bold text-slate-950 capitalize">
                       {health.database.status}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-400">
+                  <div className="text-xs text-slate-500">
                     Ping Latency:{" "}
-                    <span className="text-emerald-400 font-mono font-bold">
+                    <span className="text-emerald-700 font-mono font-bold">
                       {health.database.latencyMs} ms
                     </span>
                   </div>
                 </Card>
 
                 {/* Email Outbox Card */}
-                <Card className="bg-slate-900 border-slate-800 p-6 space-y-4">
+                <Card className="bg-white border-slate-200 p-6 space-y-4 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       Email Outbox Queue
                     </span>
-                    <Mail className="w-5 h-5 text-indigo-400" />
+                    <Mail className="w-5 h-5 text-indigo-600" />
                   </div>
-                  <div className="text-2xl font-bold text-white">
+                  <div className="text-2xl font-bold text-slate-950">
                     {health.outbox.queued}{" "}
                     <span className="text-xs font-normal text-slate-400">queued</span>
                   </div>
-                  <div className="flex justify-between text-xs text-slate-400 pt-2 border-t border-slate-800">
+                  <div className="flex justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
                     <span>Sent: {health.outbox.sent}</span>
                     <span>Dead: {health.outbox.dead}</span>
                   </div>
                 </Card>
 
                 {/* Tenants Breakdown */}
-                <Card className="bg-slate-900 border-slate-800 p-6 space-y-4">
+                <Card className="bg-white border-slate-200 p-6 space-y-4 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       Platform Tenants
                     </span>
-                    <Building2 className="w-5 h-5 text-indigo-400" />
+                    <Building2 className="w-5 h-5 text-indigo-600" />
                   </div>
-                  <div className="text-2xl font-bold text-white">
+                  <div className="text-2xl font-bold text-slate-950">
                     {health.tenants.total}{" "}
                     <span className="text-xs font-normal text-slate-400">total businesses</span>
                   </div>
-                  <div className="flex justify-between text-xs text-slate-400 pt-2 border-t border-slate-800">
-                    <span className="text-emerald-400">Active: {health.tenants.active}</span>
-                    <span className="text-rose-400">Suspended: {health.tenants.suspended}</span>
+                  <div className="flex justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+                    <span className="text-emerald-600 font-semibold">Active: {health.tenants.active}</span>
+                    <span className="text-rose-600 font-semibold">Suspended: {health.tenants.suspended}</span>
                   </div>
                 </Card>
               </div>
@@ -638,16 +638,16 @@ export default function PlatformAdminPage() {
         {tab === "audit" && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-white">Global Platform Audit Trail</h2>
-              <Button variant="outline" onClick={fetchAuditLogs} className="border-slate-800">
-                <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+              <h2 className="text-lg font-bold text-slate-950">Global Platform Audit Trail</h2>
+              <Button variant="outline" onClick={fetchAuditLogs} className="border-slate-300 bg-white">
+                <RefreshCw className="w-4 h-4 mr-2 text-indigo-600" /> Refresh
               </Button>
             </div>
 
-            <Card className="bg-slate-900 border-slate-800 overflow-hidden">
+            <Card className="bg-white border-slate-200 overflow-hidden shadow-xs rounded-3xl">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-300">
-                  <thead className="bg-slate-800/60 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <table className="w-full text-left text-sm text-slate-700">
+                  <thead className="bg-slate-50 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                     <tr>
                       <th className="px-6 py-3">Timestamp (UTC)</th>
                       <th className="px-6 py-3">Action</th>
@@ -656,29 +656,29 @@ export default function PlatformAdminPage() {
                       <th className="px-6 py-3">Reason / Details</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-slate-100">
                     {auditLogs.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                        <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                           No audit log entries recorded.
                         </td>
                       </tr>
                     ) : (
                       auditLogs.map((log) => (
-                        <tr key={log.id} className="hover:bg-slate-800/40 transition">
-                          <td className="px-6 py-3 text-xs font-mono text-slate-400">
+                        <tr key={log.id} className="hover:bg-slate-50 transition">
+                          <td className="px-6 py-3 text-xs font-mono text-slate-500">
                             {new Date(log.createdAt).toISOString()}
                           </td>
-                          <td className="px-6 py-3 font-semibold text-indigo-400 text-xs">
+                          <td className="px-6 py-3 font-semibold text-indigo-600 text-xs">
                             {log.action}
                           </td>
-                          <td className="px-6 py-3 text-xs text-slate-300">
+                          <td className="px-6 py-3 text-xs text-slate-900 font-medium">
                             {log.actorEmail || "System"}
                           </td>
-                          <td className="px-6 py-3 text-xs font-mono text-slate-400">
+                          <td className="px-6 py-3 text-xs font-mono text-slate-500">
                             {log.targetType}:{log.targetId.slice(0, 8)}...
                           </td>
-                          <td className="px-6 py-3 text-xs text-slate-400">
+                          <td className="px-6 py-3 text-xs text-slate-600">
                             {log.reason || "—"}
                           </td>
                         </tr>

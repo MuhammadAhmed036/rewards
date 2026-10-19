@@ -128,31 +128,44 @@ export default function CustomerMePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 py-10 px-4 sm:px-6">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 py-10 px-4 sm:px-6 selection:bg-indigo-500 selection:text-white">
       <div className="max-w-3xl mx-auto space-y-8">
+        {/* Navigation Breadcrumb */}
+        <div className="flex items-center justify-between">
+          <Link
+            href="/"
+            className="text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors inline-flex items-center gap-1.5"
+          >
+            ← Back to Platform Homepage
+          </Link>
+          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+            UK GDPR Compliant Profile
+          </span>
+        </div>
+
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-600/10 text-indigo-600 flex items-center justify-center font-bold text-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/90 pb-6">
+          <div className="flex items-center space-x-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xl shadow-2xs">
               <User className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Account & Privacy Centre</h1>
-              <p className="text-sm text-slate-500">{profile?.email}</p>
+              <h1 className="text-2xl font-black tracking-tight text-slate-900">Account & Privacy Centre</h1>
+              <p className="text-xs text-slate-500 font-medium">{profile?.email}</p>
             </div>
           </div>
           <a
             href="/api/v1/customer/me/export"
-            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 shadow-sm hover:bg-slate-100 transition"
+            className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-xs font-bold bg-white border border-slate-300 shadow-2xs hover:bg-slate-50 hover:border-indigo-400 transition cursor-pointer text-slate-800"
           >
-            <FileDown className="w-4 h-4 mr-2 text-indigo-500" />
+            <FileDown className="w-4 h-4 mr-2 text-indigo-600" />
             Export My Data (JSON)
           </a>
         </div>
 
         {message && (
-          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl text-sm flex items-center space-x-2">
-            <CheckCircle2 className="w-4 h-4" />
+          <div className="p-3.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-2xl text-xs font-semibold flex items-center space-x-2 shadow-2xs">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{message}</span>
           </div>
         )}
@@ -160,56 +173,57 @@ export default function CustomerMePage() {
         {/* Section: Your Memberships */}
         <section className="space-y-4">
           <div className="flex items-center space-x-2">
-            <Building2 className="w-5 h-5 text-indigo-500" />
-            <h2 className="text-lg font-bold">Your Loyalty Memberships</h2>
+            <Building2 className="w-5 h-5 text-indigo-600" />
+            <h2 className="text-base font-black text-slate-900">Your Active Loyalty Passes</h2>
           </div>
 
           {memberships.length === 0 ? (
-            <Card className="p-8 text-center bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500">
-              You have not joined any loyalty programmes yet.
-            </Card>
+            <div className="p-8 text-center bg-white border border-slate-200/90 rounded-3xl text-slate-400 text-xs shadow-2xs">
+              You have not joined any loyalty programmes yet. Scan a business QR code or visit their hub to join.
+            </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {memberships.map((m) => (
-                <Card
+                <div
                   key={m.id}
-                  className="p-5 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-4"
+                  className="p-5 bg-white border border-slate-200/90 rounded-3xl shadow-sm space-y-4 hover:border-indigo-300 transition-colors"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                     <div>
-                      <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                      <h3 className="font-black text-base text-slate-900">
                         {m.tenantName}
                       </h3>
-                      <div className="font-mono text-xs text-indigo-600 dark:text-indigo-400">
+                      <div className="font-mono text-xs text-indigo-600 font-bold">
                         Member #{m.memberNumber}
                       </div>
                     </div>
                     <div className="flex items-center space-x-3">
                       <div className="text-right">
-                        <div className="text-xl font-black text-indigo-600 dark:text-indigo-400">
+                        <div className="text-xl font-black text-indigo-600 tabular-nums">
                           {m.balance} pts
                         </div>
-                        <div className="text-xs text-slate-400">
+                        <div className="text-[11px] text-slate-400 font-medium">
                           Earned {m.lifetimeEarned} · Redeemed {m.lifetimeRedeemed}
                         </div>
                       </div>
                       <Link
                         href={`/b/${m.tenantSlug}`}
-                        className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        className="p-2.5 rounded-xl border border-slate-200 hover:bg-indigo-50 hover:border-indigo-300 text-slate-600 hover:text-indigo-600 transition cursor-pointer"
+                        title="Open Digital Pass"
                       >
-                        <ExternalLink className="w-4 h-4 text-slate-500" />
+                        <ExternalLink className="w-4 h-4" />
                       </Link>
                     </div>
                   </div>
 
                   {/* Marketing Opt-In Toggle */}
                   <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center space-x-2">
-                      <Mail className="w-4 h-4 text-slate-400" />
+                    <div className="flex items-center space-x-2.5">
+                      <Mail className="w-4 h-4 text-slate-400 shrink-0" />
                       <div>
-                        <div className="text-xs font-semibold">Marketing Communications</div>
-                        <div className="text-xs text-slate-500">
-                          Receive special offers and reward news via email
+                        <div className="text-xs font-bold text-slate-800">Email Marketing Communications</div>
+                        <div className="text-[11px] text-slate-400">
+                          Receive special offers, double points announcements & birthday perks
                         </div>
                       </div>
                     </div>
@@ -217,8 +231,8 @@ export default function CustomerMePage() {
                     <button
                       onClick={() => handleToggleConsent(m.id, m.marketingOptIn)}
                       disabled={updatingConsent === m.id}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        m.marketingOptIn ? "bg-indigo-600" : "bg-slate-300 dark:bg-slate-700"
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                        m.marketingOptIn ? "bg-indigo-600" : "bg-slate-300"
                       }`}
                     >
                       <span
@@ -228,7 +242,7 @@ export default function CustomerMePage() {
                       />
                     </button>
                   </div>
-                </Card>
+                </div>
               ))}
             </div>
           )}
@@ -237,104 +251,104 @@ export default function CustomerMePage() {
         {/* Section: Privacy Rights */}
         <section className="space-y-4">
           <div className="flex items-center space-x-2">
-            <ShieldCheck className="w-5 h-5 text-indigo-500" />
-            <h2 className="text-lg font-bold">Your Privacy Rights (UK GDPR)</h2>
+            <ShieldCheck className="w-5 h-5 text-indigo-600" />
+            <h2 className="text-base font-black text-slate-900">Your Privacy Rights (UK GDPR & DPA 2018)</h2>
           </div>
 
-          <Card className="p-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-4 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-            <p>
+          <div className="p-6 bg-white border border-slate-200/90 rounded-3xl shadow-sm space-y-4 text-xs text-slate-600 leading-relaxed">
+            <p className="font-medium">
               Under the UK General Data Protection Regulation and the Data Protection Act 2018, you
               have rights concerning your personal loyalty records:
             </p>
-            <ul className="list-disc pl-5 space-y-1">
+            <ul className="list-disc pl-5 space-y-1.5 font-normal">
               <li>
-                <strong>Right of Access:</strong> You can download a complete machine-readable JSON
-                copy of your personal profile, points ledger, and consent records using the &quot;Export&quot;
+                <strong className="text-slate-800">Right of Access (SAR):</strong> You can download a complete machine-readable JSON
+                copy of your personal profile, points ledger, and consent records using the &quot;Export My Data&quot;
                 button above.
               </li>
               <li>
-                <strong>Right to Withdraw Consent:</strong> You may opt out of marketing emails at any
+                <strong className="text-slate-800">Right to Withdraw Consent:</strong> You may opt out of marketing emails at any
                 time using the toggle switches above with immediate effect.
               </li>
               <li>
-                <strong>Right to Erasure:</strong> You can request permanent anonymisation of your
+                <strong className="text-slate-800">Right to Erasure (Article 17):</strong> You can request permanent anonymisation of your
                 personal details below.
               </li>
             </ul>
 
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
+            <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <div className="font-semibold text-rose-600">Delete Account & Anonymise Data</div>
-                <div className="text-xs text-slate-500">
-                  Permanently strip your email and name from this platform
+                <div className="font-bold text-rose-600 text-xs">Delete Account & Anonymise Data</div>
+                <div className="text-[11px] text-slate-400">
+                  Permanently strip your email and name from this platform ledger
                 </div>
               </div>
               <Button
                 variant="outline"
                 onClick={() => setShowDeleteModal(true)}
-                className="border-rose-300 dark:border-rose-900 text-rose-600 hover:bg-rose-50 text-xs font-semibold"
+                className="border-rose-300 text-rose-600 hover:bg-rose-50 text-xs font-bold rounded-xl cursor-pointer"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete Account
               </Button>
             </div>
-          </Card>
+          </div>
         </section>
       </div>
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <Card className="max-w-md w-full p-6 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-800 space-y-4">
-            <CardTitle className="text-lg text-rose-600 flex items-center space-x-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-md w-full p-6 bg-white rounded-3xl border border-slate-200 space-y-4 shadow-2xl">
+            <div className="text-lg font-black text-rose-600 flex items-center space-x-2">
               <AlertTriangle className="w-5 h-5" />
-              <span>Confirm Account Deletion</span>
-            </CardTitle>
+              <span>Confirm Account Erasure</span>
+            </div>
 
             {deleteSuccess ? (
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 rounded-xl text-sm font-semibold text-center">
-                Your account has been anonymised. Redirecting...
+              <div className="p-4 bg-emerald-50 text-emerald-800 rounded-2xl text-xs font-bold text-center">
+                Your account has been anonymised. Redirecting to homepage...
               </div>
             ) : (
               <>
-                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                <p className="text-xs text-slate-600 leading-relaxed font-medium">
                   This action is permanent and cannot be undone. Your name, email, and authentication
                   sessions will be immediately erased. In compliance with UK accounting law, minimal
-                  historical points transactions remain anonymised.
+                  historical points transactions remain anonymised in the double-entry ledger.
                 </p>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-                    Type <strong>DELETE</strong> to confirm:
+                  <label className="text-xs font-extrabold uppercase tracking-wider text-slate-700 block mb-1">
+                    Type <strong className="text-rose-600">DELETE</strong> to confirm:
                   </label>
                   <input
                     type="text"
                     value={deleteConfirmText}
                     onChange={(e) => setDeleteConfirmText(e.target.value)}
                     placeholder="DELETE"
-                    className="w-full min-h-[44px] rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 text-sm"
+                    className="w-full min-h-[44px] rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs font-mono font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500"
                   />
                 </div>
 
                 <div className="flex space-x-2 pt-2">
                   <Button
                     variant="outline"
-                    className="flex-1"
+                    className="flex-1 font-bold rounded-xl text-xs cursor-pointer"
                     onClick={() => setShowDeleteModal(false)}
                   >
                     Cancel
                   </Button>
                   <Button
-                    className="flex-1 font-bold bg-rose-600 hover:bg-rose-700 text-white"
+                    className="flex-1 font-black text-xs bg-rose-600 hover:bg-rose-700 text-white rounded-xl cursor-pointer"
                     disabled={deleteConfirmText.toUpperCase() !== "DELETE" || deleteLoading}
                     onClick={handleDeleteAccount}
                   >
-                    {deleteLoading ? "Deleting..." : "Permanently Delete"}
+                    {deleteLoading ? "Erasing..." : "Permanently Delete"}
                   </Button>
                 </div>
               </>
             )}
-          </Card>
+          </div>
         </div>
       )}
     </div>
