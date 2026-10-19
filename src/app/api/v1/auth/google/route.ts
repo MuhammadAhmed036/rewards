@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const redirectUri = `${appUrl}/api/v1/auth/google/callback`;
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${appUrl}/api/v1/auth/google/callback`;
 
   if (!clientId || clientId.startsWith("dev_mock") || clientId.startsWith("mock-")) {
     // If running in development with mock client, provide one-click mock login
@@ -29,3 +29,4 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.redirect(googleAuthUrl.toString());
 }
+
