@@ -61,11 +61,11 @@ export default function Home() {
               Sign In
             </Link>
             <Link
-              href="/dashboard"
+              href="/signup"
               className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg transition-colors shadow-xs"
             >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              Dashboard
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              Sign Up
             </Link>
           </div>
         </div>
@@ -89,32 +89,53 @@ export default function Home() {
             Anti-gating Google Review growth, immutable double-entry ledger, and strict UK GDPR compliance.
           </p>
 
-          {/* Quick Portal Launch Buttons */}
+          {/* Primary Action Buttons */}
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
-              href="/b/demo-barber"
-              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-semibold shadow-md shadow-indigo-200 transition-all hover:scale-[1.02]"
+              href="/signup?role=owner"
+              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3.5 rounded-xl font-bold shadow-lg shadow-indigo-600/25 transition-all hover:scale-[1.02] text-sm"
             >
-              <Scissors className="w-4 h-4" />
-              Launch Demo Barber (Points Mode)
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              Create Business Account (Sign Up Free)
               <ArrowRight className="w-4 h-4" />
+            </Link>
+
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 px-5 py-3.5 rounded-xl font-bold transition-all hover:scale-[1.02] text-sm shadow-2xs"
+            >
+              <Lock className="w-4 h-4 text-slate-600" />
+              Sign In to Existing Account
+            </Link>
+          </div>
+
+          {/* Quick Demo Previews */}
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5 text-xs">
+            <span className="text-slate-400 font-semibold uppercase tracking-wider text-[11px] mr-1">
+              Live Demos:
+            </span>
+            <Link
+              href="/b/demo-barber"
+              className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium transition-colors"
+            >
+              <Scissors className="w-3.5 h-3.5 text-indigo-600" />
+              Demo Barber (Points Mode)
             </Link>
 
             <Link
               href="/b/demo-coffee"
-              className="inline-flex items-center gap-2 bg-amber-700 hover:bg-amber-800 text-white px-5 py-3 rounded-xl font-semibold shadow-md shadow-amber-200 transition-all hover:scale-[1.02]"
+              className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium transition-colors"
             >
-              <Coffee className="w-4 h-4" />
-              Launch Demo Coffee (Stamps Mode)
-              <ArrowRight className="w-4 h-4" />
+              <Coffee className="w-3.5 h-3.5 text-amber-700" />
+              Demo Coffee (Stamps Mode)
             </Link>
 
             <Link
               href="/staff"
-              className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-semibold transition-all hover:scale-[1.02]"
+              className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg font-medium transition-colors"
             >
-              <Smartphone className="w-4 h-4" />
-              Open Staff Terminal
+              <Smartphone className="w-3.5 h-3.5 text-slate-300" />
+              Staff Terminal
             </Link>
           </div>
 

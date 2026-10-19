@@ -3,7 +3,9 @@ import { db } from "@/server/db";
 import { users, staffMembers } from "@/server/db/schema";
 import { createSession } from "@/server/auth";
 import { joinProgramme } from "@/server/services/member";
+import { registerOwnerAndTenant } from "@/server/services/tenant";
 import { eq } from "drizzle-orm";
+import crypto from "crypto";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -14,13 +16,19 @@ export async function GET(request: NextRequest) {
   const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   let returnTo = "/dashboard";
+  let targetRole: "owner" | "customer" | "staff" = "owner";
   if (stateRaw) {
     try {
       const decoded = JSON.parse(Buffer.from(stateRaw, "base64url").toString("utf-8"));
       if (decoded.returnTo) returnTo = decoded.returnTo;
+      if (decoded.role) targetRole = decoded.role;
     } catch {
       // fallback to default
     }
+  }
+
+  if (targetRole === "customer" && returnTo === "/dashboard") {
+    returnTo = "/me";
   }
 
   if (error || !code) {
@@ -107,8 +115,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 5. Check if staff/admin
-    const staffRow = await db.select().from(staffMembers).where(eq(staffMembers.userId, userId)).limit(1);
+    // 5. Check if staff/admin, or auto-provision tenant if owner signup
+    let staffRow = await db.select().from(staffMembers).where(eq(staffMembers.userId, userId)).limit(1);
+    if (staffRow.length === 0 && (targetRole === "owner" || returnTo === "/dashboard")) {
+      try {
+        const bizName = `${name}'s Business`;
+        const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "my-biz";
+        const uniqueSlug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
+        await registerOwnerAndTenant({
+          email,
+          password: crypto.randomUUID(),
+          name,
+          businessName: bizName,
+          slug: uniqueSlug,
+          programmeType: "points",
+        });
+        staffRow = await db.select().from(staffMembers).where(eq(staffMembers.userId, userId)).limit(1);
+      } catch (provisionErr) {
+        console.error("Auto-provision business tenant on Google signup notice:", provisionErr);
+      }
+    }
+
     const isStaff = staffRow.length > 0 || existingUser?.isPlatformAdmin || false;
 
     // 6. Create session

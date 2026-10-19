@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const returnTo = searchParams.get("returnTo") || "/dashboard";
+  const role = searchParams.get("role") || (returnTo === "/me" ? "customer" : "owner");
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const stateObj = { returnTo, ts: Date.now() };
+  const stateObj = { returnTo, role, ts: Date.now() };
   const state = Buffer.from(JSON.stringify(stateObj)).toString("base64url");
 
   const googleAuthUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
