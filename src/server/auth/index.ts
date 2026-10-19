@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { db, DbExecutor } from "../db";
-import { users, sessions, staffMembers, staffLocationScopes, verifications } from "../db/schema";
+import { users, sessions, staffMembers, staffLocationScopes, verifications, tenants } from "../db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { RequestContext, UserRole } from "../security/permissions";
 import { cookies } from "next/headers";
@@ -108,42 +108,48 @@ export async function getSessionContext(
     };
   }
 
-  // 2. Tenant Staff check (if tenant context is provided)
-  if (tenantSlugOrId) {
-    const staffRows = await db
-      .select({
-        staff: staffMembers,
-      })
-      .from(staffMembers)
-      .where(
-        and(
-          eq(staffMembers.userId, user.id),
-          eq(staffMembers.status, "active")
-        )
-      );
-
-    const matchingStaff = staffRows.find(
-      (s) => s.staff.tenantId === tenantSlugOrId
+  // 2. Tenant Staff check
+  const staffRows = await db
+    .select({
+      staff: staffMembers,
+      tenantSlug: tenants.slug,
+    })
+    .from(staffMembers)
+    .innerJoin(tenants, eq(staffMembers.tenantId, tenants.id))
+    .where(
+      and(
+        eq(staffMembers.userId, user.id),
+        eq(staffMembers.status, "active")
+      )
     );
 
-    if (matchingStaff) {
-      // Find assigned location scopes
-      const scopes = await db
-        .select({ locationId: staffLocationScopes.locationId })
-        .from(staffLocationScopes)
-        .where(eq(staffLocationScopes.staffMemberId, matchingStaff.staff.id));
+  let matchingStaff = null;
+  if (tenantSlugOrId) {
+    matchingStaff = staffRows.find(
+      (s) => s.staff.tenantId === tenantSlugOrId || s.tenantSlug === tenantSlugOrId
+    );
+  } else if (staffRows.length > 0) {
+    // Default to their primary assigned tenant
+    matchingStaff = staffRows[0];
+  }
 
-      const locationIds = scopes.map((s) => s.locationId);
+  if (matchingStaff) {
+    // Find assigned location scopes
+    const scopes = await db
+      .select({ locationId: staffLocationScopes.locationId })
+      .from(staffLocationScopes)
+      .where(eq(staffLocationScopes.staffMemberId, matchingStaff.staff.id));
 
-      return {
-        userId: user.id,
-        tenantId: matchingStaff.staff.tenantId,
-        role: matchingStaff.staff.role as UserRole,
-        locationIds: locationIds.length > 0 ? locationIds : undefined,
-        requestId,
-        isPlatformAdmin: false,
-      };
-    }
+    const locationIds = scopes.map((s) => s.locationId);
+
+    return {
+      userId: user.id,
+      tenantId: matchingStaff.staff.tenantId,
+      role: matchingStaff.staff.role as UserRole,
+      locationIds: locationIds.length > 0 ? locationIds : undefined,
+      requestId,
+      isPlatformAdmin: false,
+    };
   }
 
   // 3. Customer role (default for members across platforms)

@@ -16,6 +16,7 @@ import {
   Server,
   RefreshCw,
   Mail,
+  LogOut,
 } from "lucide-react";
 
 interface TenantSummary {
@@ -91,6 +92,10 @@ export default function PlatformAdminPage() {
       if (statusFilter) params.set("status", statusFilter);
 
       const res = await fetch(`/api/v1/admin/tenants?${params.toString()}`);
+      if (res.status === 401 || res.status === 403) {
+        window.location.href = "/login?redirect=/admin";
+        return;
+      }
       if (res.ok) {
         const json = await res.json();
         setTenants(json.data.tenants || []);
@@ -105,6 +110,10 @@ export default function PlatformAdminPage() {
   const fetchHealth = async () => {
     try {
       const res = await fetch("/api/v1/admin/health");
+      if (res.status === 401 || res.status === 403) {
+        window.location.href = "/login?redirect=/admin";
+        return;
+      }
       if (res.ok) {
         const json = await res.json();
         setHealth(json.data);
@@ -117,6 +126,10 @@ export default function PlatformAdminPage() {
   const fetchAuditLogs = async () => {
     try {
       const res = await fetch("/api/v1/admin/audit?limit=100");
+      if (res.status === 401 || res.status === 403) {
+        window.location.href = "/login?redirect=/admin";
+        return;
+      }
       if (res.ok) {
         const json = await res.json();
         setAuditLogs(json.data || []);
@@ -227,6 +240,18 @@ export default function PlatformAdminPage() {
               <span>Global Audit</span>
             </button>
           </nav>
+
+          <button
+            onClick={async () => {
+              await fetch("/api/v1/auth/logout", { method: "POST" });
+              window.location.href = "/login";
+            }}
+            title="Sign Out"
+            className="flex items-center space-x-1.5 text-xs text-rose-400 hover:text-rose-300 font-semibold px-3 py-1.5 rounded-lg border border-rose-500/30 hover:bg-rose-500/10 transition-colors ml-3 cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out</span>
+          </button>
         </div>
       </header>
 

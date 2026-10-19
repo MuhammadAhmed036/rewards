@@ -16,6 +16,7 @@ import {
   MapPin,
   RefreshCw,
   Sparkles,
+  LogOut,
 } from "lucide-react";
 
 interface LocationItem {
@@ -95,6 +96,10 @@ export default function StaffPage() {
     async function fetchLocations() {
       try {
         const res = await fetch("/api/v1/staff/locations");
+        if (res.status === 401 || res.status === 403) {
+          window.location.href = "/login?redirect=/staff";
+          return;
+        }
         if (res.ok) {
           const json = await res.json();
           setLocations(json.data || []);
@@ -339,23 +344,35 @@ export default function StaffPage() {
             <span className="font-bold text-lg">Staff Terminal</span>
           </div>
 
-          {/* Location Selector */}
-          {locations.length > 0 && (
-            <div className="flex items-center space-x-1 text-xs">
-              <MapPin className="h-4 w-4 text-slate-500" />
-              <select
-                value={selectedLocationId}
-                onChange={(e) => handleSelectLocation(e.target.value)}
-                className="bg-transparent font-medium py-1 px-1 rounded focus:outline-none border-b border-dashed border-slate-400"
-              >
-                {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id} className="text-slate-900">
-                    {loc.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="flex items-center space-x-2">
+            {/* Location Selector */}
+            {locations.length > 0 && (
+              <div className="flex items-center space-x-1 text-xs">
+                <MapPin className="h-4 w-4 text-slate-500" />
+                <select
+                  value={selectedLocationId}
+                  onChange={(e) => handleSelectLocation(e.target.value)}
+                  className="bg-transparent font-medium py-1 px-1 rounded focus:outline-none border-b border-dashed border-slate-400"
+                >
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id} className="text-slate-900">
+                      {loc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <button
+              onClick={async () => {
+                await fetch("/api/v1/auth/logout", { method: "POST" });
+                window.location.href = "/login";
+              }}
+              title="Sign Out"
+              className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </header>
 

@@ -40,25 +40,32 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/b/demo-barber"
-              className="text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors px-3 py-1.5"
+              className="text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors px-2 py-1.5 hidden md:block"
             >
               Customer Hub
             </Link>
             <Link
               href="/staff"
-              className="text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors px-3 py-1.5"
+              className="text-xs sm:text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors px-2 py-1.5 hidden md:block"
             >
               Staff Terminal
             </Link>
             <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors shadow-xs"
+              href="/login"
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-lg transition-colors"
             >
-              <LayoutDashboard className="w-4 h-4" />
-              Owner Dashboard
+              <Lock className="w-3.5 h-3.5 text-slate-500" />
+              Sign In
+            </Link>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg transition-colors shadow-xs"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              Dashboard
             </Link>
           </div>
         </div>

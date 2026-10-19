@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Sparkles,
   ExternalLink,
+  LogOut,
 } from "lucide-react";
 
 interface OverviewMetrics {
@@ -99,6 +100,10 @@ export default function OwnerDashboardPage() {
   const loadOverview = async () => {
     try {
       const res = await fetch("/api/v1/owner/overview");
+      if (res.status === 401) {
+        window.location.href = "/login?redirect=/dashboard";
+        return;
+      }
       if (res.ok) {
         const json = await res.json();
         setMetrics(json.data);
@@ -331,11 +336,21 @@ export default function OwnerDashboardPage() {
         </div>
 
         {/* Quick Links Footer */}
-        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-400 px-2 space-y-1">
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-400 px-2 space-y-2">
           <a href="/staff" className="flex items-center space-x-1 hover:text-slate-900 dark:hover:text-white">
             <ExternalLink className="h-3 w-3" />
             <span>Open Staff Terminal</span>
           </a>
+          <button
+            onClick={async () => {
+              await fetch("/api/v1/auth/logout", { method: "POST" });
+              window.location.href = "/login";
+            }}
+            className="flex items-center space-x-1.5 text-rose-600 hover:text-rose-700 font-medium cursor-pointer"
+          >
+            <LogOut className="h-3 w-3" />
+            <span>Sign Out</span>
+          </button>
         </div>
       </aside>
 
