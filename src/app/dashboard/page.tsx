@@ -53,6 +53,7 @@ interface LedgerRow {
   occurredAt: string;
   memberNumber: string;
   memberName?: string;
+  actorName?: string;
   reasonCode?: string;
   note?: string;
 }
@@ -95,6 +96,7 @@ export default function OwnerDashboardPage() {
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [newStaffEmail, setNewStaffEmail] = useState("");
   const [newStaffName, setNewStaffName] = useState("");
+  const [newStaffPassword, setNewStaffPassword] = useState("Password123!");
   const [newStaffRole, setNewStaffRole] = useState<"manager" | "staff" | "marketing">("staff");
 
   const loadOverview = async () => {
@@ -254,12 +256,14 @@ export default function OwnerDashboardPage() {
           email: newStaffEmail,
           name: newStaffName,
           role: newStaffRole,
+          temporaryPassword: newStaffPassword,
         }),
       });
       if (res.ok) {
         setShowAddStaff(false);
         setNewStaffEmail("");
         setNewStaffName("");
+        setNewStaffPassword("Password123!");
         loadTeam();
       } else {
         const json = await res.json();
@@ -529,6 +533,7 @@ export default function OwnerDashboardPage() {
                       <th className="p-3.5">Date (UTC)</th>
                       <th className="p-3.5">Type</th>
                       <th className="p-3.5">Member #</th>
+                      <th className="p-3.5">Awarded By / Staff</th>
                       <th className="p-3.5">Delta</th>
                       <th className="p-3.5">Note</th>
                       <th className="p-3.5 text-right">Action</th>
@@ -542,6 +547,9 @@ export default function OwnerDashboardPage() {
                         </td>
                         <td className="p-3.5 font-bold uppercase text-xs">{tx.type}</td>
                         <td className="p-3.5 font-mono text-xs">#{tx.memberNumber}</td>
+                        <td className="p-3.5 text-xs text-indigo-600 dark:text-indigo-400 font-semibold">
+                          {tx.actorName || "System / Owner"}
+                        </td>
                         <td
                           className={`p-3.5 font-black text-sm ${
                             tx.pointsDelta > 0 ? "text-emerald-600" : "text-rose-600"
@@ -934,6 +942,19 @@ export default function OwnerDashboardPage() {
                   <option value="manager">Manager (Adjustments & Reports)</option>
                   <option value="marketing">Marketing (Analytics Only)</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  Login Password (Hand to Staff)
+                </label>
+                <Input
+                  type="text"
+                  placeholder="e.g. Password123!"
+                  value={newStaffPassword}
+                  onChange={(e) => setNewStaffPassword(e.target.value)}
+                />
+                <p className="text-[11px] text-slate-400 mt-1">Staff will use this password to sign in to /staff terminal.</p>
               </div>
 
               <div className="flex space-x-2 pt-3">

@@ -17,6 +17,14 @@ import {
   RefreshCw,
   Mail,
   LogOut,
+  PlusCircle,
+  Sparkles,
+  ExternalLink,
+  Store,
+  User,
+  Lock,
+  Copy,
+  Check,
 } from "lucide-react";
 
 interface TenantSummary {
@@ -83,6 +91,98 @@ export default function PlatformAdminPage() {
   const [newPlan, setNewPlan] = useState<"free" | "pro">("free");
   const [actionError, setActionError] = useState("");
   const [actionSuccess, setActionSuccess] = useState("");
+
+  // Add Business Modal State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addBusinessName, setAddBusinessName] = useState("");
+  const [addSlug, setAddSlug] = useState("");
+  const [addIndustry, setAddIndustry] = useState("Restaurant & Dining");
+  const [addProgrammeType, setAddProgrammeType] = useState<"points" | "stamps">("points");
+  const [addPlan, setAddPlan] = useState<"free" | "pro">("free");
+  const [addOwnerName, setAddOwnerName] = useState("");
+  const [addOwnerEmail, setAddOwnerEmail] = useState("");
+  const [addPassword, setAddPassword] = useState("Password123!");
+  const [addLocationName, setAddLocationName] = useState("Main Branch");
+  const [addBrandColor, setAddBrandColor] = useState("#4f46e5");
+  const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError] = useState("");
+  const [createdTenantData, setCreatedTenantData] = useState<{
+    slug: string;
+    name: string;
+    ownerEmail: string;
+    ownerPassword: string;
+    programmeType: string;
+  } | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleBusinessNameChange = (val: string) => {
+    setAddBusinessName(val);
+    const slugified = val.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    setAddSlug(slugified);
+  };
+
+  const handleCreateBusiness = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addBusinessName.trim() || !addSlug.trim() || !addOwnerEmail.trim() || !addOwnerName.trim() || !addPassword.trim()) {
+      setAddError("Please fill in all required fields.");
+      return;
+    }
+
+    setAddLoading(true);
+    setAddError("");
+    try {
+      const res = await fetch("/api/v1/admin/tenants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: addBusinessName.trim(),
+          slug: addSlug.trim(),
+          ownerName: addOwnerName.trim(),
+          ownerEmail: addOwnerEmail.trim(),
+          password: addPassword,
+          plan: addPlan,
+          programmeType: addProgrammeType,
+          industry: addIndustry,
+          locationName: addLocationName.trim() || "Main Branch",
+          brandPrimaryHex: addBrandColor,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error?.message || "Failed to create business");
+      }
+
+      setCreatedTenantData({
+        slug: addSlug.trim(),
+        name: addBusinessName.trim(),
+        ownerEmail: addOwnerEmail.trim(),
+        ownerPassword: addPassword,
+        programmeType: addProgrammeType,
+      });
+
+      // Refresh table
+      fetchTenants();
+    } catch (err: unknown) {
+      setAddError(err instanceof Error ? err.message : "Failed to create business");
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  const handleCloseAddModal = () => {
+    setShowAddModal(false);
+    setAddBusinessName("");
+    setAddSlug("");
+    setAddOwnerName("");
+    setAddOwnerEmail("");
+    setAddPassword("Password123!");
+    setAddLocationName("Main Branch");
+    setAddBrandColor("#4f46e5");
+    setAddError("");
+    setCreatedTenantData(null);
+    setCopiedLink(false);
+  };
 
   const fetchTenants = async () => {
     setLoading(true);
@@ -288,6 +388,14 @@ export default function PlatformAdminPage() {
                   <option value="suspended">Suspended Only</option>
                   <option value="closed">Closed Only</option>
                 </select>
+
+                <Button
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs min-h-[40px] px-4 rounded-xl flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 cursor-pointer"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>+ Add Business</span>
+                </Button>
               </div>
             </div>
 
@@ -623,9 +731,276 @@ export default function PlatformAdminPage() {
                 onClick={handleUpdateTenant}
                 disabled={loading || !reason.trim()}
               >
-                {loading ? "Processing..." : "Confirm Action"}
               </Button>
             </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Add New Business Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
+          <Card className="max-w-xl w-full p-6 sm:p-8 bg-slate-900 border-slate-800 text-slate-100 my-8 shadow-2xl relative">
+            {!createdTenantData ? (
+              <form onSubmit={handleCreateBusiness} className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-indigo-600/20 text-indigo-400 rounded-xl border border-indigo-500/30">
+                      <Store className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg text-white">Onboard New Business</CardTitle>
+                      <p className="text-xs text-slate-400">Add a new restaurant, coffee shop, salon, or retail tenant</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCloseAddModal}
+                    className="text-slate-400 hover:text-white text-lg font-bold p-1 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {addError && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{addError}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {/* Business Name */}
+                  <div className="sm:col-span-2">
+                    <label className="font-semibold text-slate-300 block mb-1">
+                      Business Name <span className="text-rose-400">*</span>
+                    </label>
+                    <Input
+                      placeholder="e.g. Bella Italia Restaurant"
+                      value={addBusinessName}
+                      onChange={(e) => handleBusinessNameChange(e.target.value)}
+                      className="bg-slate-950 border-slate-700 text-slate-200"
+                      required
+                    />
+                  </div>
+
+                  {/* Slug */}
+                  <div>
+                    <label className="font-semibold text-slate-300 block mb-1">
+                      Webpage URL Slug <span className="text-rose-400">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-slate-500 text-xs font-mono">/b/</span>
+                      <Input
+                        placeholder="bella-italia"
+                        value={addSlug}
+                        onChange={(e) => setAddSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+                        className="pl-8 bg-slate-950 border-slate-700 text-slate-200 font-mono text-xs"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Industry */}
+                  <div>
+                    <label className="font-semibold text-slate-300 block mb-1">Industry Type</label>
+                    <select
+                      value={addIndustry}
+                      onChange={(e) => setAddIndustry(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 min-h-[40px]"
+                    >
+                      <option value="Restaurant & Dining">Restaurant & Dining</option>
+                      <option value="Coffee Shop & Cafe">Coffee Shop & Cafe</option>
+                      <option value="Barbershop & Grooming">Barbershop & Grooming</option>
+                      <option value="Beauty & Salon">Beauty & Salon</option>
+                      <option value="Car Wash & Detailing">Car Wash & Detailing</option>
+                      <option value="Retail & Grocery">Retail & Grocery</option>
+                      <option value="Fitness & Gym">Fitness & Gym</option>
+                      <option value="General Service">Other Retail</option>
+                    </select>
+                  </div>
+
+                  {/* Programme Mode */}
+                  <div>
+                    <label className="font-semibold text-slate-300 block mb-1">Loyalty Engine Mode</label>
+                    <select
+                      value={addProgrammeType}
+                      onChange={(e) => setAddProgrammeType(e.target.value as "points" | "stamps")}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 min-h-[40px]"
+                    >
+                      <option value="points">Points Mode (Spend-based: £1 = 1 Point)</option>
+                      <option value="stamps">Stamps Mode (Visit-based: 1 Stamp per visit)</option>
+                    </select>
+                  </div>
+
+                  {/* Subscription Plan */}
+                  <div>
+                    <label className="font-semibold text-slate-300 block mb-1">Subscription Plan</label>
+                    <select
+                      value={addPlan}
+                      onChange={(e) => setAddPlan(e.target.value as "free" | "pro")}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 min-h-[40px]"
+                    >
+                      <option value="free">Free Tier (Single Location)</option>
+                      <option value="pro">Pro Tier (Multi-Location & Full Exports)</option>
+                    </select>
+                  </div>
+
+                  {/* Initial Location */}
+                  <div className="sm:col-span-2">
+                    <label className="font-semibold text-slate-300 block mb-1">Primary Store Location</label>
+                    <Input
+                      placeholder="e.g. Central Branch / Soho"
+                      value={addLocationName}
+                      onChange={(e) => setAddLocationName(e.target.value)}
+                      className="bg-slate-950 border-slate-700 text-slate-200"
+                    />
+                  </div>
+
+                  {/* Divider: Owner / CEO Credentials */}
+                  <div className="sm:col-span-2 pt-2 border-t border-slate-800">
+                    <p className="font-bold text-slate-200 text-xs flex items-center gap-1.5 mb-2">
+                      <User className="w-3.5 h-3.5 text-indigo-400" />
+                      Business Owner / CEO Credentials
+                    </p>
+                  </div>
+
+                  {/* Owner Name */}
+                  <div>
+                    <label className="font-semibold text-slate-300 block mb-1">
+                      Owner Full Name <span className="text-rose-400">*</span>
+                    </label>
+                    <Input
+                      placeholder="e.g. Marco Rossi"
+                      value={addOwnerName}
+                      onChange={(e) => setAddOwnerName(e.target.value)}
+                      className="bg-slate-950 border-slate-700 text-slate-200"
+                      required
+                    />
+                  </div>
+
+                  {/* Owner Email */}
+                  <div>
+                    <label className="font-semibold text-slate-300 block mb-1">
+                      Owner Email <span className="text-rose-400">*</span>
+                    </label>
+                    <Input
+                      type="email"
+                      placeholder="e.g. marco@bellaitalia.co.uk"
+                      value={addOwnerEmail}
+                      onChange={(e) => setAddOwnerEmail(e.target.value)}
+                      className="bg-slate-950 border-slate-700 text-slate-200"
+                      required
+                    />
+                  </div>
+
+                  {/* Password */}
+                  <div className="sm:col-span-2">
+                    <label className="font-semibold text-slate-300 block mb-1">
+                      Initial Login Password <span className="text-rose-400">*</span>
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Password123!"
+                      value={addPassword}
+                      onChange={(e) => setAddPassword(e.target.value)}
+                      className="bg-slate-950 border-slate-700 text-slate-200"
+                      required
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Give this password to the restaurant owner so they can log in to their dashboard.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex space-x-2 pt-3 border-t border-slate-800">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 border-slate-800 text-slate-400"
+                    onClick={handleCloseAddModal}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 font-bold bg-indigo-600 hover:bg-indigo-500 text-white"
+                    disabled={addLoading}
+                  >
+                    {addLoading ? "Creating Business..." : "Create & Launch Business"}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-5 text-center py-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Business Successfully Launched!</h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    <span className="text-indigo-400 font-semibold">{createdTenantData.name}</span> has been provisioned with strict tenant isolation.
+                  </p>
+                </div>
+
+                {/* Handover Cards */}
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-left space-y-3 text-xs">
+                  <div>
+                    <label className="text-[11px] font-bold uppercase text-slate-500 block">Customer Webpage URL</label>
+                    <div className="flex items-center justify-between gap-2 mt-1 p-2 rounded-lg bg-slate-900 border border-slate-800">
+                      <span className="font-mono text-indigo-300 truncate">
+                        http://localhost:3000/b/{createdTenantData.slug}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`http://localhost:3000/b/${createdTenantData.slug}`);
+                            setCopiedLink(true);
+                            setTimeout(() => setCopiedLink(false), 2000);
+                          }}
+                          className="p-1 hover:text-white text-slate-400"
+                          title="Copy Link"
+                        >
+                          {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                        <a
+                          href={`/b/${createdTenantData.slug}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1 hover:text-white text-slate-400"
+                          title="Open Customer Page"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
+                    <div>
+                      <label className="text-[11px] font-bold uppercase text-slate-500 block">Owner Login Email</label>
+                      <p className="font-mono text-slate-200 mt-0.5">{createdTenantData.ownerEmail}</p>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold uppercase text-slate-500 block">Owner Password</label>
+                      <p className="font-mono text-slate-200 mt-0.5">{createdTenantData.ownerPassword}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-400">
+                  The owner can now log in at <span className="font-mono text-slate-200">/login</span> to manage rewards, view members, and invite their staff.
+                </p>
+
+                <Button
+                  onClick={handleCloseAddModal}
+                  className="w-full font-bold bg-indigo-600 hover:bg-indigo-500 text-white"
+                >
+                  Done & Return to Console
+                </Button>
+              </div>
+            )}
           </Card>
         </div>
       )}

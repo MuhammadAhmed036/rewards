@@ -20,6 +20,10 @@ export interface RegisterOwnerParams {
   businessName: string;
   slug: string;
   programmeType?: "points" | "stamps";
+  industry?: string;
+  plan?: "free" | "pro";
+  locationName?: string;
+  brandPrimaryHex?: string;
 }
 
 export async function registerOwnerAndTenant(params: RegisterOwnerParams) {
@@ -69,12 +73,13 @@ export async function registerOwnerAndTenant(params: RegisterOwnerParams) {
       .values({
         slug: normalizedSlug,
         name: params.businessName,
+        industry: params.industry || "Retail & Hospitality",
         status: "active",
         currency: "GBP",
         timezone: "Europe/London",
         locale: "en-GB",
-        brandPrimaryHex: "#1e293b",
-        plan: "free",
+        brandPrimaryHex: params.brandPrimaryHex || "#1e293b",
+        plan: params.plan || "free",
         features: {},
         limits: {},
       })
@@ -87,7 +92,7 @@ export async function registerOwnerAndTenant(params: RegisterOwnerParams) {
       .values({
         tenantId: newTenant.id,
         publicId: locationPublicId,
-        name: "Main Location",
+        name: params.locationName || "Main Location",
         address: {},
         status: "active",
       })

@@ -28,6 +28,9 @@ const createTenantSchema = z.object({
   password: z.string().min(8),
   plan: z.enum(["free", "pro"]).default("free"),
   programmeType: z.enum(["points", "stamps"]).default("points"),
+  industry: z.string().optional(),
+  locationName: z.string().optional(),
+  brandPrimaryHex: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -47,6 +50,10 @@ export async function POST(request: NextRequest) {
       businessName: validated.name,
       slug: validated.slug,
       programmeType: validated.programmeType,
+      industry: validated.industry,
+      plan: validated.plan,
+      locationName: validated.locationName,
+      brandPrimaryHex: validated.brandPrimaryHex,
     });
 
     return NextResponse.json({ data: result }, { status: 201 });

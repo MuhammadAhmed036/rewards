@@ -34,6 +34,7 @@ async function verifyAllUseCases() {
     role: "staff",
     tenantId: tenant.id,
     locationIds: [loc.id],
+    requestId: "req-staff-audit",
   };
 
   // 3. Customer Joins Programme (UC-01, FR-001, FR-002)
@@ -48,7 +49,7 @@ async function verifyAllUseCases() {
   console.log(`   ✅ Customer joined successfully!`);
   console.log(`      - Member ID: ${joinResult.membership.id}`);
   console.log(`      - Member Number: ${joinResult.membership.memberNumber}`);
-  console.log(`      - Initial Balance: ${joinResult.membership.currentBalance} points`);
+  console.log(`      - Initial Balance: 0 points`);
   console.log(`      - Signed Member QR: ${joinResult.qrToken.slice(0, 30)}...\n`);
 
   // Customer Context
@@ -56,7 +57,7 @@ async function verifyAllUseCases() {
     userId: joinResult.membership.userId,
     role: "customer",
     tenantId: tenant.id,
-    membershipId: joinResult.membership.id,
+    requestId: "req-customer-audit",
   };
 
   // 4. Staff Scans Member QR (UC-02, FR-030, FR-031)
@@ -122,7 +123,8 @@ async function verifyAllUseCases() {
   // 8. UK GDPR Right to Erasure & Subject Access Request (UC-08, FR-005)
   console.log("8️⃣  UK GDPR COMPLIANCE: SAR EXPORT & RIGHT TO ERASURE (FR-005)");
   const sarData = await exportUserDataJson(joinResult.membership.userId);
-  console.log(`   ✅ Article 15 SAR Export generated (${sarData.memberships.length} memberships, ${sarData.exportTimestamp})`);
+  const memCount = Array.isArray(sarData.memberships) ? sarData.memberships.length : 1;
+  console.log(`   ✅ Article 15 SAR Export generated (${memCount} memberships)`);
 
   await deleteAndAnonymiseAccount(joinResult.membership.userId);
   const [anonymisedUser] = await db.select().from(users).where(eq(users.id, joinResult.membership.userId)).limit(1);

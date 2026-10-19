@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { ledgerEntries, memberships, users } from "@/server/db/schema";
 import { reverseTransaction } from "@/server/services/ledger";
 import { eq, desc } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import crypto from "crypto";
 
@@ -15,6 +16,7 @@ export async function GET(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   const { ctx } = guard;
+  const actorUsers = alias(users, "actor_users");
 
   const rows = await db
     .select({
@@ -28,11 +30,12 @@ export async function GET(request: NextRequest) {
       idempotencyKey: ledgerEntries.idempotencyKey,
       memberNumber: memberships.memberNumber,
       memberName: users.name,
-      actorName: users.name,
+      actorName: actorUsers.name,
     })
     .from(ledgerEntries)
     .innerJoin(memberships, eq(ledgerEntries.membershipId, memberships.id))
     .innerJoin(users, eq(memberships.userId, users.id))
+    .leftJoin(actorUsers, eq(ledgerEntries.actorUserId, actorUsers.id))
     .where(eq(ledgerEntries.tenantId, ctx.tenantId!))
     .orderBy(desc(ledgerEntries.occurredAt))
     .limit(100);
