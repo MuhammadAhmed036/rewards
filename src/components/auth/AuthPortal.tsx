@@ -780,3 +780,4 @@ export function AuthPortal({ initialMode = "signin" }: AuthPortalProps) {
     </Suspense>
   );
 }
+

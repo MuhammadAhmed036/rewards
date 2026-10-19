@@ -360,6 +360,53 @@ export default function PlatformAdminPage() {
         {/* TAB 1: TENANTS */}
         {tab === "tenants" && (
           <div className="space-y-6">
+            {/* Enterprise Platform Overview KPIs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-extrabold uppercase tracking-wider text-[10px]">Total Businesses</span>
+                  <span className="text-emerald-400 font-bold">{tenants.filter((t) => t.status === "active").length} Active</span>
+                </div>
+                <div className="text-3xl font-black text-white mt-1.5 tabular-nums">
+                  {tenants.length}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Multi-tenant database isolates</p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-extrabold uppercase tracking-wider text-[10px]">Active Locations</span>
+                  <span className="text-indigo-400 font-bold">UK Network</span>
+                </div>
+                <div className="text-3xl font-black text-white mt-1.5 tabular-nums">
+                  {tenants.reduce((acc, t) => acc + (t.stats?.locationCount || 0), 0)}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Cashier terminal branches</p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-extrabold uppercase tracking-wider text-[10px]">Platform Members</span>
+                  <span className="text-violet-400 font-bold">Cross-Tenant</span>
+                </div>
+                <div className="text-3xl font-black text-white mt-1.5 tabular-nums">
+                  {tenants.reduce((acc, t) => acc + (t.stats?.memberCount || 0), 0).toLocaleString()}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Enrolled customer passes</p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-extrabold uppercase tracking-wider text-[10px]">Ledger Points Liability</span>
+                  <span className="text-amber-400 font-bold">Audited</span>
+                </div>
+                <div className="text-3xl font-black text-amber-400 mt-1.5 tabular-nums">
+                  {tenants.reduce((acc, t) => acc + (t.stats?.outstandingPoints || 0), 0).toLocaleString()} <span className="text-sm font-semibold text-slate-400">pts</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">Total points outstanding</p>
+              </div>
+            </div>
+
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
               <div className="flex items-center space-x-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-80">
@@ -400,7 +447,7 @@ export default function PlatformAdminPage() {
             </div>
 
             {/* Tenants Table */}
-            <Card className="bg-slate-900 border-slate-800 overflow-hidden">
+            <Card className="bg-slate-900 border-slate-800 overflow-hidden shadow-2xl rounded-3xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-slate-300">
                   <thead className="bg-slate-800/60 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
