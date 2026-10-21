@@ -25,6 +25,9 @@ export interface RegisterOwnerParams {
   plan?: "free" | "pro";
   locationName?: string;
   brandPrimaryHex?: string;
+  status?: "active" | "pending" | "suspended";
+  maxStaff?: number;
+  maxLocations?: number;
 }
 
 export async function registerOwnerAndTenant(params: RegisterOwnerParams) {
@@ -75,14 +78,18 @@ export async function registerOwnerAndTenant(params: RegisterOwnerParams) {
         slug: normalizedSlug,
         name: params.businessName,
         industry: params.industry || "Retail & Hospitality",
-        status: "active",
+        status: params.status || "active",
         currency: "GBP",
         timezone: "Europe/London",
         locale: "en-GB",
         brandPrimaryHex: params.brandPrimaryHex || "#1e293b",
         plan: params.plan || "free",
         features: {},
-        limits: {},
+        limits: {
+          maxStaff: params.maxStaff || 10,
+          maxLocations: params.maxLocations || 3,
+          maxActiveRewards: 10,
+        },
       })
       .returning();
 

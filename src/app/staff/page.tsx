@@ -17,6 +17,9 @@ import {
   RefreshCw,
   Sparkles,
   LogOut,
+  Package,
+  X,
+  Plus,
 } from "lucide-react";
 
 interface LocationItem {
@@ -49,10 +52,79 @@ interface TransactionItem {
   displayName: string;
 }
 
+interface ProductItem {
+  id: string;
+  name: string;
+  category: string;
+  priceMinor: number;
+  pointsAwarded: number;
+  discountPercent: number;
+  isActive: boolean;
+}
+
+interface StaffCampaignQrItem {
+  id: string;
+  code: string;
+  title: string;
+  offerType: "points_bonus" | "stamps_bonus" | "free_product" | "discount_promo";
+  pointsToAward: number;
+  requiredVisits: number;
+  productId?: string | null;
+  productRewardName?: string | null;
+  discountPercent: number;
+  status: "active" | "expired" | "deactivated";
+  validityDays: number;
+  expiresAt: string;
+  totalScans: number;
+  totalClaims: number;
+  qrDataUrl: string;
+  scanUrl: string;
+  createdAt: string;
+}
+
+interface StaffPromoReportItem {
+  id: string;
+  campaignTitle: string;
+  offerType: string;
+  productRewardName?: string;
+  memberName: string;
+  memberNumber: string;
+  pointsAwarded: number;
+  visitNumber: number;
+  requiredVisits: number;
+  status: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  scannedAt: string;
+}
+
 export default function StaffPage() {
   const [locations, setLocations] = useState<LocationItem[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"scan" | "search" | "code" | "history">("scan");
+  const [activeTab, setActiveTab] = useState<"scan" | "search" | "code" | "products" | "history">("scan");
+
+  // Products state for Staff
+  const [productsList, setProductsList] = useState<ProductItem[]>([]);
+  const [showAddProdModal, setShowAddProdModal] = useState(false);
+  const [newProdName, setNewProdName] = useState("");
+  const [newProdCategory, setNewProdCategory] = useState("General");
+  const [newProdPrice, setNewProdPrice] = useState("3.50");
+  const [newProdPoints, setNewProdPoints] = useState("2");
+  const [newProdDiscount, setNewProdDiscount] = useState("0");
+  const [dailyDiscountSetting, setDailyDiscountSetting] = useState("10");
+
+  // Campaign QR state for Staff
+  const [campaignQrs, setCampaignQrs] = useState<StaffCampaignQrItem[]>([]);
+  const [promoReports, setPromoReports] = useState<StaffPromoReportItem[]>([]);
+  const [showCreatePromoModal, setShowCreatePromoModal] = useState(false);
+  const [promoTitle, setPromoTitle] = useState("");
+  const [promoOfferType, setPromoOfferType] = useState<"points_bonus" | "stamps_bonus" | "free_product" | "discount_promo">("points_bonus");
+  const [promoPoints, setPromoPoints] = useState("10");
+  const [promoRequiredVisits, setPromoRequiredVisits] = useState("3");
+  const [promoValidityDays, setPromoValidityDays] = useState("30");
+  const [promoDiscountPct, setPromoDiscountPct] = useState("15");
+  const [promoSelectedProdId, setPromoSelectedProdId] = useState("");
+  const [fullscreenQr, setFullscreenQr] = useState<StaffCampaignQrItem | null>(null);
 
   // Scanner & Member state
   const [qrInput, setQrInput] = useState("");
@@ -332,11 +404,201 @@ export default function StaffPage() {
     }
   };
 
+  // Fetch store products & campaign QRs
+  const fetchProducts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/products");
+      if (res.ok) {
+        const json = await res.json();
+        setProductsList(json.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to load products", err);
+    }
+  }, []);
+
+  const fetchCampaignQrs = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/campaign-qrs");
+      if (res.ok) {
+        const json = await res.json();
+        setCampaignQrs(json.data || []);
+      }
+    } catch (e) {
+      console.error("Failed to load campaign QRs", e);
+    }
+  }, []);
+
+  const fetchPromoReports = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/campaign-qrs/reports");
+      if (res.ok) {
+        const json = await res.json();
+        setPromoReports(json.data || []);
+      }
+    } catch (e) {
+      console.error("Failed to load promo scan reports", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+    fetchCampaignQrs();
+    fetchPromoReports();
+  }, [fetchProducts, fetchCampaignQrs, fetchPromoReports]);
+
+  const handleCreatePromoQr = async () => {
+    if (!promoTitle.trim()) {
+      alert("Please enter a campaign title");
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await fetch("/api/v1/campaign-qrs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: promoTitle.trim(),
+          offerType: promoOfferType,
+          pointsToAward: promoOfferType === "points_bonus" ? parseInt(promoPoints || "0", 10) : undefined,
+          productId: promoOfferType === "free_product" && promoSelectedProdId ? promoSelectedProdId : undefined,
+          discountPercent: promoOfferType === "discount_promo" ? parseInt(promoDiscountPct || "0", 10) : undefined,
+          requiredVisits: parseInt(promoRequiredVisits || "1", 10),
+          validityDays: parseInt(promoValidityDays || "30", 10),
+          locationId: selectedLocationId || undefined,
+        }),
+      });
+      if (res.ok) {
+        setShowCreatePromoModal(false);
+        setPromoTitle("");
+        setPromoPoints("10");
+        setPromoRequiredVisits("3");
+        setPromoValidityDays("30");
+        setPromoSelectedProdId("");
+        fetchCampaignQrs();
+        fetchPromoReports();
+      } else {
+        const json = await res.json();
+        alert(json.error?.message || "Failed to generate offer QR code");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveScan = async (scanId: string) => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/v1/campaign-qrs/scans/${scanId}/approve`, {
+        method: "PATCH",
+      });
+      if (res.ok) {
+        fetchPromoReports();
+        fetchCampaignQrs();
+      } else {
+        const json = await res.json();
+        alert(json.error?.message || "Failed to approve claim");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDiscardScan = async (scanId: string) => {
+    if (!confirm("Are you sure you want to discard / reset this claim?")) return;
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/v1/campaign-qrs/scans/${scanId}/discard`, {
+        method: "PATCH",
+      });
+      if (res.ok) {
+        fetchPromoReports();
+      } else {
+        const json = await res.json();
+        alert(json.error?.message || "Failed to discard claim");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeactivatePromoQr = async (qrId: string) => {
+    if (!confirm("Are you sure you want to expire and deactivate this QR code?")) return;
+    try {
+      const res = await fetch(`/api/v1/campaign-qrs/${qrId}/deactivate`, {
+        method: "PATCH",
+      });
+      if (res.ok) {
+        fetchCampaignQrs();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Create Product as Staff
+  const handleCreateProduct = async () => {
+    if (!newProdName.trim()) return;
+    try {
+      setLoading(true);
+      const res = await fetch("/api/v1/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newProdName.trim(),
+          category: newProdCategory,
+          priceMinor: Math.round(parseFloat(newProdPrice || "0") * 100),
+          pointsAwarded: parseInt(newProdPoints || "0", 10),
+          discountPercent: parseInt(newProdDiscount || "0", 10),
+        }),
+      });
+      if (res.ok) {
+        setShowAddProdModal(false);
+        setNewProdName("");
+        fetchProducts();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Set Today's Storewide Discount
+  const handleApplyDailyDiscount = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/v1/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          discountPercent: parseInt(dailyDiscountSetting || "0", 10),
+        }),
+      });
+      if (res.ok) {
+        fetchProducts();
+        alert(`Today's storewide promotional discount (${dailyDiscountSetting}%) applied to all products!`);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Quick tap product to add to spend
+  const handleTapProduct = (prod: ProductItem) => {
+    const discountedPrice = Math.round(prod.priceMinor * (1 - (prod.discountPercent || 0) / 100)) / 100;
+    const current = parseFloat(spendInput || "0");
+    const nextTotal = (current + discountedPrice).toFixed(2);
+    setSpendInput(nextTotal);
+  };
+
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-20 selection:bg-indigo-500 selection:text-white">
       {/* Top Header Bar - High-End POS Shell */}
-      <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 backdrop-blur-md px-4 py-3 shadow-2xs">
-        <div className="mx-auto flex max-w-md items-center justify-between">
+      <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-3 shadow-2xs">
+        <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white flex items-center justify-center font-black text-sm shadow-sm shadow-indigo-500/20">
               <QrCode className="w-5 h-5" />
@@ -385,8 +647,8 @@ export default function StaffPage() {
         </div>
       </header>
 
-      {/* Main Content Container (Mobile-first max-w-md) */}
-      <main className="mx-auto max-w-md px-4 pt-5">
+      {/* Main Content Container (Enterprise Responsive max-w-5xl) */}
+      <main className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 pt-6">
         {/* Error Alert */}
         {errorMsg && (
           <div className="mb-4 flex items-start space-x-3 rounded-2xl bg-rose-50 p-4 border border-rose-200 text-rose-800 animate-in fade-in shadow-xs">
@@ -496,6 +758,46 @@ export default function StaffPage() {
                       </button>
                     ))}
                   </div>
+
+                  {/* Quick Tap Products from Store Menu */}
+                  {productsList.length > 0 && (
+                    <div className="mt-3 pt-2.5 border-t border-slate-100">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                          Tap Menu Item to Add to Bill
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSpendInput("0.00")}
+                          className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
+                        >
+                          Clear Bill
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                        {productsList.map((prod) => {
+                          const discount = prod.discountPercent || 0;
+                          const finalPrice = ((prod.priceMinor * (1 - discount / 100)) / 100).toFixed(2);
+                          return (
+                            <button
+                              key={prod.id}
+                              type="button"
+                              onClick={() => handleTapProduct(prod)}
+                              className="py-1 px-2.5 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 border border-slate-200 text-slate-800 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                            >
+                              <span>{prod.name}</span>
+                              <span className="font-mono font-bold text-indigo-700">£{finalPrice}</span>
+                              {discount > 0 && (
+                                <span className="text-[9px] bg-rose-100 text-rose-700 font-extrabold px-1 rounded-sm">
+                                  -{discount}%
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -591,10 +893,10 @@ export default function StaffPage() {
         ) : (
           /* Main Tab Navigation */
           <div>
-            <div className="grid grid-cols-4 gap-1 p-1 mb-5 bg-slate-200/80 rounded-2xl border border-slate-300/60 shadow-2xs">
+            <div className="grid grid-cols-5 gap-1 p-1 mb-5 bg-slate-200/80 rounded-2xl border border-slate-300/60 shadow-2xs">
               <button
                 onClick={() => setActiveTab("scan")}
-                className={`flex flex-col items-center justify-center py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === "scan"
                     ? "bg-white text-indigo-600 shadow-sm font-black"
                     : "text-slate-600 hover:text-slate-900"
@@ -605,7 +907,7 @@ export default function StaffPage() {
               </button>
               <button
                 onClick={() => setActiveTab("search")}
-                className={`flex flex-col items-center justify-center py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === "search"
                     ? "bg-white text-indigo-600 shadow-sm font-black"
                     : "text-slate-600 hover:text-slate-900"
@@ -616,7 +918,7 @@ export default function StaffPage() {
               </button>
               <button
                 onClick={() => setActiveTab("code")}
-                className={`flex flex-col items-center justify-center py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === "code"
                     ? "bg-white text-indigo-600 shadow-sm font-black"
                     : "text-slate-600 hover:text-slate-900"
@@ -626,8 +928,22 @@ export default function StaffPage() {
                 Redeem
               </button>
               <button
+                onClick={() => {
+                  setActiveTab("products");
+                  fetchProducts();
+                }}
+                className={`flex flex-col items-center justify-center py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === "products"
+                    ? "bg-white text-indigo-600 shadow-sm font-black"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Package className="h-4 w-4 mb-1" />
+                Products
+              </button>
+              <button
                 onClick={handleLoadHistory}
-                className={`flex flex-col items-center justify-center py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === "history"
                     ? "bg-white text-indigo-600 shadow-sm font-black"
                     : "text-slate-600 hover:text-slate-900"
@@ -878,9 +1194,623 @@ export default function StaffPage() {
                 </div>
               </div>
             )}
+
+            {/* Tab 5: Products & Daily Discount Screen */}
+            {activeTab === "products" && (
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 space-y-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-3 gap-3">
+                  <div>
+                    <h3 className="text-base font-black text-slate-900">Products & Counter Offer QR Codes</h3>
+                    <p className="text-xs text-slate-400">Generate dynamic promotional QR codes for customers at the counter</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setPromoTitle("");
+                        setPromoOfferType("points_bonus");
+                        setPromoPoints("10");
+                        setPromoValidityDays("30");
+                        setPromoSelectedProdId("");
+                        setShowCreatePromoModal(true);
+                      }}
+                      className="bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs cursor-pointer flex items-center gap-1.5 shadow-sm"
+                    >
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>⚡ Generate Offer QR</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setShowAddProdModal(true)}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Add Item</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Today's Storewide Discount Control */}
+                <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                      Today&apos;s Storewide Promo Discount
+                    </span>
+                    <span className="text-xs font-extrabold text-amber-700">{dailyDiscountSetting}% OFF</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {["0", "5", "10", "15", "20", "25", "50"].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => setDailyDiscountSetting(pct)}
+                        className={`px-2.5 py-1 text-xs rounded-lg font-bold border cursor-pointer transition-colors ${
+                          dailyDiscountSetting === pct
+                            ? "bg-amber-600 text-white border-amber-600"
+                            : "bg-white text-slate-700 border-amber-200 hover:bg-amber-100"
+                        }`}
+                      >
+                        {pct === "0" ? "None (0%)" : `${pct}%`}
+                      </button>
+                    ))}
+                    <Button
+                      size="sm"
+                      onClick={handleApplyDailyDiscount}
+                      className="ml-auto bg-amber-700 hover:bg-amber-800 text-white font-bold text-[11px] rounded-xl h-7"
+                    >
+                      Apply to All Items
+                    </Button>
+                  </div>
+                </div>
+
+                {/* ACTIVE PROMOTIONAL QR CODES FOR COUNTER DISPLAY */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <QrCode className="w-4 h-4 text-purple-600" />
+                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                        Counter Promotional QR Codes
+                      </h4>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={fetchCampaignQrs}
+                      className="text-xs font-bold text-purple-600 hover:bg-purple-50"
+                    >
+                      <RefreshCw className="w-3 h-3 mr-1" />
+                      Refresh
+                    </Button>
+                  </div>
+
+                  {campaignQrs.length === 0 ? (
+                    <div className="p-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-center">
+                      <p className="text-xs text-slate-500">
+                        No promotional QR codes yet. Click <strong>&quot;⚡ Generate Offer QR&quot;</strong> to create one for customers to scan!
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {campaignQrs.map((qr) => {
+                        const isExpired = qr.status === "expired" || new Date(qr.expiresAt) < new Date();
+                        const isDeactivated = qr.status === "deactivated";
+                        const isActive = !isExpired && !isDeactivated;
+                        const daysLeft = Math.max(
+                          0,
+                          Math.ceil((new Date(qr.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                        );
+
+                        return (
+                          <div
+                            key={qr.id}
+                            className={`p-3.5 rounded-2xl border transition-all ${
+                              isActive
+                                ? "bg-white border-purple-200 shadow-2xs hover:shadow-md"
+                                : "bg-slate-50 border-slate-200 opacity-60"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <span
+                                className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                                  isActive
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : isDeactivated
+                                    ? "bg-rose-50 text-rose-700 border-rose-200"
+                                    : "bg-slate-100 text-slate-600 border-slate-200"
+                                }`}
+                              >
+                                {isActive ? `Active • ${daysLeft}d left` : isDeactivated ? "Deactivated" : "Expired"}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400 font-bold">{qr.code}</span>
+                            </div>
+
+                            <div className="flex items-center gap-3 mb-3">
+                              <div
+                                onClick={() => setFullscreenQr(qr)}
+                                className="w-14 h-14 rounded-xl border border-slate-200 p-1 bg-white cursor-pointer hover:border-purple-500 shadow-2xs shrink-0"
+                              >
+                                <img src={qr.qrDataUrl} alt={qr.title} className="w-full h-full object-contain" />
+                              </div>
+                              <div className="min-w-0">
+                                <h5 className="font-bold text-xs text-slate-900 truncate">{qr.title}</h5>
+                                <p className="text-[11px] text-purple-700 font-semibold mt-0.5">
+                                  {qr.offerType === "free_product" && `🎁 Free ${qr.productRewardName || "Item"}`}
+                                  {qr.offerType === "points_bonus" && `+${qr.pointsToAward} Bonus Points`}
+                                  {qr.offerType === "stamps_bonus" && `+1 Stamp`}
+                                  {qr.offerType === "discount_promo" && `${qr.discountPercent}% OFF`}
+                                </p>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  {qr.totalScans} scans • {qr.totalClaims} claims
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                              <Button
+                                size="sm"
+                                onClick={() => setFullscreenQr(qr)}
+                                className="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-[11px] font-bold h-7 rounded-lg"
+                              >
+                                Show on Tablet Screen
+                              </Button>
+
+                              {isActive && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeactivatePromoQr(qr.id)}
+                                  className="text-[11px] font-bold text-rose-600 hover:bg-rose-50 h-7 px-2 rounded-lg"
+                                >
+                                  Expire
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Product Catalog List */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                      Product Catalog &amp; Menu
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono">{productsList.length} items</span>
+                  </div>
+
+                  {productsList.length === 0 ? (
+                    <div className="text-center py-6 text-slate-400 text-xs">
+                      No products added yet. Click &quot;+ Add Item&quot; to create your first menu item.
+                    </div>
+                  ) : (
+                    productsList.map((prod) => {
+                      const originalPrice = (prod.priceMinor / 100).toFixed(2);
+                      const finalPrice = ((prod.priceMinor * (1 - (prod.discountPercent || 0) / 100)) / 100).toFixed(2);
+                      return (
+                        <div
+                          key={prod.id}
+                          className="p-3 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-center justify-between text-xs shadow-2xs"
+                        >
+                          <div>
+                            <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                              <span>{prod.name}</span>
+                              <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md font-semibold">
+                                {prod.category}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              Awards <span className="font-bold text-indigo-600">+{prod.pointsAwarded} pts</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <div className="font-black text-sm text-slate-900 tabular-nums">
+                                £{finalPrice}
+                              </div>
+                              {prod.discountPercent > 0 && (
+                                <div className="text-[10px] text-slate-400 line-through">
+                                  £{originalPrice} ({prod.discountPercent}% off)
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                setPromoTitle(`Free ${prod.name} Counter Perk`);
+                                setPromoOfferType("free_product");
+                                setPromoSelectedProdId(prod.id);
+                                setPromoValidityDays("30");
+                                setShowCreatePromoModal(true);
+                              }}
+                              className="text-[11px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-2 py-1 rounded-lg cursor-pointer transition-colors"
+                            >
+                              + QR
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* LIVE SCAN AUDIT REPORT IN STAFF TERMINAL */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <History className="w-3.5 h-3.5 text-purple-600" />
+                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                        Customer Scan Audit Log
+                      </h4>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={fetchPromoReports}
+                      className="text-xs font-bold text-purple-600 hover:bg-purple-50"
+                    >
+                      <RefreshCw className="w-3 h-3 mr-1" />
+                      Refresh
+                    </Button>
+                  </div>
+
+                  {promoReports.length === 0 ? (
+                    <p className="text-xs text-slate-400 text-center py-4">
+                      No customer promo scans recorded yet.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {promoReports.slice(0, 15).map((r) => {
+                        const isPending = r.status === "pending_claim";
+                        const isApproved = r.status === "approved";
+                        const isDiscarded = r.status === "discarded";
+
+                        return (
+                          <div
+                            key={r.id}
+                            className={`p-3 rounded-2xl border text-xs transition-all ${
+                              isPending
+                                ? "bg-amber-50/70 border-amber-300 shadow-xs"
+                                : "bg-white border-slate-200"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <span className="font-bold text-slate-900 block">{r.memberName}</span>
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  #{r.memberNumber} • {new Date(r.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              </div>
+                              <div className="text-right">
+                                <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold text-[10px] border border-purple-200 inline-block">
+                                  {r.requiredVisits > 1 ? `Visit ${r.visitNumber}/${r.requiredVisits}` : "1-Time Claim"}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="mt-1 flex items-center justify-between text-[11px]">
+                              <span className="font-semibold text-slate-700 truncate max-w-[160px]">
+                                {r.campaignTitle}
+                              </span>
+                              {isPending && (
+                                <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse">
+                                  ⏳ Needs Counter Approval
+                                </span>
+                              )}
+                              {isApproved && (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                  ✓ Handed Over
+                                </span>
+                              )}
+                              {isDiscarded && (
+                                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                                  Discarded
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Counter Action Buttons for Staff */}
+                            {isPending && (
+                              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-amber-200/80">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleApproveScan(r.id)}
+                                  disabled={loading}
+                                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] h-7 rounded-lg shadow-xs"
+                                >
+                                  ✓ Approve &amp; Give Perk
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDiscardScan(r.id)}
+                                  disabled={loading}
+                                  className="bg-white border-rose-200 text-rose-700 hover:bg-rose-50 font-bold text-[11px] h-7 px-2 rounded-lg"
+                                >
+                                  ✕ Discard
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
+
+      {/* Add Product Modal */}
+      {showAddProdModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl relative border border-slate-200">
+            <button
+              onClick={() => setShowAddProdModal(false)}
+              className="absolute right-4 top-4 p-2 text-slate-400 hover:text-slate-900 rounded-xl cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h3 className="text-lg font-black text-slate-900 mb-1">Add Store Product</h3>
+            <p className="text-xs text-slate-500 mb-4">Add a new item to store catalog with points and price.</p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Product Name</label>
+                <Input
+                  placeholder="e.g. Americano or Standard Haircut"
+                  value={newProdName}
+                  onChange={(e) => setNewProdName(e.target.value)}
+                  className="text-xs rounded-xl"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Price (£)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={newProdPrice}
+                    onChange={(e) => setNewProdPrice(e.target.value)}
+                    className="text-xs rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Points Awarded</label>
+                  <Input
+                    type="number"
+                    value={newProdPoints}
+                    onChange={(e) => setNewProdPoints(e.target.value)}
+                    className="text-xs rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Category</label>
+                <select
+                  value={newProdCategory}
+                  onChange={(e) => setNewProdCategory(e.target.value)}
+                  className="w-full text-xs rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-medium"
+                >
+                  <option value="Beverages">Beverages</option>
+                  <option value="Food & Pastry">Food & Pastry</option>
+                  <option value="Services">Services</option>
+                  <option value="Retail & Merch">Retail & Merch</option>
+                  <option value="General">General</option>
+                </select>
+              </div>
+
+              <Button
+                onClick={handleCreateProduct}
+                disabled={loading || !newProdName.trim()}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl mt-2 cursor-pointer"
+              >
+                {loading ? "Adding Product..." : "Save Product"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Staff Generate Offer QR Modal */}
+      {showCreatePromoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl relative border border-slate-200">
+            <button
+              onClick={() => setShowCreatePromoModal(false)}
+              className="absolute right-4 top-4 p-2 text-slate-400 hover:text-slate-900 rounded-xl cursor-pointer"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                <QrCode className="w-4 h-4" />
+              </div>
+              <h3 className="text-base font-black text-slate-900">Generate Counter Offer QR</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Create a promotional QR code for customers to scan at the counter or table.
+            </p>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Offer Title</label>
+                <Input
+                  placeholder="e.g. Free Coffee, 10 Bonus Points, 15% Off"
+                  value={promoTitle}
+                  onChange={(e) => setPromoTitle(e.target.value)}
+                  className="rounded-xl text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Offer Type</label>
+                <select
+                  value={promoOfferType}
+                  onChange={(e) => setPromoOfferType(e.target.value as any)}
+                  className="w-full text-xs rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-medium"
+                >
+                  <option value="points_bonus">Bonus Points upon Scan</option>
+                  <option value="free_product">Free Product / Item Perk</option>
+                  <option value="discount_promo">Promotional Discount %</option>
+                  <option value="stamps_bonus">Bonus Stamp (+1)</option>
+                </select>
+              </div>
+
+              {promoOfferType === "free_product" && (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Select Free Product</label>
+                  <select
+                    value={promoSelectedProdId}
+                    onChange={(e) => setPromoSelectedProdId(e.target.value)}
+                    className="w-full text-xs rounded-xl border border-purple-200 bg-purple-50/50 p-2.5 font-medium"
+                  >
+                    <option value="">-- Choose from menu --</option>
+                    {productsList.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} (£{(p.priceMinor / 100).toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {promoOfferType === "points_bonus" && (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Points to Award</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 10"
+                    value={promoPoints}
+                    onChange={(e) => setPromoPoints(e.target.value)}
+                    className="rounded-xl text-xs"
+                  />
+                </div>
+              )}
+
+              {promoOfferType === "discount_promo" && (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Discount %</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    placeholder="e.g. 15"
+                    value={promoDiscountPct}
+                    onChange={(e) => setPromoDiscountPct(e.target.value)}
+                    className="rounded-xl text-xs"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Purchases / Visits Required (e.g. 3)
+                </label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="50"
+                    placeholder="3"
+                    value={promoRequiredVisits}
+                    onChange={(e) => setPromoRequiredVisits(e.target.value)}
+                    className="rounded-xl text-xs font-bold w-20"
+                  />
+                  <span className="text-[11px] text-slate-500">
+                    {parseInt(promoRequiredVisits || "1", 10) > 1
+                      ? `Must scan ${promoRequiredVisits} times to unlock reward`
+                      : "Instant claim on 1st scan"}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Validity (Expiry)</label>
+                <select
+                  value={promoValidityDays}
+                  onChange={(e) => setPromoValidityDays(e.target.value)}
+                  className="w-full text-xs rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-medium"
+                >
+                  <option value="1">1 Day (Today Only)</option>
+                  <option value="3">3 Days (Weekend Flash)</option>
+                  <option value="7">7 Days (1 Week)</option>
+                  <option value="14">14 Days (2 Weeks)</option>
+                  <option value="30">30 Days (1 Month)</option>
+                  <option value="90">90 Days</option>
+                </select>
+              </div>
+
+              <Button
+                onClick={handleCreatePromoQr}
+                disabled={loading || !promoTitle.trim()}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl mt-2 cursor-pointer"
+              >
+                {loading ? "Generating..." : "Generate QR Code"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Counter Tablet QR Modal */}
+      {fullscreenQr && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl relative border-2 border-purple-500">
+            <button
+              onClick={() => setFullscreenQr(null)}
+              className="absolute right-4 top-4 p-2 text-slate-400 hover:text-slate-900 rounded-xl cursor-pointer"
+            >
+              <X className="h-6 w-6" />
+            </button>
+
+            <span className="text-[10px] font-extrabold uppercase px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+              Point Phone Camera to Scan
+            </span>
+
+            <h3 className="text-xl font-black text-slate-950 mt-3 mb-1">
+              {fullscreenQr.title}
+            </h3>
+            <p className="text-xs text-purple-700 font-bold mb-4">
+              {fullscreenQr.offerType === "free_product" && `🎁 Unlock Free ${fullscreenQr.productRewardName || "Perk"}!`}
+              {fullscreenQr.offerType === "points_bonus" && `🎉 Claim +${fullscreenQr.pointsToAward} Bonus Points!`}
+              {fullscreenQr.offerType === "stamps_bonus" && `🎉 Claim +1 Stamp on your card!`}
+              {fullscreenQr.offerType === "discount_promo" && `🔥 Enjoy ${fullscreenQr.discountPercent}% Discount!`}
+            </p>
+
+            <div className="p-4 bg-white border-2 border-slate-200 rounded-2xl inline-block shadow-inner mb-4">
+              <img
+                src={fullscreenQr.qrDataUrl}
+                alt={fullscreenQr.title}
+                className="w-60 h-60 object-contain mx-auto"
+              />
+            </div>
+
+            <p className="text-[11px] text-slate-400 font-medium">
+              Valid until {new Date(fullscreenQr.expiresAt).toLocaleDateString()} • {fullscreenQr.totalScans} customers scanned
+            </p>
+
+            <Button
+              variant="outline"
+              onClick={() => setFullscreenQr(null)}
+              className="w-full mt-4 font-bold text-xs rounded-xl"
+            >
+              Close Counter Screen
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

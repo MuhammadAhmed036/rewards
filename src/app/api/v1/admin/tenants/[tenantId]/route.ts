@@ -31,7 +31,7 @@ export async function GET(
 }
 
 const updateSchema = z.object({
-  status: z.enum(["active", "suspended", "closed"]).optional(),
+  status: z.enum(["active", "suspended", "closed", "pending"]).optional(),
   plan: z.enum(["free", "pro"]).optional(),
   features: z.record(z.unknown()).optional(),
   limits: z.record(z.unknown()).optional(),

@@ -3,6 +3,8 @@ import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { hashPassword, createSession } from "@/server/auth";
 import { registerOwnerAndTenant } from "@/server/services/tenant";
+import { queueEmail, processOutbox } from "@/server/services/email";
+import { env } from "@/lib/env";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -12,6 +14,9 @@ const signupSchema = z.object({
   email: z.string().email("Valid email required"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   businessName: z.string().optional(),
+  category: z.string().optional(),
+  requestedStaffCount: z.number().int().min(1).max(100).optional(),
+  requestedManagerCount: z.number().int().min(0).max(50).optional(),
   programmeType: z.enum(["points", "stamps"]).default("points"),
 });
 
@@ -47,6 +52,8 @@ export async function POST(request: NextRequest) {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, "") || `biz-${Date.now()}`;
 
+      const totalRequestedStaff = (validated.requestedStaffCount || 5) + (validated.requestedManagerCount || 2);
+
       const result = await registerOwnerAndTenant({
         email: normalizedEmail,
         password: validated.password,
@@ -54,33 +61,49 @@ export async function POST(request: NextRequest) {
         businessName: bizName,
         slug,
         programmeType: validated.programmeType,
+        industry: validated.category || "Coffee Shop & Cafe",
+        status: "pending", // Requires SuperAdmin approval before owner can log in
+        maxStaff: totalRequestedStaff,
       });
 
-      // Create session
-      const { token, expiresAt } = await createSession(result.user.id, true);
+      const storeUrl = `${env.APP_URL || "http://localhost:3000"}/b/${result.tenant.slug}`;
 
-      const response = NextResponse.json(
+      // Send owner welcome email with dedicated store path per client request
+      try {
+        await queueEmail({
+          toEmail: normalizedEmail,
+          template: "owner_business_registered",
+          payload: {
+            ownerName: validated.name.trim(),
+            businessName: bizName,
+            category: validated.category || "Coffee Shop & Cafe",
+            storeUrl,
+            slug: result.tenant.slug,
+          },
+          kind: "transactional",
+          tenantId: result.tenant.id,
+        });
+        await processOutbox(5);
+      } catch (err) {
+        console.error("Failed to queue/process welcome email for owner:", err);
+      }
+
+      return NextResponse.json(
         {
           data: {
             user: result.user,
-            tenant: result.tenant,
-            redirectUrl: "/dashboard",
+            tenant: {
+              ...result.tenant,
+              storeUrl,
+            },
+            storeUrl,
+            pendingApproval: true,
+            message:
+              "🎉 Your business registration has been submitted! A welcome email with your store URL has been dispatched to your email address. It is currently pending approval by the Super Admin.",
           },
         },
         { status: 201 }
       );
-
-      response.cookies.set({
-        name: "loyalty_session",
-        value: token,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        expires: expiresAt,
-      });
-
-      return response;
     } else {
       // Customer registration
       const hashedPassword = await hashPassword(validated.password);

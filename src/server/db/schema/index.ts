@@ -486,6 +486,90 @@ export const supportReports = pgTable(
   ]
 );
 
+export const products = pgTable(
+  "products",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 255 }).notNull(),
+    category: varchar("category", { length: 128 }).default("General").notNull(),
+    priceMinor: integer("price_minor").default(0).notNull(), // In pence (e.g. 450 = £4.50)
+    pointsAwarded: integer("points_awarded").default(1).notNull(),
+    discountPercent: integer("discount_percent").default(0).notNull(), // 0-100%
+    isActive: boolean("is_active").default(true).notNull(),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("products_tenant_active_idx").on(table.tenantId, table.isActive),
+  ]
+);
+
+export const promoQrCodes = pgTable(
+  "promo_qr_codes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    locationId: uuid("location_id").references(() => locations.id, { onDelete: "set null" }),
+    code: varchar("code", { length: 64 }).notNull().unique(),
+    title: varchar("title", { length: 255 }).notNull(),
+    offerType: varchar("offer_type", { length: 32 }).default("points_bonus").notNull(), // points_bonus, stamps_bonus, free_product, discount_promo
+    pointsToAward: integer("points_to_award").default(0).notNull(),
+    requiredVisits: integer("required_visits").default(1).notNull(), // e.g. 3 for "Buy 3 get 1 free"
+    productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
+    productRewardName: varchar("product_reward_name", { length: 255 }),
+    discountPercent: integer("discount_percent").default(0).notNull(),
+    status: varchar("status", { length: 32 }).default("active").notNull(), // active, expired, deactivated
+    validityDays: integer("validity_days").default(30).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    totalScans: integer("total_scans").default(0).notNull(),
+    totalClaims: integer("total_claims").default(0).notNull(),
+    qrDataUrl: text("qr_data_url").notNull(),
+    scanUrl: text("scan_url").notNull(),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("promo_qr_tenant_status_idx").on(table.tenantId, table.status),
+    index("promo_qr_code_idx").on(table.code),
+    index("promo_qr_expires_idx").on(table.expiresAt),
+  ]
+);
+
+export const promoQrScans = pgTable(
+  "promo_qr_scans",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    campaignQrId: uuid("campaign_qr_id")
+      .notNull()
+      .references(() => promoQrCodes.id, { onDelete: "cascade" }),
+    membershipId: uuid("membership_id").references(() => memberships.id, { onDelete: "set null" }),
+    memberNumber: varchar("member_number", { length: 64 }),
+    memberName: varchar("member_name", { length: 255 }),
+    scannedAt: timestamp("scanned_at", { withTimezone: true }).defaultNow().notNull(),
+    pointsAwarded: integer("points_awarded").default(0).notNull(),
+    visitNumber: integer("visit_number").default(1).notNull(),
+    requiredVisits: integer("required_visits").default(1).notNull(),
+    status: varchar("status", { length: 32 }).default("recorded").notNull(), // recorded, visit_logged, pending_claim, approved, discarded
+    approvedBy: uuid("approved_by").references(() => users.id),
+    approvedByName: varchar("approved_by_name", { length: 255 }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("promo_qr_scans_tenant_idx").on(table.tenantId, table.scannedAt),
+    index("promo_qr_scans_campaign_idx").on(table.campaignQrId),
+  ]
+);
+
 // ==========================================
 // 8. Operations & Security
 // ==========================================

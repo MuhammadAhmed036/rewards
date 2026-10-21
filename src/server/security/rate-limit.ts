@@ -1,5 +1,4 @@
 import { env } from "@/lib/env";
-import { NextResponse } from "next/server";
 
 export class RateLimitError extends Error {
   readonly code = "RATE_LIMITED";
@@ -11,35 +10,6 @@ export class RateLimitError extends Error {
     this.name = "RateLimitError";
     this.retryAfterSeconds = retryAfterSeconds;
   }
-}
-
-export function rateLimitResponse(error: RateLimitError): NextResponse {
-  return NextResponse.json(
-    {
-      error: {
-        code: error.code,
-        message: error.message,
-      },
-    },
-    {
-      status: error.status,
-      headers: {
-        "Retry-After": String(error.retryAfterSeconds),
-      },
-    }
-  );
-}
-
-export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0].trim();
-  }
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) {
-    return realIp.trim();
-  }
-  return "127.0.0.1";
 }
 
 interface RateLimitBucket {
@@ -247,6 +217,44 @@ export async function checkPublicTenantRateLimit(ip: string) {
     120,
     60,
     "RATE_LIMITED: Public request rate limit exceeded."
+  );
+}
+
+export function getClientIp(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  return request.headers.get("x-real-ip") || "127.0.0.1";
+}
+
+export function rateLimitResponse(
+  retryAfterOrErr: number | RateLimitError = 60,
+  customMessage?: string
+) {
+  const retryAfterSeconds =
+    typeof retryAfterOrErr === "number"
+      ? retryAfterOrErr
+      : retryAfterOrErr?.retryAfterSeconds || 60;
+  const message =
+    customMessage ||
+    (typeof retryAfterOrErr === "object" && retryAfterOrErr?.message
+      ? retryAfterOrErr.message
+      : `Too many requests. Please try again in ${retryAfterSeconds} seconds.`);
+
+  return Response.json(
+    {
+      error: {
+        code: "RATE_LIMITED",
+        message,
+      },
+    },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": String(retryAfterSeconds),
+      },
+    }
   );
 }
 

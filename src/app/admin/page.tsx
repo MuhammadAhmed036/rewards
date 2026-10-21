@@ -431,6 +431,7 @@ export default function PlatformAdminPage() {
                   className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-700 min-h-[40px]"
                 >
                   <option value="">All Statuses</option>
+                  <option value="pending">⏳ Pending Approval</option>
                   <option value="active">Active Only</option>
                   <option value="suspended">Suspended Only</option>
                   <option value="closed">Closed Only</option>
@@ -501,6 +502,10 @@ export default function PlatformAdminPage() {
                               <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 Active
                               </Badge>
+                            ) : t.status === "pending" ? (
+                              <Badge className="bg-amber-50 text-amber-800 border border-amber-300 font-bold">
+                                ⏳ Pending Approval
+                              </Badge>
                             ) : t.status === "suspended" ? (
                               <Badge className="bg-rose-50 text-rose-700 border border-rose-200">
                                 Suspended
@@ -512,7 +517,32 @@ export default function PlatformAdminPage() {
                             )}
                           </td>
                           <td className="px-6 py-4 text-right space-x-2">
-                            {t.status === "active" ? (
+                            {t.status === "pending" ? (
+                              <Button
+                                size="sm"
+                                onClick={async () => {
+                                  try {
+                                    setLoading(true);
+                                    await fetch(`/api/v1/admin/tenants/${t.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        status: "active",
+                                        reason: "Approved by Super Admin",
+                                      }),
+                                    });
+                                    fetchTenants();
+                                  } catch (e) {
+                                    console.error(e);
+                                  } finally {
+                                    setLoading(false);
+                                  }
+                                }}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs cursor-pointer"
+                              >
+                                ✓ Approve Business
+                              </Button>
+                            ) : t.status === "active" ? (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -520,7 +550,7 @@ export default function PlatformAdminPage() {
                                   setSelectedTenant(t);
                                   setActionType("suspend");
                                 }}
-                                className="border-rose-900/60 text-rose-400 hover:bg-rose-950/40 text-xs"
+                                className="border-rose-300 text-rose-700 hover:bg-rose-50 text-xs"
                               >
                                 Suspend
                               </Button>
@@ -532,7 +562,7 @@ export default function PlatformAdminPage() {
                                   setSelectedTenant(t);
                                   setActionType("reactivate");
                                 }}
-                                className="border-emerald-900/60 text-emerald-400 hover:bg-emerald-950/40 text-xs"
+                                className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs"
                               >
                                 Reactivate
                               </Button>

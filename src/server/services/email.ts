@@ -12,7 +12,8 @@ export type EmailTemplate =
   | "reward_unlocked"
   | "redemption_receipt"
   | "feedback_received"
-  | "data_export_ready";
+  | "data_export_ready"
+  | "owner_business_registered";
 
 export interface QueueEmailOptions {
   toEmail: string;
@@ -115,6 +116,51 @@ export function renderEmailTemplate(
             </div>
             <div style="margin: 24px 0; text-align: center;">
               <a href="${hubUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">View My Rewards & QR</a>
+            </div>
+          </div>
+        `,
+      };
+    }
+    case "owner_business_registered": {
+      const ownerName = String(payload.ownerName || "Business Owner");
+      const businessName = String(payload.businessName || "Your Store");
+      const category = String(payload.category || "Commercial");
+      const storeUrl = String(payload.storeUrl || `${env.APP_URL}`);
+
+      return {
+        subject: `🎉 Congratulations! Your business "${businessName}" is registered on ${appName}`,
+        text: `Hello ${ownerName},\n\nCongratulations! Your business "${businessName}" (${category}) has been successfully registered on ${appName}.\n\nYour Dedicated Store Website:\n${storeUrl}\n\nStatus: Pending Super Admin Approval.\nOnce our platform team approves your account, you will be able to log in to your owner dashboard directly at your store link above.\n\nThank you for choosing ${appName}!`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px;">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <span style="font-size: 36px;">🎉</span>
+              <h1 style="color: #0f172a; font-size: 24px; font-weight: 800; margin: 8px 0 4px 0;">Welcome to ${appName}!</h1>
+              <p style="color: #64748b; font-size: 14px; margin: 0;">Your business account has been created successfully.</p>
+            </div>
+
+            <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 1px solid #cbd5e1; border-radius: 14px; padding: 20px; margin: 24px 0;">
+              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Registered Store</div>
+              <div style="font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 4px;">${businessName}</div>
+              <div style="font-size: 13px; color: #475569; margin-top: 2px;">Category: ${category}</div>
+
+              <div style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed #cbd5e1;">
+                <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Your Store Website URL</div>
+                <div style="font-family: monospace; font-size: 14px; font-weight: 700; color: #4f46e5; margin-top: 4px; word-break: break-all;">${storeUrl}</div>
+              </div>
+            </div>
+
+            <div style="margin: 28px 0; text-align: center;">
+              <a href="${storeUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);">Visit Your Store Page →</a>
+            </div>
+
+            <div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 12px; padding: 14px; margin-top: 24px;">
+              <p style="color: #92400e; font-size: 13px; margin: 0; line-height: 1.5;">
+                <strong>Next Step:</strong> Your store is currently pending review by the platform Super Admin. As soon as approval is granted, you can sign in directly at your store link to configure rewards, staff accounts, and daily promotions.
+              </p>
+            </div>
+
+            <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #f1f5f9; text-align: center; color: #94a3b8; font-size: 12px;">
+              ${appName} • Enterprise Customer Loyalty Infrastructure
             </div>
           </div>
         `,

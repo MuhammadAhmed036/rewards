@@ -15,6 +15,27 @@
       "when": 1792558578706,
       "tag": "0001_pale_masque",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792561312373,
+      "tag": "0002_chilly_zaran",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792567031503,
+      "tag": "0003_optimal_nemesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792576593127,
+      "tag": "0004_safe_calypso",
+      "breakpoints": true
     }
   ]
 }

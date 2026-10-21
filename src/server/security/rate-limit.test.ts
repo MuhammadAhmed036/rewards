@@ -72,3 +72,4 @@ describe("Rate Limiting Engine (FR-042, PRS Section 8)", () => {
     await expect(checkFeedbackRateLimit(memberId)).rejects.toThrow(/RATE_LIMITED/);
   });
 });
+

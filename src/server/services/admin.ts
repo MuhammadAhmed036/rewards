@@ -189,7 +189,7 @@ export async function getTenantDetail(ctx: RequestContext, tenantId: string, rea
 }
 
 export interface UpdateTenantInput {
-  status?: "active" | "suspended" | "closed";
+  status?: "active" | "suspended" | "closed" | "pending";
   plan?: "free" | "pro";
   features?: Record<string, unknown>;
   limits?: Record<string, unknown>;

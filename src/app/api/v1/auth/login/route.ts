@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { users } from "@/server/db/schema";
+import { users, tenants } from "@/server/db/schema";
 import { verifyPassword, createSession, getSessionContext } from "@/server/auth";
 import { checkLoginRateLimit, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { eq } from "drizzle-orm";
@@ -56,6 +56,41 @@ export async function POST(request: NextRequest) {
 
     // Resolve context to get role and tenant
     const ctx = await getSessionContext(token);
+
+    // If user is owner or staff, verify business approval status
+    if (ctx?.tenantId && !user.isPlatformAdmin) {
+      const [tenant] = await db
+        .select({ id: tenants.id, status: tenants.status, name: tenants.name })
+        .from(tenants)
+        .where(eq(tenants.id, ctx.tenantId))
+        .limit(1);
+
+      if (tenant?.status === "pending") {
+        return NextResponse.json(
+          {
+            error: {
+              code: "PENDING_APPROVAL",
+              message:
+                "Your business registration is pending approval by the Super Admin. You will be able to log in once approved.",
+            },
+          },
+          { status: 403 }
+        );
+      }
+
+      if (tenant?.status === "suspended") {
+        return NextResponse.json(
+          {
+            error: {
+              code: "TENANT_SUSPENDED",
+              message:
+                "Your business account has been suspended. Please contact platform support.",
+            },
+          },
+          { status: 403 }
+        );
+      }
+    }
 
     const response = NextResponse.json({
       success: true,

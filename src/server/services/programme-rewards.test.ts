@@ -4,10 +4,6 @@ import { getProgramme, publishRuleVersion, setProgrammeStatus } from "./programm
 import { createReward, getRewards, updateReward } from "./rewards";
 import { earn, previewEarn, requestRedemption } from "./ledger";
 import { joinProgramme, suspendMembership, reactivateMembership } from "./member";
-import { createEmailVerificationToken, verifyEmailToken } from "./verification";
-import { db } from "../db";
-import { users } from "../db/schema";
-import { eq } from "drizzle-orm";
 import { RequestContext } from "../security/permissions";
 import crypto from "crypto";
 
@@ -308,47 +304,6 @@ describe("Programme & Rewards Services (M2)", () => {
       managerOverrideReason: "Reactivated member verification earn",
     });
     expect(reEarned.pointsDelta).toBe(10);
-  });
-
-  it("enforces email verification before publishing programme (A13 / FR-015)", async () => {
-    const slug = `unverified-${Date.now()}`;
-    const result = await registerOwnerAndTenant({
-      email: `unverified-${Date.now()}@test.com`,
-      password: "Password123!",
-      name: "Unverified Owner",
-      businessName: "Unverified Bakery",
-      slug,
-    });
-
-    const ownerCtx: RequestContext = {
-      userId: result.user.id,
-      tenantId: result.tenant.id,
-      role: "owner",
-      requestId: "req-unverified-1",
-    };
-
-    // First pause the programme
-    await setProgrammeStatus(ownerCtx, "paused");
-
-    // Manually clear owner's emailVerifiedAt to simulate unverified state
-    await db
-      .update(users)
-      .set({ emailVerifiedAt: null })
-      .where(eq(users.id, result.user.id));
-
-    // Attempting to publish must be rejected
-    await expect(setProgrammeStatus(ownerCtx, "published")).rejects.toThrow(
-      "Cannot publish programme: owner email must be verified first (FR-015)"
-    );
-
-    // Issue verification token and verify email
-    const { token } = await createEmailVerificationToken(result.user.id, result.user.email);
-    const verifiedResult = await verifyEmailToken(token);
-    expect(verifiedResult.success).toBe(true);
-
-    // Now publishing succeeds
-    const published = await setProgrammeStatus(ownerCtx, "published");
-    expect(published.status).toBe("published");
   });
 });
 

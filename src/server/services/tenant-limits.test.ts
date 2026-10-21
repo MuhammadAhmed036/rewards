@@ -132,3 +132,4 @@ describe("Tenant Tier Limits (A18 / FR-011)", () => {
     ).rejects.toThrow(/Active reward limit reached for your plan/);
   });
 });
+

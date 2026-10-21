@@ -1,0 +1,609 @@
+import { db } from "../db";
+import {
+  promoQrCodes,
+  promoQrScans,
+  tenants,
+  products,
+  memberships,
+  users,
+  ledgerEntries,
+  membershipBalances,
+} from "../db/schema";
+import { RequestContext, assertCan } from "../security/permissions";
+import { generateQrDataUrl } from "../qr";
+import { env } from "@/lib/env";
+import { eq, and, desc, sql, lt } from "drizzle-orm";
+import crypto from "crypto";
+
+export interface CreateCampaignQrInput {
+  title: string;
+  offerType: "points_bonus" | "stamps_bonus" | "free_product" | "discount_promo";
+  pointsToAward?: number;
+  requiredVisits?: number;
+  productId?: string;
+  productRewardName?: string;
+  discountPercent?: number;
+  validityDays?: number;
+  locationId?: string;
+}
+
+/**
+ * Creates a dynamic promotional QR code for a business.
+ * Valid for X days, fully tenant-scoped, and deactivatable at any time.
+ */
+export async function createCampaignQr(
+  ctx: RequestContext,
+  input: CreateCampaignQrInput
+) {
+  if (!ctx.tenantId) throw new Error("tenantId is required");
+
+  // Load tenant slug
+  const [tenant] = await db
+    .select({ slug: tenants.slug, name: tenants.name })
+    .from(tenants)
+    .where(eq(tenants.id, ctx.tenantId))
+    .limit(1);
+
+  if (!tenant) throw new Error("Tenant not found");
+
+  // If productId provided, verify product exists
+  let rewardName = input.productRewardName;
+  if (input.productId && !rewardName) {
+    const [prod] = await db
+      .select({ name: products.name })
+      .from(products)
+      .where(and(eq(products.id, input.productId), eq(products.tenantId, ctx.tenantId)))
+      .limit(1);
+    if (prod) rewardName = prod.name;
+  }
+
+  // Auto-detect required visits if title contains "Buy 3" or similar and requiredVisits wasn't set
+  let requiredVisits = Math.max(1, input.requiredVisits || 1);
+  if (requiredVisits === 1 && input.title) {
+    const match = input.title.match(/buy\s*(\d+)/i);
+    if (match && match[1]) {
+      requiredVisits = parseInt(match[1], 10);
+    }
+  }
+
+  const validityDays = Math.max(1, Math.min(365, input.validityDays || 30));
+  const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
+  const code = `QR_${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
+
+  const baseUrl = env.APP_URL || "http://localhost:3000";
+  const scanUrl = `${baseUrl}/b/${tenant.slug}?claimQr=${code}`;
+  const qrDataUrl = await generateQrDataUrl(scanUrl);
+
+  const [campaign] = await db
+    .insert(promoQrCodes)
+    .values({
+      tenantId: ctx.tenantId,
+      locationId: input.locationId || null,
+      code,
+      title: input.title.trim(),
+      offerType: input.offerType,
+      pointsToAward: input.pointsToAward || 0,
+      requiredVisits,
+      productId: input.productId || null,
+      productRewardName: rewardName || null,
+      discountPercent: input.discountPercent || 0,
+      status: "active",
+      validityDays,
+      expiresAt,
+      totalScans: 0,
+      totalClaims: 0,
+      qrDataUrl,
+      scanUrl,
+      createdBy: ctx.userId || null,
+    })
+    .returning();
+
+  return campaign;
+}
+
+/**
+ * Lists all promotional QR codes created by a store with auto-expiry check.
+ */
+export async function getCampaignQrs(ctx: RequestContext) {
+  if (!ctx.tenantId) throw new Error("tenantId is required");
+
+  const now = new Date();
+
+  // Mark expired any codes where expiresAt < now and status === 'active'
+  await db
+    .update(promoQrCodes)
+    .set({ status: "expired" })
+    .where(
+      and(
+        eq(promoQrCodes.tenantId, ctx.tenantId),
+        eq(promoQrCodes.status, "active"),
+        lt(promoQrCodes.expiresAt, now)
+      )
+    );
+
+  return await db
+    .select()
+    .from(promoQrCodes)
+    .where(eq(promoQrCodes.tenantId, ctx.tenantId))
+    .orderBy(desc(promoQrCodes.createdAt));
+}
+
+/**
+ * Deactivates / expires an active QR code manually on-demand.
+ */
+export async function deactivateCampaignQr(ctx: RequestContext, qrId: string) {
+  if (!ctx.tenantId) throw new Error("tenantId is required");
+
+  const [updated] = await db
+    .update(promoQrCodes)
+    .set({ status: "deactivated", updatedAt: new Date() })
+    .where(and(eq(promoQrCodes.id, qrId), eq(promoQrCodes.tenantId, ctx.tenantId)))
+    .returning();
+
+  if (!updated) {
+    throw new Error("Campaign QR code not found or unauthorized");
+  }
+
+  return updated;
+}
+
+/**
+ * Customer scans and claims a promotional QR code.
+ * Validates expiration, records visit progress (e.g. 1/3, 2/3, 3/3),
+ * handles duplicate claim prevention, and sets up pending claim for staff/owner approval.
+ */
+export async function scanAndClaimCampaignQr(
+  tenantId: string,
+  code: string,
+  membershipId: string
+) {
+  const now = new Date();
+
+  // 1. Fetch QR code
+  const [qr] = await db
+    .select()
+    .from(promoQrCodes)
+    .where(and(eq(promoQrCodes.code, code), eq(promoQrCodes.tenantId, tenantId)))
+    .limit(1);
+
+  if (!qr) {
+    throw new Error("Invalid QR Code: Promotional offer not found for this store.");
+  }
+
+  if (qr.status === "deactivated") {
+    throw new Error("This promotional QR code was deactivated by the business manager.");
+  }
+
+  if (qr.status === "expired" || qr.expiresAt < now) {
+    if (qr.status !== "expired") {
+      await db.update(promoQrCodes).set({ status: "expired" }).where(eq(promoQrCodes.id, qr.id));
+    }
+    throw new Error("This promotional QR code has expired.");
+  }
+
+  // 2. Fetch Member details
+  const [member] = await db
+    .select({
+      id: memberships.id,
+      memberNumber: memberships.memberNumber,
+      userName: users.name,
+      userEmail: users.email,
+    })
+    .from(memberships)
+    .innerJoin(users, eq(memberships.userId, users.id))
+    .where(and(eq(memberships.id, membershipId), eq(memberships.tenantId, tenantId)))
+    .limit(1);
+
+  if (!member) {
+    throw new Error("Member not found for this store.");
+  }
+
+  // 3. Check if member already claimed and had this offer approved
+  const [alreadyApproved] = await db
+    .select()
+    .from(promoQrScans)
+    .where(
+      and(
+        eq(promoQrScans.campaignQrId, qr.id),
+        eq(promoQrScans.membershipId, member.id),
+        eq(promoQrScans.status, "approved")
+      )
+    )
+    .limit(1);
+
+  if (alreadyApproved) {
+    throw new Error(
+      `You have already claimed this promotional offer on ${new Date(
+        alreadyApproved.approvedAt || alreadyApproved.scannedAt
+      ).toLocaleDateString()}. Each customer can claim this perk once.`
+    );
+  }
+
+  // 4. Check if member already has a pending claim waiting for staff approval
+  const [pendingClaim] = await db
+    .select()
+    .from(promoQrScans)
+    .where(
+      and(
+        eq(promoQrScans.campaignQrId, qr.id),
+        eq(promoQrScans.membershipId, member.id),
+        eq(promoQrScans.status, "pending_claim")
+      )
+    )
+    .limit(1);
+
+  if (pendingClaim) {
+    return {
+      success: true,
+      isIntermediateVisit: false,
+      isPendingClaim: true,
+      currentVisit: pendingClaim.requiredVisits,
+      requiredVisits: pendingClaim.requiredVisits,
+      campaignTitle: qr.title,
+      productRewardName: qr.productRewardName,
+      message: `⏳ Your Free ${qr.productRewardName || "Perk"} claim is waiting at the counter! Staff or Owner will approve and hand it over to you.`,
+    };
+  }
+
+  // 5. Determine required visits (e.g. 3 for "BUY 3 GET ONE FREE")
+  let requiredVisits = Math.max(1, qr.requiredVisits || 1);
+  if (requiredVisits === 1 && qr.title) {
+    const match = qr.title.match(/buy\s*(\d+)/i);
+    if (match && match[1]) {
+      requiredVisits = parseInt(match[1], 10);
+    }
+  }
+
+  // Count active in-progress scans
+  const previousVisits = await db
+    .select()
+    .from(promoQrScans)
+    .where(
+      and(
+        eq(promoQrScans.campaignQrId, qr.id),
+        eq(promoQrScans.membershipId, member.id),
+        eq(promoQrScans.status, "visit_logged")
+      )
+    );
+
+  const currentVisit = previousVisits.length + 1;
+
+  // Case A: Intermediate visit (e.g. 1/3 or 2/3)
+  if (currentVisit < requiredVisits) {
+    await db.transaction(async (tx) => {
+      await tx.insert(promoQrScans).values({
+        tenantId,
+        campaignQrId: qr.id,
+        membershipId: member.id,
+        memberNumber: member.memberNumber,
+        memberName: member.userName || member.userEmail || "Member",
+        pointsAwarded: 0,
+        visitNumber: currentVisit,
+        requiredVisits,
+        status: "visit_logged",
+      });
+
+      await tx
+        .update(promoQrCodes)
+        .set({
+          totalScans: sql`${promoQrCodes.totalScans} + 1`,
+          updatedAt: now,
+        })
+        .where(eq(promoQrCodes.id, qr.id));
+    });
+
+    const remaining = requiredVisits - currentVisit;
+    return {
+      success: true,
+      isIntermediateVisit: true,
+      isPendingClaim: false,
+      currentVisit,
+      requiredVisits,
+      visitsRemaining: remaining,
+      campaignTitle: qr.title,
+      productRewardName: qr.productRewardName,
+      message: `☕ Visit ${currentVisit} of ${requiredVisits} recorded! Buy ${remaining} more ${
+        qr.productRewardName || "item(s)"
+      } to get 1 Free!`,
+    };
+  }
+
+  // Case B: Final visit / Goal reached (e.g. 3 of 3)!
+  let awardedPoints = qr.pointsToAward || 0;
+  if (qr.offerType === "stamps_bonus" && awardedPoints === 0) {
+    awardedPoints = 1;
+  }
+
+  await db.transaction(async (tx) => {
+    // Record scan as pending_claim waiting for counter approval
+    await tx.insert(promoQrScans).values({
+      tenantId,
+      campaignQrId: qr.id,
+      membershipId: member.id,
+      memberNumber: member.memberNumber,
+      memberName: member.userName || member.userEmail || "Member",
+      pointsAwarded: awardedPoints,
+      visitNumber: requiredVisits,
+      requiredVisits,
+      status: "pending_claim",
+    });
+
+    await tx
+      .update(promoQrCodes)
+      .set({
+        totalScans: sql`${promoQrCodes.totalScans} + 1`,
+        updatedAt: now,
+      })
+      .where(eq(promoQrCodes.id, qr.id));
+  });
+
+  return {
+    success: true,
+    isIntermediateVisit: false,
+    isPendingClaim: true,
+    currentVisit: requiredVisits,
+    requiredVisits,
+    campaignTitle: qr.title,
+    productRewardName: qr.productRewardName,
+    message: `🎉 Goal Reached (${requiredVisits}/${requiredVisits})! Your Free ${
+      qr.productRewardName || "Reward"
+    } request is waiting at the counter. Staff / Owner will approve and hand it over to you!`,
+  };
+}
+
+/**
+ * Staff or Owner approves a pending claim and hands over the free product / reward.
+ */
+export async function approvePromoClaim(ctx: RequestContext, scanId: string) {
+  if (!ctx.tenantId) throw new Error("tenantId is required");
+
+  const [scan] = await db
+    .select()
+    .from(promoQrScans)
+    .where(and(eq(promoQrScans.id, scanId), eq(promoQrScans.tenantId, ctx.tenantId)))
+    .limit(1);
+
+  if (!scan) throw new Error("Promo scan record not found");
+  if (scan.status === "approved") throw new Error("This claim has already been approved");
+
+  const [qr] = await db
+    .select()
+    .from(promoQrCodes)
+    .where(eq(promoQrCodes.id, scan.campaignQrId))
+    .limit(1);
+
+  const now = new Date();
+  let approverName = "Staff / Owner";
+  if (ctx.userId) {
+    const [u] = await db
+      .select({ name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, ctx.userId))
+      .limit(1);
+    if (u) approverName = u.name || u.email || "Staff / Owner";
+  }
+
+  let newBalance: number | null = null;
+
+  await db.transaction(async (tx) => {
+    // 1. If points bonus, credit through append-only ledger
+    if (scan.pointsAwarded > 0 && scan.membershipId) {
+      const [balanceRow] = await tx
+        .select()
+        .from(membershipBalances)
+        .where(eq(membershipBalances.membershipId, scan.membershipId))
+        .for("update");
+
+      const currentBal = balanceRow?.balance || 0;
+      const currentLifetime = balanceRow?.lifetimeEarned || 0;
+      const computedBal = currentBal + scan.pointsAwarded;
+
+      await tx.insert(ledgerEntries).values({
+        tenantId: ctx.tenantId!,
+        membershipId: scan.membershipId,
+        type: "earn",
+        pointsDelta: scan.pointsAwarded,
+        reasonCode: "promo_qr_bonus",
+        note: `Approved promo claim: ${qr?.title || "Promo QR"}`,
+        idempotencyKey: `promo_claim_approve_${scan.id}_${Date.now()}`,
+        occurredAt: now,
+      });
+
+      await tx
+        .update(membershipBalances)
+        .set({
+          balance: computedBal,
+          lifetimeEarned: currentLifetime + scan.pointsAwarded,
+          updatedAt: now,
+        })
+        .where(eq(membershipBalances.membershipId, scan.membershipId));
+
+      newBalance = computedBal;
+    }
+
+    // 2. Mark this scan as approved
+    await tx
+      .update(promoQrScans)
+      .set({
+        status: "approved",
+        approvedBy: ctx.userId || null,
+        approvedByName: approverName,
+        approvedAt: now,
+      })
+      .where(eq(promoQrScans.id, scan.id));
+
+    // 3. Mark previous in-progress visit scans for this member as approved (completed cycle)
+    if (scan.membershipId) {
+      await tx
+        .update(promoQrScans)
+        .set({ status: "approved", approvedAt: now })
+        .where(
+          and(
+            eq(promoQrScans.campaignQrId, scan.campaignQrId),
+            eq(promoQrScans.membershipId, scan.membershipId),
+            eq(promoQrScans.status, "visit_logged")
+          )
+        );
+    }
+
+    // 4. Increment total claims counter
+    if (qr) {
+      await tx
+        .update(promoQrCodes)
+        .set({
+          totalClaims: sql`${promoQrCodes.totalClaims} + 1`,
+          updatedAt: now,
+        })
+        .where(eq(promoQrCodes.id, qr.id));
+    }
+  });
+
+  return {
+    success: true,
+    scanId: scan.id,
+    status: "approved",
+    approvedByName: approverName,
+    approvedAt: now.toISOString(),
+    newBalance,
+  };
+}
+
+/**
+ * Staff or Owner discards / resets an offer claim or in-progress visit.
+ */
+export async function discardPromoClaim(ctx: RequestContext, scanId: string) {
+  if (!ctx.tenantId) throw new Error("tenantId is required");
+
+  const [scan] = await db
+    .select()
+    .from(promoQrScans)
+    .where(and(eq(promoQrScans.id, scanId), eq(promoQrScans.tenantId, ctx.tenantId)))
+    .limit(1);
+
+  if (!scan) throw new Error("Promo scan record not found");
+
+  const now = new Date();
+  let approverName = "Staff / Owner";
+  if (ctx.userId) {
+    const [u] = await db
+      .select({ name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, ctx.userId))
+      .limit(1);
+    if (u) approverName = u.name || u.email || "Staff / Owner";
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(promoQrScans)
+      .set({
+        status: "discarded",
+        approvedBy: ctx.userId || null,
+        approvedByName: approverName,
+        approvedAt: now,
+      })
+      .where(eq(promoQrScans.id, scan.id));
+
+    if (scan.membershipId) {
+      await tx
+        .update(promoQrScans)
+        .set({ status: "discarded", approvedAt: now })
+        .where(
+          and(
+            eq(promoQrScans.campaignQrId, scan.campaignQrId),
+            eq(promoQrScans.membershipId, scan.membershipId),
+            eq(promoQrScans.status, "visit_logged")
+          )
+        );
+    }
+  });
+
+  return {
+    success: true,
+    scanId: scan.id,
+    status: "discarded",
+  };
+}
+
+/**
+ * Returns public metadata for a promo QR code so the customer landing page
+ * can display the promotional banner even before the customer logs in.
+ */
+export async function getCampaignQrPublicInfo(slug: string, code: string) {
+  const [tenant] = await db
+    .select({ id: tenants.id, name: tenants.name })
+    .from(tenants)
+    .where(eq(tenants.slug, slug))
+    .limit(1);
+
+  if (!tenant) return null;
+
+  const [qr] = await db
+    .select()
+    .from(promoQrCodes)
+    .where(and(eq(promoQrCodes.code, code), eq(promoQrCodes.tenantId, tenant.id)))
+    .limit(1);
+
+  if (!qr) return null;
+
+  const now = new Date();
+  let status = qr.status;
+  if (status === "active" && qr.expiresAt < now) {
+    status = "expired";
+  }
+
+  let requiredVisits = Math.max(1, qr.requiredVisits || 1);
+  if (requiredVisits === 1 && qr.title) {
+    const match = qr.title.match(/buy\s*(\d+)/i);
+    if (match && match[1]) {
+      requiredVisits = parseInt(match[1], 10);
+    }
+  }
+
+  return {
+    id: qr.id,
+    tenantId: qr.tenantId,
+    businessName: tenant.name,
+    code: qr.code,
+    title: qr.title,
+    offerType: qr.offerType,
+    pointsToAward: qr.pointsToAward,
+    requiredVisits,
+    productRewardName: qr.productRewardName,
+    discountPercent: qr.discountPercent,
+    status,
+    expiresAt: qr.expiresAt.toISOString(),
+    isExpired: status === "expired",
+    isDeactivated: status === "deactivated",
+  };
+}
+
+/**
+ * Returns scan and claim activity reports for staff & owner.
+ */
+export async function getCampaignQrReports(ctx: RequestContext) {
+  if (!ctx.tenantId) throw new Error("tenantId is required");
+
+  return await db
+    .select({
+      id: promoQrScans.id,
+      campaignQrId: promoQrScans.campaignQrId,
+      campaignTitle: promoQrCodes.title,
+      offerType: promoQrCodes.offerType,
+      productRewardName: promoQrCodes.productRewardName,
+      memberName: promoQrScans.memberName,
+      memberNumber: promoQrScans.memberNumber,
+      pointsAwarded: promoQrScans.pointsAwarded,
+      visitNumber: promoQrScans.visitNumber,
+      requiredVisits: promoQrScans.requiredVisits,
+      status: promoQrScans.status,
+      approvedByName: promoQrScans.approvedByName,
+      approvedAt: promoQrScans.approvedAt,
+      scannedAt: promoQrScans.scannedAt,
+    })
+    .from(promoQrScans)
+    .innerJoin(promoQrCodes, eq(promoQrScans.campaignQrId, promoQrCodes.id))
+    .where(eq(promoQrScans.tenantId, ctx.tenantId))
+    .orderBy(desc(promoQrScans.scannedAt))
+    .limit(100);
+}

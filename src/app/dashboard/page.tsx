@@ -37,6 +37,10 @@ import {
   ChevronRight,
   Check,
   AlertTriangle,
+  Gift,
+  Tag,
+  Copy,
+  Trash2,
 } from "lucide-react";
 
 interface OverviewMetrics {
@@ -81,21 +85,78 @@ interface StaffRow {
   email: string;
 }
 
+interface ProductRow {
+  id: string;
+  name: string;
+  category: string;
+  priceMinor: number;
+  pointsAwarded: number;
+  discountPercent: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface CampaignQrRow {
+  id: string;
+  code: string;
+  title: string;
+  offerType: "points_bonus" | "stamps_bonus" | "free_product" | "discount_promo";
+  pointsToAward: number;
+  requiredVisits: number;
+  productId?: string | null;
+  productRewardName?: string | null;
+  discountPercent: number;
+  status: "active" | "expired" | "deactivated";
+  validityDays: number;
+  expiresAt: string;
+  totalScans: number;
+  totalClaims: number;
+  qrDataUrl: string;
+  scanUrl: string;
+  createdAt: string;
+}
+
+interface PromoScanReportRow {
+  id: string;
+  campaignTitle: string;
+  offerType: string;
+  productRewardName?: string;
+  memberName: string;
+  memberNumber: string;
+  pointsAwarded: number;
+  visitNumber: number;
+  requiredVisits: number;
+  status: string; // visit_logged, pending_claim, approved, discarded
+  approvedByName?: string;
+  approvedAt?: string;
+  scannedAt: string;
+}
+
 export default function OwnerDashboardPage() {
   const [activeTab, setActiveTab] = useState<
-    "overview" | "members" | "ledger" | "rewards" | "links" | "qr" | "team" | "reports"
+    "overview" | "members" | "ledger" | "rewards" | "products" | "links" | "qr" | "team" | "reports"
   >("overview");
 
   const [metrics, setMetrics] = useState<OverviewMetrics | null>(null);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [ledger, setLedger] = useState<LedgerRow[]>([]);
   const [team, setTeam] = useState<StaffRow[]>([]);
+  const [productsList, setProductsList] = useState<ProductRow[]>([]);
   const [links, setLinks] = useState<LinkConfig[]>([]);
   const [qrData, setQrData] = useState<{ joinUrl: string; qrPng: string } | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [ledgerSearch, setLedgerSearch] = useState("");
+
+  // Product modal state
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductCategory, setNewProductCategory] = useState("General");
+  const [newProductPrice, setNewProductPrice] = useState("4.50");
+  const [newProductPoints, setNewProductPoints] = useState("1");
+  const [newProductDiscount, setNewProductDiscount] = useState("0");
+  const [storewideDiscountInput, setStorewideDiscountInput] = useState("10");
 
   // Adjust points modal state
   const [adjustingMember, setAdjustingMember] = useState<MemberRow | null>(null);
@@ -114,6 +175,20 @@ export default function OwnerDashboardPage() {
   const [newStaffName, setNewStaffName] = useState("");
   const [newStaffPassword, setNewStaffPassword] = useState("Password123!");
   const [newStaffRole, setNewStaffRole] = useState<"manager" | "staff" | "marketing">("staff");
+
+  // Promotional Campaign QR state
+  const [campaignQrs, setCampaignQrs] = useState<CampaignQrRow[]>([]);
+  const [promoScanReports, setPromoScanReports] = useState<PromoScanReportRow[]>([]);
+  const [showCreatePromoQr, setShowCreatePromoQr] = useState(false);
+  const [promoTitle, setPromoTitle] = useState("");
+  const [promoOfferType, setPromoOfferType] = useState<"points_bonus" | "stamps_bonus" | "free_product" | "discount_promo">("points_bonus");
+  const [promoPointsAward, setPromoPointsAward] = useState("10");
+  const [promoRequiredVisits, setPromoRequiredVisits] = useState("3");
+  const [promoValidityDays, setPromoValidityDays] = useState("30");
+  const [promoDiscountPct, setPromoDiscountPct] = useState("15");
+  const [promoSelectedProdId, setPromoSelectedProdId] = useState("");
+  const [viewingPromoQr, setViewingPromoQr] = useState<CampaignQrRow | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const loadOverview = async () => {
     try {
@@ -195,14 +270,141 @@ export default function OwnerDashboardPage() {
     loadOverview();
   }, []);
 
+  const loadCampaignQrs = async () => {
+    try {
+      const res = await fetch("/api/v1/campaign-qrs");
+      if (res.ok) {
+        const json = await res.json();
+        setCampaignQrs(json.data || []);
+      }
+    } catch (e) {
+      console.error("Failed to load campaign QRs", e);
+    }
+  };
+
+  const loadPromoReports = async () => {
+    try {
+      const res = await fetch("/api/v1/campaign-qrs/reports");
+      if (res.ok) {
+        const json = await res.json();
+        setPromoScanReports(json.data || []);
+      }
+    } catch (e) {
+      console.error("Failed to load promo scan reports", e);
+    }
+  };
+
+  const handleCreatePromoQr = async () => {
+    if (!promoTitle.trim()) {
+      alert("Please enter a campaign title");
+      return;
+    }
+    setLoading(true);
+    try {
+      const body = {
+        title: promoTitle.trim(),
+        offerType: promoOfferType,
+        pointsToAward: promoOfferType === "points_bonus" ? parseInt(promoPointsAward || "0", 10) : undefined,
+        productId: promoOfferType === "free_product" && promoSelectedProdId ? promoSelectedProdId : undefined,
+        discountPercent: promoOfferType === "discount_promo" ? parseInt(promoDiscountPct || "0", 10) : undefined,
+        requiredVisits: parseInt(promoRequiredVisits || "1", 10),
+        validityDays: parseInt(promoValidityDays || "30", 10),
+      };
+
+      const res = await fetch("/api/v1/campaign-qrs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        setShowCreatePromoQr(false);
+        setPromoTitle("");
+        setPromoPointsAward("10");
+        setPromoRequiredVisits("3");
+        setPromoValidityDays("30");
+        setPromoSelectedProdId("");
+        loadCampaignQrs();
+        loadPromoReports();
+      } else {
+        const json = await res.json();
+        alert(json.error?.message || "Failed to generate promotional QR code");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveScan = async (scanId: string) => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/v1/campaign-qrs/scans/${scanId}/approve`, {
+        method: "PATCH",
+      });
+      if (res.ok) {
+        loadPromoReports();
+        loadCampaignQrs();
+        loadLedger();
+      } else {
+        const json = await res.json();
+        alert(json.error?.message || "Failed to approve claim");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDiscardScan = async (scanId: string) => {
+    if (!confirm("Are you sure you want to discard / reset this claim?")) return;
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/v1/campaign-qrs/scans/${scanId}/discard`, {
+        method: "PATCH",
+      });
+      if (res.ok) {
+        loadPromoReports();
+      } else {
+        const json = await res.json();
+        alert(json.error?.message || "Failed to discard claim");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeactivatePromoQr = async (qrId: string) => {
+    if (!confirm("Are you sure you want to deactivate and expire this QR code? Scans after deactivation will be rejected.")) return;
+    try {
+      const res = await fetch(`/api/v1/campaign-qrs/${qrId}/deactivate`, {
+        method: "PATCH",
+      });
+      if (res.ok) {
+        loadCampaignQrs();
+      } else {
+        const json = await res.json();
+        alert(json.error?.message || "Failed to deactivate QR code");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleTabChange = (tab: typeof activeTab) => {
     setActiveTab(tab);
     if (tab === "overview") loadOverview();
     if (tab === "members") loadMembers();
     if (tab === "ledger") loadLedger();
+    if (tab === "products") {
+      loadProducts();
+      loadCampaignQrs();
+      loadPromoReports();
+    }
     if (tab === "team") loadTeam();
     if (tab === "links") loadLinks();
-    if (tab === "qr") loadQr();
+    if (tab === "qr") {
+      loadQr();
+      loadCampaignQrs();
+    }
   };
 
   // Submit Point Adjustment
@@ -289,6 +491,89 @@ export default function OwnerDashboardPage() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProducts = async () => {
+    try {
+      const res = await fetch("/api/v1/products");
+      if (res.ok) {
+        const json = await res.json();
+        setProductsList(json.data || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAddProduct = async () => {
+    if (!newProductName.trim()) return;
+    setLoading(true);
+    try {
+      const priceMinor = Math.round(parseFloat(newProductPrice || "0") * 100);
+      const points = parseInt(newProductPoints || "1", 10);
+      const discount = parseInt(newProductDiscount || "0", 10);
+
+      const res = await fetch("/api/v1/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newProductName.trim(),
+          category: newProductCategory.trim() || "General",
+          priceMinor,
+          pointsAwarded: points,
+          discountPercent: discount,
+        }),
+      });
+
+      if (res.ok) {
+        setShowAddProduct(false);
+        setNewProductName("");
+        setNewProductPrice("4.50");
+        setNewProductPoints("1");
+        setNewProductDiscount("0");
+        loadProducts();
+      } else {
+        const json = await res.json();
+        alert(json.error?.message || "Failed to create product");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetStorewideDiscount = async () => {
+    const disc = parseInt(storewideDiscountInput, 10);
+    if (isNaN(disc) || disc < 0 || disc > 100) {
+      alert("Please enter a valid discount percentage between 0 and 100");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/v1/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "storewide_discount",
+          discountPercent: disc,
+        }),
+      });
+      if (res.ok) {
+        alert(`Today's storewide discount of ${disc}% has been applied to all products!`);
+        loadProducts();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (!confirm("Are you sure you want to remove this product?")) return;
+    try {
+      const res = await fetch(`/api/v1/products/${id}`, { method: "DELETE" });
+      if (res.ok) loadProducts();
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -389,6 +674,7 @@ export default function OwnerDashboardPage() {
             <nav className="space-y-1">
               {[
                 { id: "overview", label: "Executive Overview", icon: LayoutDashboard },
+                { id: "products", label: "Products & Discounts", icon: Sparkles },
                 { id: "members", label: "Customer Members", icon: Users },
                 { id: "ledger", label: "Immutable Ledger", icon: Receipt },
                 { id: "links", label: "Links & Review Hub", icon: Share2 },
@@ -565,6 +851,471 @@ export default function OwnerDashboardPage() {
                       <p className="text-[11px] text-slate-500 mt-0.5">Calculations run exclusively in pence to eliminate float drift.</p>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* TAB: PRODUCTS & DISCOUNTS MANAGEMENT                    */}
+          {/* ======================================================== */}
+          {activeTab === "products" && (
+            <div className="space-y-8">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-950 tracking-tight">Products & Offer QR Codes</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Define catalog items, storewide discounts, and generate dynamic promotional QR codes for customers.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => {
+                      setPromoTitle("");
+                      setPromoOfferType("points_bonus");
+                      setPromoPointsAward("10");
+                      setPromoValidityDays("30");
+                      setPromoSelectedProdId("");
+                      setShowCreatePromoQr(true);
+                    }}
+                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer flex items-center gap-1.5"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>⚡ Generate Offer QR Code</span>
+                  </Button>
+
+                  <Button
+                    onClick={() => setShowAddProduct(true)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Add Product / Item</span>
+                  </Button>
+                </div>
+              </div>
+
+              {/* Today's Storewide Discount Banner */}
+              <div className="p-5 rounded-3xl bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border border-indigo-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-md shadow-indigo-600/25">
+                    %
+                  </div>
+                  <div>
+                    <h3 className="font-black text-sm text-slate-900">Today's Promotional Store Discount</h3>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Apply a storewide discount across all products for today (e.g. Happy Hour or Daily Special).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                  <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-2xs">
+                    <span className="text-xs font-bold text-slate-500">Discount:</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={storewideDiscountInput}
+                      onChange={(e) => setStorewideDiscountInput(e.target.value)}
+                      className="w-14 text-xs font-black text-indigo-700 focus:outline-none"
+                    />
+                    <span className="text-xs font-bold text-slate-700">%</span>
+                  </div>
+                  <Button
+                    onClick={handleSetStorewideDiscount}
+                    disabled={loading}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs"
+                  >
+                    Apply Storewide
+                  </Button>
+                </div>
+              </div>
+
+              {/* Products Table */}
+              <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+                <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                    <h3 className="font-bold text-xs uppercase tracking-wider text-slate-700">Products & Menu Catalog</h3>
+                  </div>
+                  <span className="text-xs text-slate-500 font-mono font-semibold">{productsList.length} items configured</span>
+                </div>
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
+                    <tr>
+                      <th className="p-4">Item Name</th>
+                      <th className="p-4">Category</th>
+                      <th className="p-4">Price (£)</th>
+                      <th className="p-4">Points Awarded</th>
+                      <th className="p-4">Discount</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {productsList.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-slate-400">
+                          No products found. Click "+ Add Product / Item" to create your menu or service items.
+                        </td>
+                      </tr>
+                    ) : (
+                      productsList.map((prod) => (
+                        <tr key={prod.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="p-4 font-bold text-slate-900">{prod.name}</td>
+                          <td className="p-4">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold text-[11px]">
+                              {prod.category}
+                            </span>
+                          </td>
+                          <td className="p-4 font-mono font-bold text-slate-900">
+                            £{(prod.priceMinor / 100).toFixed(2)}
+                          </td>
+                          <td className="p-4">
+                            <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold text-[11px] border border-indigo-200">
+                              +{prod.pointsAwarded} pts
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            {prod.discountPercent > 0 ? (
+                              <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold text-[11px] border border-rose-200">
+                                {prod.discountPercent}% OFF
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 font-medium">Standard</span>
+                            )}
+                          </td>
+                          <td className="p-4">
+                            <Badge className={prod.isActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500"}>
+                              {prod.isActive ? "Active" : "Archived"}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-3">
+                              <button
+                                onClick={() => {
+                                  setPromoTitle(`Free ${prod.name} Reward`);
+                                  setPromoOfferType("free_product");
+                                  setPromoSelectedProdId(prod.id);
+                                  setPromoValidityDays("30");
+                                  setShowCreatePromoQr(true);
+                                }}
+                                className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline cursor-pointer flex items-center gap-1"
+                              >
+                                <QrCode className="w-3.5 h-3.5" />
+                                <span>+ Promo QR</span>
+                              </button>
+                              <span className="text-slate-300">|</span>
+                              <button
+                                onClick={() => handleDeleteProduct(prod.id)}
+                                className="text-xs font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* DYNAMIC PROMOTIONAL & OFFER QR CODES GRID */}
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <QrCode className="w-5 h-5 text-purple-600" />
+                      <h3 className="text-xl font-black text-slate-950 tracking-tight">Active Promotional & Offer QR Codes</h3>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Unique QR codes configured with custom validity periods. Deactivate or expire them anytime on-demand.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadCampaignQrs}
+                    className="bg-white border-slate-300 text-xs font-bold text-slate-700"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5 text-purple-600" />
+                    Refresh QRs
+                  </Button>
+                </div>
+
+                {campaignQrs.length === 0 ? (
+                  <div className="p-8 rounded-3xl border border-dashed border-slate-300 bg-white text-center">
+                    <QrCode className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <h4 className="text-sm font-bold text-slate-800">No Promotional QR Codes Created Yet</h4>
+                    <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
+                      Create a promo QR code for "Buy 3 get 1 free", bonus points, or discounts. Print it out or display on counter for customer scans!
+                    </p>
+                    <Button
+                      onClick={() => setShowCreatePromoQr(true)}
+                      className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-xs"
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" />
+                      Create First Offer QR Code
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {campaignQrs.map((qr) => {
+                      const isExpired = qr.status === "expired" || new Date(qr.expiresAt) < new Date();
+                      const isDeactivated = qr.status === "deactivated";
+                      const isActive = !isExpired && !isDeactivated;
+                      const daysLeft = Math.max(
+                        0,
+                        Math.ceil((new Date(qr.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                      );
+
+                      return (
+                        <div
+                          key={qr.id}
+                          className={`p-5 rounded-3xl border transition-all flex flex-col justify-between ${
+                            isActive
+                              ? "bg-white border-slate-200 shadow-xs hover:border-purple-300 hover:shadow-md"
+                              : "bg-slate-50/80 border-slate-200 opacity-75"
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-3 mb-3">
+                              <span
+                                className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
+                                  isActive
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : isDeactivated
+                                    ? "bg-rose-50 text-rose-700 border-rose-200"
+                                    : "bg-slate-100 text-slate-600 border-slate-200"
+                                }`}
+                              >
+                                {isActive ? `Active • ${daysLeft}d left` : isDeactivated ? "Deactivated" : "Expired"}
+                              </span>
+
+                              <span className="text-[10px] font-mono text-slate-400 font-semibold">{qr.code}</span>
+                            </div>
+
+                            <div className="flex items-center gap-3 mb-3">
+                              <div
+                                onClick={() => setViewingPromoQr(qr)}
+                                className="w-16 h-16 rounded-xl border border-slate-200 p-1 bg-white cursor-pointer hover:border-purple-500 shadow-2xs shrink-0"
+                              >
+                                <img src={qr.qrDataUrl} alt={qr.title} className="w-full h-full object-contain" />
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="text-sm font-black text-slate-900 truncate">{qr.title}</h4>
+                                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                  {qr.offerType === "free_product" && (
+                                    <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                                      🎁 Free {qr.productRewardName || "Product"}
+                                    </span>
+                                  )}
+                                  {qr.offerType === "points_bonus" && (
+                                    <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                                      +{qr.pointsToAward} Bonus Points
+                                    </span>
+                                  )}
+                                  {qr.offerType === "stamps_bonus" && (
+                                    <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                      +1 Stamp
+                                    </span>
+                                  )}
+                                  {qr.offerType === "discount_promo" && (
+                                    <span className="text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                                      {qr.discountPercent}% OFF
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-600 mb-4">
+                              <div>
+                                <span className="text-slate-400 block text-[10px] uppercase font-bold">Scans</span>
+                                <span className="font-bold text-slate-900 text-xs">{qr.totalScans} scans</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block text-[10px] uppercase font-bold">Claims</span>
+                                <span className="font-bold text-purple-700 text-xs">{qr.totalClaims} claimed</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setViewingPromoQr(qr)}
+                              className="flex-1 bg-white border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 h-8"
+                            >
+                              <QrCode className="w-3.5 h-3.5 mr-1 text-purple-600" />
+                              View & Print
+                            </Button>
+
+                            {isActive && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeactivatePromoQr(qr.id)}
+                                className="bg-rose-50 border-rose-200 text-xs font-bold text-rose-700 hover:bg-rose-100 h-8"
+                              >
+                                Expire
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* LIVE CUSTOMER SCANS REPORT */}
+              <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+                <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <History className="w-4 h-4 text-purple-600" />
+                    <div>
+                      <h3 className="font-bold text-xs uppercase tracking-wider text-slate-700">Customer Promotional QR Scans Audit Log</h3>
+                      <p className="text-[11px] text-slate-500">Real-time ledger recording of members who claimed promotional offers</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={loadPromoReports}
+                    className="text-xs font-bold text-purple-600 hover:bg-purple-50"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                    Refresh
+                  </Button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50/50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
+                      <tr>
+                        <th className="p-3.5">Timestamp</th>
+                        <th className="p-3.5">Customer Member</th>
+                        <th className="p-3.5">Promotional Offer</th>
+                        <th className="p-3.5">Visit Progress</th>
+                        <th className="p-3.5">Claim Status</th>
+                        <th className="p-3.5 text-right">Counter Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-mono text-xs">
+                      {promoScanReports.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="p-8 text-center text-slate-400 font-sans text-xs">
+                            No customer promotional scans recorded yet. Once customers scan an offer QR code, live audit entries will appear here.
+                          </td>
+                        </tr>
+                      ) : (
+                        promoScanReports.map((scan) => {
+                          const isPending = scan.status === "pending_claim";
+                          const isApproved = scan.status === "approved";
+                          const isDiscarded = scan.status === "discarded";
+                          const isVisit = scan.status === "visit_logged";
+
+                          return (
+                            <tr key={scan.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="p-3.5 text-slate-500 text-[11px]">
+                                {new Date(scan.scannedAt).toLocaleString()}
+                              </td>
+                              <td className="p-3.5 font-sans">
+                                <span className="font-bold text-slate-900 block">{scan.memberName}</span>
+                                <span className="text-[11px] font-mono text-indigo-600">#{scan.memberNumber}</span>
+                              </td>
+                              <td className="p-3.5 font-sans font-semibold text-slate-800">
+                                <div>{scan.campaignTitle}</div>
+                                {scan.productRewardName && (
+                                  <span className="text-[10px] text-purple-700 font-bold block">
+                                    Reward: Free {scan.productRewardName}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3.5 font-sans">
+                                <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold text-[11px] border border-purple-200 inline-block">
+                                  {scan.requiredVisits > 1
+                                    ? `Visit ${scan.visitNumber} of ${scan.requiredVisits}`
+                                    : "1-Time Claim"}
+                                </span>
+                              </td>
+                              <td className="p-3.5">
+                                {isPending && (
+                                  <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-300 flex items-center gap-1 w-max animate-pulse">
+                                    <Clock className="w-3 h-3" />
+                                    Pending Approval
+                                  </span>
+                                )}
+                                {isApproved && (
+                                  <div className="font-sans">
+                                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 inline-block">
+                                      Claimed &amp; Approved
+                                    </span>
+                                    {scan.approvedByName && (
+                                      <span className="text-[10px] text-slate-400 block mt-0.5">
+                                        By {scan.approvedByName}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                {isDiscarded && (
+                                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                                    Discarded / Reset
+                                  </span>
+                                )}
+                                {isVisit && (
+                                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                                    In Progress ({scan.requiredVisits - scan.visitNumber} left)
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3.5 text-right font-sans">
+                                {isPending && (
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleApproveScan(scan.id)}
+                                      disabled={loading}
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-7 px-2.5 rounded-lg shadow-xs"
+                                    >
+                                      ✓ Approve &amp; Give Perk
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleDiscardScan(scan.id)}
+                                      disabled={loading}
+                                      className="bg-white border-rose-200 text-rose-700 hover:bg-rose-50 font-bold text-xs h-7 px-2 rounded-lg"
+                                    >
+                                      ✕ Discard
+                                    </Button>
+                                  </div>
+                                )}
+                                {isApproved && (
+                                  <span className="text-[11px] font-bold text-emerald-600 flex items-center justify-end gap-1">
+                                    <Check className="w-3.5 h-3.5" /> Handed Over
+                                  </span>
+                                )}
+                                {isVisit && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDiscardScan(scan.id)}
+                                    className="text-[10px] text-slate-400 hover:text-rose-600 h-6 px-1.5"
+                                  >
+                                    Reset Progress
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -1187,6 +1938,355 @@ export default function OwnerDashboardPage() {
                   {loading ? "Adding..." : "Add Member"}
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Product / Item Modal */}
+      {showAddProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="max-w-md w-full p-6 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-950">Add Product or Service Item</h3>
+            <p className="text-xs text-slate-500 mt-1 mb-4">
+              Add an item to your menu or catalog with pricing and points rewarded.
+            </p>
+
+            <div className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Item / Service Name</label>
+                <Input
+                  placeholder="e.g. Cappuccino, Skin Fade, Margherita Pizza"
+                  value={newProductName}
+                  onChange={(e) => setNewProductName(e.target.value)}
+                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Category</label>
+                <Input
+                  placeholder="e.g. Hot Drinks, Bakery, Haircut, Food"
+                  value={newProductCategory}
+                  onChange={(e) => setNewProductCategory(e.target.value)}
+                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Price (£)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g. 3.50"
+                    value={newProductPrice}
+                    onChange={(e) => setNewProductPrice(e.target.value)}
+                    className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Points Given</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 3"
+                    value={newProductPoints}
+                    onChange={(e) => setNewProductPoints(e.target.value)}
+                    className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Special Discount (%) - Optional</label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="e.g. 10"
+                  value={newProductDiscount}
+                  onChange={(e) => setNewProductDiscount(e.target.value)}
+                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 bg-white border-slate-300 text-xs font-bold text-slate-700"
+                  onClick={() => setShowAddProduct(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                  onClick={handleAddProduct}
+                  disabled={loading || !newProductName.trim()}
+                >
+                  {loading ? "Adding..." : "Add to Menu"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generate Promotional / Offer QR Code Modal */}
+      {showCreatePromoQr && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="max-w-md w-full p-6 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-2xl">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                <QrCode className="w-4 h-4" />
+              </div>
+              <h3 className="text-lg font-black text-slate-950">Generate Offer QR Code</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Configure what customers receive upon camera scan, and set the QR validity duration.
+            </p>
+
+            <div className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Campaign Title / Offer Description</label>
+                <Input
+                  placeholder="e.g. Buy 3 coffees get 1 free, Weekend VIP Bonus, 20% Off"
+                  value={promoTitle}
+                  onChange={(e) => setPromoTitle(e.target.value)}
+                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Offer Type</label>
+                <select
+                  value={promoOfferType}
+                  onChange={(e) => setPromoOfferType(e.target.value as any)}
+                  className="w-full h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs text-slate-900 font-semibold"
+                >
+                  <option value="points_bonus">Bonus Points upon Scan</option>
+                  <option value="free_product">Free Product / Item Reward</option>
+                  <option value="discount_promo">Promotional Discount %</option>
+                  <option value="stamps_bonus">Bonus Stamp (+1)</option>
+                </select>
+              </div>
+
+              {promoOfferType === "free_product" && (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Select Free Product / Item</label>
+                  <select
+                    value={promoSelectedProdId}
+                    onChange={(e) => setPromoSelectedProdId(e.target.value)}
+                    className="w-full h-10 rounded-xl border border-purple-300 bg-purple-50/50 px-3 text-xs text-slate-900 font-semibold"
+                  >
+                    <option value="">-- Choose from your product menu --</option>
+                    {productsList.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} (£{(p.priceMinor / 100).toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Customer gets this item unlocked and recorded on their digital pass when scanned.
+                  </p>
+                </div>
+              )}
+
+              {promoOfferType === "points_bonus" && (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Points Credited to Pass</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 15"
+                    value={promoPointsAward}
+                    onChange={(e) => setPromoPointsAward(e.target.value)}
+                    className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Awarded instantly to customer's balance through the immutable ledger.
+                  </p>
+                </div>
+              )}
+
+              {promoOfferType === "discount_promo" && (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Discount Percentage (%)</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    placeholder="e.g. 20"
+                    value={promoDiscountPct}
+                    onChange={(e) => setPromoDiscountPct(e.target.value)}
+                    className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Purchases / Visits Required (e.g. 3 for &quot;Buy 3 Get 1 Free&quot;)
+                </label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="50"
+                    placeholder="3"
+                    value={promoRequiredVisits}
+                    onChange={(e) => setPromoRequiredVisits(e.target.value)}
+                    className="bg-slate-50 border-slate-300 text-xs text-slate-900 font-bold w-24"
+                  />
+                  <span className="text-xs text-slate-500">
+                    {parseInt(promoRequiredVisits || "1", 10) > 1
+                      ? `Customer must scan ${promoRequiredVisits} times to unlock the free reward`
+                      : "Instant reward on single scan"}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Validity Period (Expiry)</label>
+                <select
+                  value={promoValidityDays}
+                  onChange={(e) => setPromoValidityDays(e.target.value)}
+                  className="w-full h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs text-slate-900"
+                >
+                  <option value="3">3 Days (Flash Promo)</option>
+                  <option value="7">7 Days (1 Week)</option>
+                  <option value="14">14 Days (2 Weeks)</option>
+                  <option value="30">30 Days (1 Month)</option>
+                  <option value="60">60 Days (2 Months)</option>
+                  <option value="90">90 Days (Quarterly)</option>
+                  <option value="180">180 Days (Half Year)</option>
+                  <option value="365">365 Days (1 Year)</option>
+                </select>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Once expired, customer scans will be politely rejected. You can also manually deactivate at any time.
+                </p>
+              </div>
+
+              <div className="flex gap-2.5 pt-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 bg-white border-slate-300 text-xs font-bold text-slate-700"
+                  onClick={() => setShowCreatePromoQr(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 font-bold text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                  onClick={handleCreatePromoQr}
+                  disabled={loading || !promoTitle.trim()}
+                >
+                  {loading ? "Generating..." : "Generate QR Code"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View & Print High-Res QR Modal */}
+      {viewingPromoQr && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="max-w-sm w-full p-6 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-2xl text-center">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                Official Promo Collateral
+              </span>
+              <button
+                onClick={() => setViewingPromoQr(null)}
+                className="text-slate-400 hover:text-slate-600 font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <h3 className="text-lg font-black text-slate-950 mb-1">{viewingPromoQr.title}</h3>
+            <p className="text-xs text-slate-500 mb-4 font-mono">
+              Code: <span className="font-bold text-purple-700">{viewingPromoQr.code}</span>
+            </p>
+
+            <div className="p-4 rounded-2xl border-2 border-slate-200 bg-white inline-block shadow-inner mb-4">
+              <img
+                src={viewingPromoQr.qrDataUrl}
+                alt={viewingPromoQr.title}
+                className="w-56 h-56 object-contain mx-auto"
+              />
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 space-y-1 mb-4 text-left">
+              <div className="flex justify-between">
+                <span>Expires On:</span>
+                <span className="font-bold text-slate-900">
+                  {new Date(viewingPromoQr.expiresAt).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Audit Scans:</span>
+                <span className="font-bold text-slate-900">{viewingPromoQr.totalScans}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Status:</span>
+                <span
+                  className={`font-bold uppercase text-[10px] ${
+                    viewingPromoQr.status === "active" ? "text-emerald-600" : "text-rose-600"
+                  }`}
+                >
+                  {viewingPromoQr.status}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <a
+                href={viewingPromoQr.qrDataUrl}
+                download={`${viewingPromoQr.title}-QR.png`}
+                className="w-full inline-flex items-center justify-center font-bold px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs shadow-sm transition-colors cursor-pointer"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download High-Res PNG
+              </a>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(viewingPromoQr.scanUrl);
+                  setCopiedLink(true);
+                  setTimeout(() => setCopiedLink(false), 2000);
+                }}
+                className="w-full bg-white border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                    Copied Scan Link!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                    Copy Direct Scan URL
+                  </>
+                )}
+              </Button>
+
+              {viewingPromoQr.status === "active" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    await handleDeactivatePromoQr(viewingPromoQr.id);
+                    setViewingPromoQr(null);
+                  }}
+                  className="w-full bg-rose-50 border-rose-200 text-xs font-bold text-rose-700 hover:bg-rose-100"
+                >
+                  Deactivate / Expire QR Code Now
+                </Button>
+              )}
             </div>
           </div>
         </div>
