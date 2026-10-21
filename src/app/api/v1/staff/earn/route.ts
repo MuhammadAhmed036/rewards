@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardApiRequest } from "@/server/auth/route-guard";
 import { earn } from "@/server/services/ledger";
+import { checkEarnRateLimit, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { z } from "zod";
 import crypto from "crypto";
 
@@ -26,6 +27,8 @@ export async function POST(request: NextRequest) {
     crypto.randomUUID();
 
   try {
+    await checkEarnRateLimit(guard.ctx.userId);
+
     const body = await request.json();
     const validated = earnSchema.parse(body);
 
@@ -36,6 +39,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: result });
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return rateLimitResponse(err);
+    }
     const message = err instanceof Error ? err.message : "Earn failed";
     const status = message.includes("DUPLICATE_VISIT") ? 429 : 400;
 

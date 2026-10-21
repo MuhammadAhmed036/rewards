@@ -61,6 +61,10 @@ export async function previewEarn(
     throw new Error("No active programme rules configured");
   }
 
+  if (prog.status !== "published") {
+    throw new Error(`PROGRAMME_NOT_ACTIVE: Loyalty programme is ${prog.status}. Earning is only allowed when published.`);
+  }
+
   const [ruleRow] = await db
     .select()
     .from(ruleVersions)
@@ -168,8 +172,12 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
       )
       .limit(1);
 
-    if (!membership || membership.status !== "active") {
+    if (!membership) {
       throw new Error("Active membership not found for this tenant");
+    }
+
+    if (membership.status !== "active") {
+      throw new Error(`MEMBERSHIP_SUSPENDED: Membership is ${membership.status}`);
     }
 
     // 3. Load Programme & Rule
@@ -181,6 +189,10 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
 
     if (!prog || !prog.currentRuleVersionId) {
       throw new Error("No active programme rules configured");
+    }
+
+    if (prog.status !== "published") {
+      throw new Error(`PROGRAMME_NOT_ACTIVE: Loyalty programme is ${prog.status}. Earning is only allowed when published.`);
     }
 
     const [ruleRow] = await tx
@@ -345,8 +357,12 @@ export async function requestRedemption(
     )
     .limit(1);
 
-  if (!membership || membership.status !== "active") {
-    throw new Error("Active membership required");
+  if (!membership) {
+    throw new Error("Membership not found");
+  }
+
+  if (membership.status !== "active") {
+    throw new Error(`MEMBERSHIP_SUSPENDED: Membership is ${membership.status}`);
   }
 
   const [reward] = await db
@@ -357,6 +373,15 @@ export async function requestRedemption(
 
   if (!reward || reward.status !== "active") {
     throw new Error("Reward is currently unavailable");
+  }
+
+  // Check validity time window per FR-060
+  const now = new Date();
+  if (reward.startsAt && new Date(reward.startsAt) > now) {
+    throw new Error("REWARD_NOT_ACTIVE: Reward is not yet active");
+  }
+  if (reward.endsAt && new Date(reward.endsAt) < now) {
+    throw new Error("REWARD_EXPIRED: Reward has expired");
   }
 
   // Check stock

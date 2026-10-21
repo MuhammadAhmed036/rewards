@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardApiRequest } from "@/server/auth/route-guard";
 import { resolveMemberQrForStaff } from "@/server/services/member";
+import { checkScanResolveRateLimit, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { z } from "zod";
 
 const resolveSchema = z.object({
@@ -16,6 +17,8 @@ export async function POST(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
+    await checkScanResolveRateLimit(guard.ctx.userId);
+
     const body = await request.json();
     const validated = resolveSchema.parse(body);
 
@@ -27,6 +30,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: summary });
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return rateLimitResponse(err);
+    }
     return NextResponse.json(
       {
         error: {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { verifyPassword, createSession, getSessionContext } from "@/server/auth";
+import { checkLoginRateLimit, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -23,6 +24,8 @@ export async function POST(request: NextRequest) {
     }
 
     const email = validated.data.email.toLowerCase().trim();
+    await checkLoginRateLimit(email);
+
     const [user] = await db
       .select()
       .from(users)
@@ -79,6 +82,9 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
+    if (error instanceof RateLimitError) {
+      return rateLimitResponse(error);
+    }
     console.error("Login error:", error);
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Authentication failed. Please try again." } },

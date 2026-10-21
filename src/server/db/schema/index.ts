@@ -465,6 +465,27 @@ export const feedbackMessages = pgTable(
   ]
 );
 
+export const supportReports = pgTable(
+  "support_reports",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    membershipId: uuid("membership_id").references(() => memberships.id),
+    ledgerEntryId: uuid("ledger_entry_id").references(() => ledgerEntries.id),
+    message: text("message").notNull(),
+    contactInfo: text("contact_info"),
+    status: varchar("status", { length: 32 }).default("open").notNull(), // open, resolved
+    resolvedBy: uuid("resolved_by").references(() => users.id),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("support_reports_tenant_status_created_idx").on(table.tenantId, table.status, table.createdAt),
+  ]
+);
+
 // ==========================================
 // 8. Operations & Security
 // ==========================================

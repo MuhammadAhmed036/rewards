@@ -215,11 +215,19 @@ export function renderEmailTemplate(
  * Creates SMTP transport targeting local Mailpit or configured SMTP server
  */
 export function getMailTransporter() {
+  const host =
+    !env.SMTP_HOST || env.SMTP_HOST === "localhost"
+      ? "127.0.0.1"
+      : env.SMTP_HOST;
+
   return nodemailer.createTransport({
-    host: env.SMTP_HOST || "localhost",
+    host,
     port: env.SMTP_PORT || 1025,
     secure: false, // Port 1025 for Mailpit does not require TLS
     ignoreTLS: true,
+    connectionTimeout: 4000,
+    greetingTimeout: 4000,
+    socketTimeout: 4000,
   });
 }
 

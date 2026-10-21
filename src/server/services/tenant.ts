@@ -10,7 +10,8 @@ import {
 } from "../db/schema";
 import { hashPassword, createSession } from "../auth";
 import { logAuditEvent } from "./audit";
-import { eq } from "drizzle-orm";
+import { RequestContext, assertCan } from "../security/permissions";
+import { eq, and, count } from "drizzle-orm";
 import crypto from "crypto";
 
 export interface RegisterOwnerParams {
@@ -231,4 +232,63 @@ export async function registerOwnerAndTenant(params: RegisterOwnerParams) {
       session,
     };
   });
+}
+
+export async function createLocation(
+  ctx: RequestContext,
+  params: { name: string; address?: Record<string, unknown> }
+) {
+  assertCan(ctx, "location.manage");
+  if (!ctx.tenantId) throw new Error("tenantId required");
+
+  // Check tier limit: maxLocations (A18 / FR-011)
+  const [tenant] = await db
+    .select({ limits: tenants.limits })
+    .from(tenants)
+    .where(eq(tenants.id, ctx.tenantId))
+    .limit(1);
+
+  const maxLocations = (tenant?.limits as Record<string, unknown> | null)?.maxLocations;
+  if (typeof maxLocations === "number" && maxLocations > 0) {
+    const [locCount] = await db
+      .select({ count: count() })
+      .from(locations)
+      .where(and(eq(locations.tenantId, ctx.tenantId), eq(locations.status, "active")));
+
+    if (Number(locCount?.count ?? 0) >= maxLocations) {
+      throw new Error(
+        `Location limit reached for your plan (maximum: ${maxLocations}). Upgrade your plan to add more locations.`
+      );
+    }
+  }
+
+  const locationPublicId = `loc_${crypto.randomBytes(4).toString("hex")}`;
+  const [newLocation] = await db
+    .insert(locations)
+    .values({
+      tenantId: ctx.tenantId,
+      publicId: locationPublicId,
+      name: params.name.trim(),
+      address: params.address || {},
+      status: "active",
+    })
+    .returning();
+
+  await logAuditEvent(ctx, {
+    action: "location.created",
+    targetType: "location",
+    targetId: newLocation.id,
+    metadata: { name: params.name },
+  });
+
+  return newLocation;
+}
+
+export async function getLocations(ctx: RequestContext) {
+  if (!ctx.tenantId) throw new Error("tenantId required");
+
+  return await db
+    .select()
+    .from(locations)
+    .where(eq(locations.tenantId, ctx.tenantId));
 }

@@ -295,3 +295,55 @@ export async function revokeMemberQr(ctx: RequestContext, membershipId: string) 
   };
 }
 
+export async function suspendMembership(
+  ctx: RequestContext,
+  membershipId: string,
+  reason: string
+) {
+  assertCan(ctx, "member.manage");
+  if (!ctx.tenantId) throw new Error("tenantId required");
+
+  const [updated] = await db
+    .update(memberships)
+    .set({ status: "suspended" })
+    .where(and(eq(memberships.id, membershipId), eq(memberships.tenantId, ctx.tenantId)))
+    .returning();
+
+  if (!updated) throw new Error("Membership not found for this tenant");
+
+  await logAuditEvent(ctx, {
+    action: "membership.suspended",
+    targetType: "membership",
+    targetId: membershipId,
+    reason,
+  });
+
+  return updated;
+}
+
+export async function reactivateMembership(
+  ctx: RequestContext,
+  membershipId: string,
+  reason?: string
+) {
+  assertCan(ctx, "member.manage");
+  if (!ctx.tenantId) throw new Error("tenantId required");
+
+  const [updated] = await db
+    .update(memberships)
+    .set({ status: "active" })
+    .where(and(eq(memberships.id, membershipId), eq(memberships.tenantId, ctx.tenantId)))
+    .returning();
+
+  if (!updated) throw new Error("Membership not found for this tenant");
+
+  await logAuditEvent(ctx, {
+    action: "membership.reactivated",
+    targetType: "membership",
+    targetId: membershipId,
+    reason: reason || "Reactivated by management",
+  });
+
+  return updated;
+}
+

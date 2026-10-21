@@ -30,6 +30,14 @@ export async function runMigrations() {
     // 3. Apply Section 7.3 Row Level Security (RLS)
     console.log("⏳ Setting up Row Level Security (RLS)...");
     await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'loyalty_rls_user') THEN
+          CREATE ROLE loyalty_rls_user WITH LOGIN PASSWORD 'test' NOINHERIT;
+        END IF;
+      END $$;
+      GRANT USAGE ON SCHEMA public TO loyalty_rls_user;
+      GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO loyalty_rls_user;
+
       -- Enable and force RLS on ledger_entries
       ALTER TABLE ledger_entries ENABLE ROW LEVEL SECURITY;
       ALTER TABLE ledger_entries FORCE ROW LEVEL SECURITY;

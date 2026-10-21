@@ -1,8 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { registerOwnerAndTenant } from "./tenant";
-import { getProgramme, publishRuleVersion } from "./programme";
+import { getProgramme, publishRuleVersion, setProgrammeStatus } from "./programme";
 import { createReward, getRewards, updateReward } from "./rewards";
+import { earn, previewEarn, requestRedemption } from "./ledger";
+import { joinProgramme, suspendMembership, reactivateMembership } from "./member";
+import { createEmailVerificationToken, verifyEmailToken } from "./verification";
+import { db } from "../db";
+import { users } from "../db/schema";
+import { eq } from "drizzle-orm";
 import { RequestContext } from "../security/permissions";
+import crypto from "crypto";
 
 describe("Programme & Rewards Services (M2)", () => {
   it("publishes new rule version and increments version number", async () => {
@@ -100,6 +107,248 @@ describe("Programme & Rewards Services (M2)", () => {
     });
     expect(updated.version).toBe(2);
     expect(updated.title).toBe("Deluxe Beard Trim");
+  });
+
+  it("enforces programme status: paused programme rejects earn and preview", async () => {
+    const slug = `paused-cafe-${Date.now()}`;
+    const result = await registerOwnerAndTenant({
+      email: `paused-${Date.now()}@test.com`,
+      password: "Password123!",
+      name: "Paused Owner",
+      businessName: "Paused Cafe",
+      slug,
+    });
+
+    const ctx: RequestContext = {
+      userId: result.user.id,
+      tenantId: result.tenant.id,
+      role: "owner",
+      requestId: "req-pause-test",
+    };
+
+    const member = await joinProgramme({
+      tenantSlug: slug,
+      email: `paused-member-${Date.now()}@example.com`,
+    });
+
+    // Pause the programme
+    await setProgrammeStatus(ctx, "paused");
+
+    // Preview earn should fail
+    await expect(
+      previewEarn(ctx, {
+        membershipId: member.membership.id,
+        locationId: result.location.id,
+        amountMinor: 2000,
+      })
+    ).rejects.toThrow(/PROGRAMME_NOT_ACTIVE/);
+
+    // Earning points should fail
+    await expect(
+      earn(ctx, {
+        membershipId: member.membership.id,
+        locationId: result.location.id,
+        amountMinor: 2000,
+        idempotencyKey: crypto.randomUUID(),
+      })
+    ).rejects.toThrow(/PROGRAMME_NOT_ACTIVE/);
+
+    // Unpause programme and verify earn succeeds
+    await setProgrammeStatus(ctx, "published");
+    const earned = await earn(ctx, {
+      membershipId: member.membership.id,
+      locationId: result.location.id,
+      amountMinor: 2000,
+      idempotencyKey: crypto.randomUUID(),
+    });
+    expect(earned.pointsDelta).toBe(20);
+  });
+
+  it("enforces reward validity window: rejects redemption before startsAt or after endsAt", async () => {
+    const slug = `time-rewards-${Date.now()}`;
+    const result = await registerOwnerAndTenant({
+      email: `timer-${Date.now()}@test.com`,
+      password: "Password123!",
+      name: "Time Owner",
+      businessName: "Time Shop",
+      slug,
+    });
+
+    const ownerCtx: RequestContext = {
+      userId: result.user.id,
+      tenantId: result.tenant.id,
+      role: "owner",
+      requestId: "req-time-rew",
+    };
+
+    const member = await joinProgramme({
+      tenantSlug: slug,
+      email: `timer-member-${Date.now()}@example.com`,
+    });
+
+    const custCtx: RequestContext = {
+      userId: member.membership.userId,
+      tenantId: result.tenant.id,
+      role: "customer",
+      requestId: "req-cust-time",
+    };
+
+    // Give customer 200 points
+    await earn(ownerCtx, {
+      membershipId: member.membership.id,
+      locationId: result.location.id,
+      amountMinor: 20000,
+      idempotencyKey: crypto.randomUUID(),
+    });
+
+    // 1. Reward in future (startsAt in 1 day)
+    const futureReward = await createReward(ownerCtx, {
+      title: "Future Coffee",
+      costPoints: 50,
+      type: "free_item",
+      startsAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    });
+
+    await expect(
+      requestRedemption(custCtx, {
+        membershipId: member.membership.id,
+        rewardId: futureReward.id,
+      })
+    ).rejects.toThrow(/REWARD_NOT_ACTIVE/);
+
+    // 2. Expired reward (endsAt in past)
+    const expiredReward = await createReward(ownerCtx, {
+      title: "Expired Coffee",
+      costPoints: 50,
+      type: "free_item",
+      endsAt: new Date(Date.now() - 10000),
+    });
+
+    await expect(
+      requestRedemption(custCtx, {
+        membershipId: member.membership.id,
+        rewardId: expiredReward.id,
+      })
+    ).rejects.toThrow(/REWARD_EXPIRED/);
+  });
+
+  it("enforces membership status: suspended member cannot earn or redeem", async () => {
+    const slug = `suspend-test-${Date.now()}`;
+    const result = await registerOwnerAndTenant({
+      email: `sus-owner-${Date.now()}@test.com`,
+      password: "Password123!",
+      name: "Owner Sus",
+      businessName: "Sus Shop",
+      slug,
+    });
+
+    const ownerCtx: RequestContext = {
+      userId: result.user.id,
+      tenantId: result.tenant.id,
+      role: "owner",
+      requestId: "req-sus-test",
+    };
+
+    const reward = await createReward(ownerCtx, {
+      title: "Test Reward",
+      costPoints: 10,
+      type: "free_item",
+    });
+
+    const member = await joinProgramme({
+      tenantSlug: slug,
+      email: `bad-member-${Date.now()}@example.com`,
+    });
+
+    const custCtx: RequestContext = {
+      userId: member.membership.userId,
+      tenantId: result.tenant.id,
+      role: "customer",
+      requestId: "req-cust-sus",
+    };
+
+    // Earn initially
+    await earn(ownerCtx, {
+      membershipId: member.membership.id,
+      locationId: result.location.id,
+      amountMinor: 5000,
+      idempotencyKey: crypto.randomUUID(),
+    });
+
+    // Suspend member
+    await suspendMembership(ownerCtx, member.membership.id, "Chargeback investigation");
+
+    // Earn while suspended -> Rejected
+    await expect(
+      earn(ownerCtx, {
+        membershipId: member.membership.id,
+        locationId: result.location.id,
+        amountMinor: 2000,
+        idempotencyKey: crypto.randomUUID(),
+      })
+    ).rejects.toThrow(/MEMBERSHIP_SUSPENDED/);
+
+    // Redeem while suspended -> Rejected
+    await expect(
+      requestRedemption(custCtx, {
+        membershipId: member.membership.id,
+        rewardId: reward.id,
+      })
+    ).rejects.toThrow(/MEMBERSHIP_SUSPENDED/);
+
+    // Reactivate member
+    await reactivateMembership(ownerCtx, member.membership.id);
+
+    // Earn now succeeds with override or after interval
+    const reEarned = await earn(ownerCtx, {
+      membershipId: member.membership.id,
+      locationId: result.location.id,
+      amountMinor: 1000,
+      idempotencyKey: crypto.randomUUID(),
+      managerOverrideReason: "Reactivated member verification earn",
+    });
+    expect(reEarned.pointsDelta).toBe(10);
+  });
+
+  it("enforces email verification before publishing programme (A13 / FR-015)", async () => {
+    const slug = `unverified-${Date.now()}`;
+    const result = await registerOwnerAndTenant({
+      email: `unverified-${Date.now()}@test.com`,
+      password: "Password123!",
+      name: "Unverified Owner",
+      businessName: "Unverified Bakery",
+      slug,
+    });
+
+    const ownerCtx: RequestContext = {
+      userId: result.user.id,
+      tenantId: result.tenant.id,
+      role: "owner",
+      requestId: "req-unverified-1",
+    };
+
+    // First pause the programme
+    await setProgrammeStatus(ownerCtx, "paused");
+
+    // Manually clear owner's emailVerifiedAt to simulate unverified state
+    await db
+      .update(users)
+      .set({ emailVerifiedAt: null })
+      .where(eq(users.id, result.user.id));
+
+    // Attempting to publish must be rejected
+    await expect(setProgrammeStatus(ownerCtx, "published")).rejects.toThrow(
+      "Cannot publish programme: owner email must be verified first (FR-015)"
+    );
+
+    // Issue verification token and verify email
+    const { token } = await createEmailVerificationToken(result.user.id, result.user.email);
+    const verifiedResult = await verifyEmailToken(token);
+    expect(verifiedResult.success).toBe(true);
+
+    // Now publishing succeeds
+    const published = await setProgrammeStatus(ownerCtx, "published");
+    expect(published.status).toBe("published");
   });
 });
 

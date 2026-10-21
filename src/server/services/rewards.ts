@@ -1,8 +1,8 @@
 import { db } from "../db";
-import { rewards, rewardLocations, programmes } from "../db/schema";
+import { rewards, rewardLocations, programmes, tenants } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
 import { logAuditEvent } from "./audit";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 import { z } from "zod";
 
 export const createRewardSchema = z.object({
@@ -18,11 +18,32 @@ export const createRewardSchema = z.object({
   locationIds: z.array(z.string().uuid()).optional(),
 });
 
-export type CreateRewardInput = z.infer<typeof createRewardSchema>;
+export type CreateRewardInput = z.input<typeof createRewardSchema>;
 
 export async function createReward(ctx: RequestContext, input: CreateRewardInput) {
   assertCan(ctx, "reward.manage");
   if (!ctx.tenantId) throw new Error("tenantId required");
+
+  // Check tier limit: maxActiveRewards (A18 / FR-011)
+  const [tenant] = await db
+    .select({ limits: tenants.limits })
+    .from(tenants)
+    .where(eq(tenants.id, ctx.tenantId))
+    .limit(1);
+
+  const maxActiveRewards = (tenant?.limits as Record<string, unknown> | null)?.maxActiveRewards;
+  if (typeof maxActiveRewards === "number" && maxActiveRewards > 0) {
+    const [rewardCount] = await db
+      .select({ count: count() })
+      .from(rewards)
+      .where(and(eq(rewards.tenantId, ctx.tenantId), eq(rewards.status, "active")));
+
+    if (Number(rewardCount?.count ?? 0) >= maxActiveRewards) {
+      throw new Error(
+        `Active reward limit reached for your plan (maximum: ${maxActiveRewards}). Upgrade your plan to create more rewards.`
+      );
+    }
+  }
 
   const validated = createRewardSchema.parse(input);
 

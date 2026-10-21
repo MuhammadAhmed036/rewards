@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { programmes, ruleVersions } from "../db/schema";
+import { programmes, ruleVersions, users } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
 import { ruleConfigSchema, RuleConfig } from "@/lib/points";
 import { logAuditEvent } from "./audit";
@@ -95,6 +95,19 @@ export async function setProgrammeStatus(
 ) {
   assertCan(ctx, "programme.manage");
   if (!ctx.tenantId) throw new Error("tenantId required");
+
+  // FR-015: Owner cannot publish until email is verified
+  if (status === "published") {
+    const [user] = await db
+      .select({ emailVerifiedAt: users.emailVerifiedAt })
+      .from(users)
+      .where(eq(users.id, ctx.userId))
+      .limit(1);
+
+    if (!user || !user.emailVerifiedAt) {
+      throw new Error("Cannot publish programme: owner email must be verified first (FR-015)");
+    }
+  }
 
   const [updated] = await db
     .update(programmes)

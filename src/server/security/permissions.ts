@@ -37,7 +37,9 @@ export type Action =
   | "qr.download"
   | "customer.profile"
   | "customer.redeem"
-  | "customer.feedback";
+  | "customer.feedback"
+  | "support.read"
+  | "support.manage";
 
 // RBAC Action Matrix per Section 6
 const ROLE_PERMISSIONS: Record<UserRole, readonly Action[]> = {
@@ -60,6 +62,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Action[]> = {
     "analytics.view",
     "reports.export",
     "qr.download",
+    "support.read",
+    "support.manage",
   ],
   owner: [
     "tenant.manage",
@@ -76,6 +80,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Action[]> = {
     "links.manage",
     "feedback.read",
     "feedback.manage",
+    "support.read",
+    "support.manage",
     "analytics.view",
     "reports.export",
     "qr.download",
@@ -90,6 +96,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Action[]> = {
     "ledger.reverse",
     "feedback.read",
     "feedback.manage",
+    "support.read",
+    "support.manage",
     "analytics.view",
     "reports.export",
     "qr.download",

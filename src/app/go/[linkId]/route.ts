@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordLinkClick } from "@/server/services/links";
+import { checkGoRedirectRateLimit, getClientIp, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { cookies } from "next/headers";
 import { db } from "@/server/db";
 import { sessions, memberships } from "@/server/db/schema";
@@ -13,6 +14,9 @@ export async function GET(
   const linkId = params.linkId;
 
   try {
+    const clientIp = getClientIp(request);
+    await checkGoRedirectRateLimit(clientIp);
+
     // Check if customer session cookie exists
     const cookieStore = await cookies();
     const token = cookieStore.get("loyalty_session")?.value;
@@ -52,7 +56,10 @@ export async function GET(
     const response = NextResponse.redirect(destinationUrl, { status: 302 });
     response.headers.set("Referrer-Policy", "no-referrer");
     return response;
-  } catch {
+  } catch (err) {
+    if (err instanceof RateLimitError) {
+      return rateLimitResponse(err);
+    }
     return new NextResponse(
       `<!DOCTYPE html>
       <html>

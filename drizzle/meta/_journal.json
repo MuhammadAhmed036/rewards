@@ -8,6 +8,13 @@
       "when": 1791953587284,
       "tag": "0000_chubby_domino",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792558578706,
+      "tag": "0001_pale_masque",
+      "breakpoints": true
     }
   ]
 }

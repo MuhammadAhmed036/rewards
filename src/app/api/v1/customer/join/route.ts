@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { joinProgramme } from "@/server/services/member";
 import { createSession } from "@/server/auth";
+import { checkJoinRateLimit, getClientIp, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { z } from "zod";
 
 const joinSchema = z.object({
@@ -13,6 +14,9 @@ const joinSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const clientIp = getClientIp(request);
+    await checkJoinRateLimit(clientIp);
+
     const body = await request.json();
     const validated = joinSchema.parse(body);
 
@@ -32,6 +36,9 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return rateLimitResponse(err);
+    }
     return NextResponse.json(
       {
         error: {

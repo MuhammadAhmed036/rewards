@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { submitFeedback } from "@/server/services/feedback";
+import { checkFeedbackRateLimit, getClientIp, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { z } from "zod";
 
 const feedbackSchema = z.object({
@@ -15,9 +16,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = feedbackSchema.parse(body);
 
+    const clientIp = getClientIp(request);
+    const rateLimitIdentifier = validated.membershipId || clientIp;
+    await checkFeedbackRateLimit(rateLimitIdentifier);
+
     const result = await submitFeedback(validated);
     return NextResponse.json({ data: result });
   } catch (err) {
+    if (err instanceof RateLimitError) {
+      return rateLimitResponse(err);
+    }
     return NextResponse.json(
       {
         error: {
