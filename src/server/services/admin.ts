@@ -369,3 +369,54 @@ export async function getPlatformAuditLogs(
 
   return logs;
 }
+
+export async function listPlatformCustomers(
+  ctx: RequestContext,
+  filters: { q?: string; tenantId?: string; limit?: number; offset?: number } = {}
+) {
+  assertCan(ctx, "platform.admin");
+  const limit = filters.limit || 100;
+  const offset = filters.offset || 0;
+
+  const conditions = [];
+  if (filters.tenantId) {
+    conditions.push(eq(memberships.tenantId, filters.tenantId));
+  }
+  if (filters.q) {
+    const search = `%${filters.q.trim().toLowerCase()}%`;
+    conditions.push(
+      or(
+        ilike(users.name, search),
+        ilike(users.email, search),
+        ilike(memberships.memberNumber, search),
+        ilike(tenants.name, search)
+      )!
+    );
+  }
+
+  const baseQuery = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const rows = await db
+    .select({
+      id: memberships.id,
+      memberNumber: memberships.memberNumber,
+      status: memberships.status,
+      joinedAt: memberships.joinedAt,
+      balance: membershipBalances.balance,
+      name: users.name,
+      email: users.email,
+      tenantId: tenants.id,
+      tenantName: tenants.name,
+      tenantSlug: tenants.slug,
+    })
+    .from(memberships)
+    .innerJoin(users, eq(memberships.userId, users.id))
+    .innerJoin(tenants, eq(memberships.tenantId, tenants.id))
+    .leftJoin(membershipBalances, eq(memberships.id, membershipBalances.membershipId))
+    .where(baseQuery)
+    .orderBy(desc(memberships.joinedAt))
+    .limit(limit)
+    .offset(offset);
+
+  return rows;
+}

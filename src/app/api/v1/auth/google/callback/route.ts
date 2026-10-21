@@ -107,6 +107,7 @@ export async function GET(request: NextRequest) {
             email,
             name,
             marketingOptIn: true,
+            allowExistingUser: true,
           });
         } catch (joinErr) {
           // If already member, ignore

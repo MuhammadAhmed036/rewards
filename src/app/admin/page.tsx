@@ -75,9 +75,25 @@ interface AuditLogEntry {
   actorName: string | null;
 }
 
+interface AdminCustomerItem {
+  id: string;
+  memberNumber: string;
+  status: string;
+  joinedAt: string;
+  balance: number | null;
+  name: string | null;
+  email: string;
+  tenantId: string;
+  tenantName: string;
+  tenantSlug: string;
+}
+
 export default function PlatformAdminPage() {
-  const [tab, setTab] = useState<"tenants" | "health" | "audit">("tenants");
+  const [tab, setTab] = useState<"tenants" | "customers" | "health" | "audit">("tenants");
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
+  const [customers, setCustomers] = useState<AdminCustomerItem[]>([]);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerLoading, setCustomerLoading] = useState(false);
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -239,8 +255,29 @@ export default function PlatformAdminPage() {
     }
   };
 
+  const fetchCustomers = async (searchOverride?: string) => {
+    try {
+      setCustomerLoading(true);
+      const q = searchOverride !== undefined ? searchOverride : customerSearch;
+      const res = await fetch(`/api/v1/admin/customers${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      if (res.status === 401 || res.status === 403) {
+        window.location.href = "/login?redirect=/admin";
+        return;
+      }
+      if (res.ok) {
+        const json = await res.json();
+        setCustomers(json.data || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCustomerLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (tab === "tenants") fetchTenants();
+    if (tab === "customers") fetchCustomers();
     if (tab === "health") fetchHealth();
     if (tab === "audit") fetchAuditLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -316,6 +353,17 @@ export default function PlatformAdminPage() {
             >
               <Building2 className="w-4 h-4" />
               <span>Tenants</span>
+            </button>
+            <button
+              onClick={() => setTab("customers")}
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                tab === "customers"
+                  ? "bg-white text-indigo-700 shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <User className="w-4 h-4" />
+              <span>Customers</span>
             </button>
             <button
               onClick={() => setTab("health")}
@@ -579,6 +627,118 @@ export default function PlatformAdminPage() {
                             >
                               Plan
                             </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* TAB: REGISTERED CUSTOMERS (PLATFORM WIDE) */}
+        {tab === "customers" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black text-slate-950 tracking-tight">Enrolled Customer Directory</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Real-time visibility into all customers registered across the loyalty platform
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2 w-full sm:w-auto">
+                <div className="relative flex-1 sm:w-80">
+                  <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <Input
+                    placeholder="Search by customer name, email, or business..."
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && fetchCustomers()}
+                    className="pl-9 bg-white border-slate-300 text-xs"
+                  />
+                </div>
+                <Button
+                  onClick={() => fetchCustomers()}
+                  disabled={customerLoading}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs"
+                >
+                  Search
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setCustomerSearch("");
+                    fetchCustomers("");
+                  }}
+                  className="text-xs font-semibold"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                  Reset
+                </Button>
+              </div>
+            </div>
+
+            <Card className="bg-white border-slate-200 overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
+                    <tr>
+                      <th className="p-4">Customer</th>
+                      <th className="p-4">Email</th>
+                      <th className="p-4">Registered Business</th>
+                      <th className="p-4">Member #</th>
+                      <th className="p-4">Points Balance</th>
+                      <th className="p-4">Enrolled Date</th>
+                      <th className="p-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {customerLoading ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-slate-400 text-xs">
+                          Loading customer accounts...
+                        </td>
+                      </tr>
+                    ) : customers.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-slate-400 text-xs">
+                          No registered customer accounts found.
+                        </td>
+                      </tr>
+                    ) : (
+                      customers.map((c) => (
+                        <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-4">
+                            <span className="font-bold text-slate-900 block text-xs">{c.name || "Customer Member"}</span>
+                          </td>
+                          <td className="p-4 font-mono text-[11px] text-slate-600">
+                            {c.email}
+                          </td>
+                          <td className="p-4">
+                            <span className="font-bold text-slate-800 block text-xs">{c.tenantName}</span>
+                            <span className="text-[10px] font-mono text-slate-400">/b/{c.tenantSlug}</span>
+                          </td>
+                          <td className="p-4 font-mono font-bold text-indigo-600">
+                            #{c.memberNumber}
+                          </td>
+                          <td className="p-4">
+                            <span className="font-black text-sm text-slate-900">{c.balance ?? 0}</span>{" "}
+                            <span className="text-[10px] text-slate-400 uppercase">pts</span>
+                          </td>
+                          <td className="p-4 text-slate-500 text-[11px]">
+                            {new Date(c.joinedAt).toLocaleDateString()}
+                          </td>
+                          <td className="p-4">
+                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                              c.status === "active"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-rose-50 text-rose-700 border-rose-200"
+                            }`}>
+                              {c.status}
+                            </span>
                           </td>
                         </tr>
                       ))

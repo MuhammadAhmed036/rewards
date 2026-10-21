@@ -16,16 +16,19 @@ import {
 import { getRewards } from "./rewards";
 import { RequestContext, assertCan } from "../security/permissions";
 import { logAuditEvent } from "./audit";
+import { hashPassword } from "../auth";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 
 export interface JoinProgrammeInput {
   tenantSlug: string;
   email: string;
+  password?: string;
   name?: string;
   marketingOptIn?: boolean;
   termsVersion?: string;
   locationPublicId?: string;
+  allowExistingUser?: boolean;
 }
 
 export async function joinProgramme(input: JoinProgrammeInput) {
@@ -51,7 +54,7 @@ export async function joinProgramme(input: JoinProgrammeInput) {
     if (loc) locationId = loc.id;
   }
 
-  // 1. Ensure user exists
+  // 1. Ensure user does not already exist with this email
   let userId: string;
   const existingUsers = await db
     .select({ id: users.id })
@@ -60,13 +63,24 @@ export async function joinProgramme(input: JoinProgrammeInput) {
     .limit(1);
 
   if (existingUsers.length > 0) {
+    if (!input.allowExistingUser) {
+      throw new Error(
+        "An account with this email already exists. Please sign in or use a different email to create a new account."
+      );
+    }
     userId = existingUsers[0].id;
   } else {
+    let passwordHash: string | null = null;
+    if (input.password && input.password.trim()) {
+      passwordHash = await hashPassword(input.password);
+    }
+
     const [newUser] = await db
       .insert(users)
       .values({
         email: normalizedEmail,
         name: input.name || null,
+        passwordHash,
         emailVerifiedAt: new Date(),
       })
       .returning({ id: users.id });

@@ -268,6 +268,7 @@ export default function OwnerDashboardPage() {
 
   useEffect(() => {
     loadOverview();
+    loadMembers();
   }, []);
 
   const loadCampaignQrs = async () => {
@@ -852,6 +853,66 @@ export default function OwnerDashboardPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Recent Registered Customers Widget on Overview */}
+              <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 flex items-center justify-center">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Recent Customer Registrations</h3>
+                      <p className="text-xs text-slate-500">Live feed of customers who recently created loyalty accounts at your store</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setActiveTab("members");
+                      loadMembers();
+                    }}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                  >
+                    View All {members.length} Members →
+                  </Button>
+                </div>
+
+                {members.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400 text-xs">
+                    No customer members enrolled yet. Customers will appear here as soon as they sign up on your store portal.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {members.slice(0, 5).map((m) => (
+                      <div key={m.id} className="py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs uppercase">
+                            {(m.name || m.email || "C").slice(0, 2)}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs text-slate-900">{m.name || "Customer Member"}</span>
+                              <span className="text-[10px] font-mono text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded font-bold">
+                                #{m.memberNumber}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-slate-500 font-mono block">✉ {m.email}</span>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-xs font-black text-slate-900">{m.balance} pts</span>
+                          <span className="text-[10px] text-slate-400 block">
+                            Enrolled: {new Date(m.joinedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

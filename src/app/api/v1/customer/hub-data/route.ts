@@ -11,6 +11,7 @@ import {
 } from "@/server/db/schema";
 import { getVisibleLinks } from "@/server/services/links";
 import { getRewards } from "@/server/services/rewards";
+import { joinProgramme } from "@/server/services/member";
 import { generateMemberQrToken, generateQrDataUrl } from "@/server/qr";
 import { eq, and, gt, desc } from "drizzle-orm";
 import { cookies } from "next/headers";
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
       .limit(1);
 
     if (session) {
-      const [membership] = await db
+      let [membership] = await db
         .select({
           id: memberships.id,
           memberNumber: memberships.memberNumber,
@@ -94,6 +95,46 @@ export async function GET(request: NextRequest) {
           )
         )
         .limit(1);
+
+      if (!membership) {
+        const [u] = await db.select().from(users).where(eq(users.id, session.userId)).limit(1);
+        if (u) {
+          try {
+            await joinProgramme({
+              tenantSlug: slug,
+              email: u.email,
+              name: u.name || undefined,
+              marketingOptIn: true,
+              allowExistingUser: true,
+            });
+            const [newMem] = await db
+              .select({
+                id: memberships.id,
+                memberNumber: memberships.memberNumber,
+                publicId: memberships.publicId,
+                qrVersion: memberships.qrVersion,
+                status: memberships.status,
+                joinedAt: memberships.joinedAt,
+                userName: users.name,
+                userEmail: users.email,
+              })
+              .from(memberships)
+              .innerJoin(users, eq(memberships.userId, users.id))
+              .where(
+                and(
+                  eq(memberships.tenantId, tenant.id),
+                  eq(memberships.userId, session.userId)
+                )
+              )
+              .limit(1);
+            if (newMem) {
+              membership = newMem;
+            }
+          } catch (e) {
+            console.error("Auto join for existing session error", e);
+          }
+        }
+      }
 
       if (membership && membership.status === "active") {
         const [bal] = await db

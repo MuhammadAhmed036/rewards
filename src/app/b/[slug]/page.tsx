@@ -93,6 +93,7 @@ export default function BusinessHubPage(props: {
 
   // Customer Join Form State
   const [joinEmail, setJoinEmail] = useState("");
+  const [joinPassword, setJoinPassword] = useState("");
   const [joinName, setJoinName] = useState("");
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
@@ -279,13 +280,23 @@ export default function BusinessHubPage(props: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tenantSlug: slug,
-          email: joinEmail,
-          name: joinName,
+          email: joinEmail.trim(),
+          password: joinPassword.trim() || undefined,
+          name: joinName.trim() || undefined,
           marketingOptIn,
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error?.message || "Failed to join");
+      if (!res.ok) {
+        if (
+          json.error?.code === "ACCOUNT_ALREADY_EXISTS" ||
+          json.error?.message?.toLowerCase().includes("already exists")
+        ) {
+          setCustomerLoginEmail(joinEmail.trim());
+          throw new Error("⚠️ An account with this email already exists. Please switch to the Sign In tab below to sign in.");
+        }
+        throw new Error(json.error?.message || "Failed to join");
+      }
       // Refresh hub data to show logged-in member view
       const updatedHubRes = await fetch(`/api/v1/customer/hub-data?slug=${encodeURIComponent(slug)}`);
       const updatedHubJson = await updatedHubRes.json();
@@ -621,14 +632,30 @@ export default function BusinessHubPage(props: {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
           {/* Error notification banner */}
           {errorMsg && (
-            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs flex justify-between items-center shadow-xs">
+            <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 shadow-xs">
               <div className="flex items-center gap-2.5">
                 <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                 <span className="font-semibold">{errorMsg}</span>
               </div>
-              <button onClick={() => setErrorMsg(null)} className="font-bold underline ml-2 cursor-pointer">
-                Dismiss
-              </button>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                {errorMsg.toLowerCase().includes("already exists") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivePortalRole("customer");
+                      setCustomerAuthMode("signin");
+                      if (joinEmail.trim()) setCustomerLoginEmail(joinEmail.trim());
+                      setErrorMsg(null);
+                    }}
+                    className="px-2.5 py-1 bg-white text-indigo-700 font-bold rounded-lg border border-indigo-200 text-xs shadow-2xs hover:bg-indigo-50 cursor-pointer"
+                  >
+                    👉 Go to Sign In
+                  </button>
+                )}
+                <button onClick={() => setErrorMsg(null)} className="font-bold underline ml-1 cursor-pointer">
+                  Dismiss
+                </button>
+              </div>
             </div>
           )}
 
@@ -1335,6 +1362,19 @@ export default function BusinessHubPage(props: {
                               placeholder="First & Last Name"
                               value={joinName}
                               onChange={(e) => setJoinName(e.target.value)}
+                              className="text-xs rounded-xl bg-slate-50 border-slate-200"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-bold text-slate-700 block mb-1">
+                              Create Password (Optional)
+                            </label>
+                            <Input
+                              type="password"
+                              placeholder="Min 6 characters to sign in anytime"
+                              value={joinPassword}
+                              onChange={(e) => setJoinPassword(e.target.value)}
                               className="text-xs rounded-xl bg-slate-50 border-slate-200"
                             />
                           </div>

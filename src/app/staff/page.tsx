@@ -32,8 +32,11 @@ interface MemberSummary {
   membershipId: string;
   memberNumber: string;
   displayName: string;
+  name?: string;
+  email?: string;
   balance: number;
   status: string;
+  joinedAt?: string;
   availableRewards: Array<{
     id: string;
     title: string;
@@ -221,13 +224,13 @@ export default function StaffPage() {
     }
   };
 
-  // Search Members
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+  // Search Members & Registered Customers
+  const handleSearch = async (queryOverride?: string) => {
+    const q = queryOverride !== undefined ? queryOverride : searchQuery;
     setLoading(true);
     setErrorMsg(null);
     try {
-      const res = await fetch(`/api/v1/staff/members/search?q=${encodeURIComponent(searchQuery)}`);
+      const res = await fetch(`/api/v1/staff/members/search?q=${encodeURIComponent(q.trim())}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Search failed");
       setSearchResults(json.data || []);
@@ -906,7 +909,10 @@ export default function StaffPage() {
                 Scan QR
               </button>
               <button
-                onClick={() => setActiveTab("search")}
+                onClick={() => {
+                  setActiveTab("search");
+                  handleSearch("");
+                }}
                 className={`flex flex-col items-center justify-center py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   activeTab === "search"
                     ? "bg-white text-indigo-600 shadow-sm font-black"
@@ -914,7 +920,7 @@ export default function StaffPage() {
                 }`}
               >
                 <Search className="h-4 w-4 mb-1" />
-                Lookup
+                Customers
               </button>
               <button
                 onClick={() => setActiveTab("code")}
@@ -1024,24 +1030,29 @@ export default function StaffPage() {
               </div>
             )}
 
-            {/* Tab 2: Search Member Screen */}
+            {/* Tab 2: Registered Customers & Search Screen */}
             {activeTab === "search" && (
               <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 className="text-sm font-black text-slate-900">Search Member Directory</h3>
-                  <span className="text-[10px] font-bold text-slate-400">Phone, Name or Number</span>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Enrolled Customers Directory</h3>
+                    <p className="text-[11px] text-slate-500">Live list of customers registered at your store</p>
+                  </div>
+                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                    {searchResults.length} Customers
+                  </span>
                 </div>
 
                 <div className="flex space-x-2">
                   <Input
-                    placeholder="Member number (e.g. 7X8Y9Z) or name"
+                    placeholder="Search by customer name, email, or member #..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                     className="text-xs rounded-xl bg-slate-50 border-slate-200"
                   />
                   <Button
-                    onClick={handleSearch}
+                    onClick={() => handleSearch()}
                     disabled={loading}
                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs px-4 cursor-pointer"
                   >
@@ -1049,19 +1060,31 @@ export default function StaffPage() {
                   </Button>
                 </div>
 
-                {searchResults.length > 0 && (
-                  <div className="space-y-2 pt-1">
+                {searchResults.length > 0 ? (
+                  <div className="space-y-2 pt-1 max-h-96 overflow-y-auto pr-1">
                     {searchResults.map((member) => (
                       <div
                         key={member.membershipId}
                         onClick={() => setActiveMember(member)}
                         className="p-3.5 rounded-2xl border border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/30 flex items-center justify-between cursor-pointer transition-all shadow-2xs"
                       >
-                        <div>
-                          <div className="font-bold text-sm text-slate-900">{member.displayName}</div>
-                          <div className="text-xs text-slate-400 font-mono">
-                            #{member.memberNumber}
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-slate-900">{member.name || member.displayName}</span>
+                            <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
+                              #{member.memberNumber}
+                            </span>
                           </div>
+                          {member.email && (
+                            <div className="text-xs text-slate-500 font-mono">
+                              ✉ {member.email}
+                            </div>
+                          )}
+                          {member.joinedAt && (
+                            <div className="text-[10px] text-slate-400">
+                              Enrolled: {new Date(member.joinedAt).toLocaleDateString()}
+                            </div>
+                          )}
                         </div>
                         <div className="text-right">
                           <div className="font-black text-sm text-indigo-700">
@@ -1073,6 +1096,10 @@ export default function StaffPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-slate-400 text-xs">
+                    {searchQuery ? `No customers found matching "${searchQuery}".` : "No registered customers yet."}
                   </div>
                 )}
               </div>

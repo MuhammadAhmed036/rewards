@@ -7,6 +7,7 @@ import { z } from "zod";
 const joinSchema = z.object({
   tenantSlug: z.string().min(1, "Tenant slug is required"),
   email: z.string().email("Valid email required"),
+  password: z.string().min(6, "Password must be at least 6 characters").optional(),
   name: z.string().optional(),
   marketingOptIn: z.boolean().optional(),
   locationPublicId: z.string().optional(),
@@ -39,14 +40,16 @@ export async function POST(request: NextRequest) {
     if (err instanceof RateLimitError) {
       return rateLimitResponse(err);
     }
+    const msg = err instanceof Error ? err.message : "Failed to join programme";
+    const isDuplicate = msg.toLowerCase().includes("already exists");
     return NextResponse.json(
       {
         error: {
-          code: "JOIN_FAILED",
-          message: err instanceof Error ? err.message : "Failed to join programme",
+          code: isDuplicate ? "ACCOUNT_ALREADY_EXISTS" : "JOIN_FAILED",
+          message: msg,
         },
       },
-      { status: 400 }
+      { status: isDuplicate ? 409 : 400 }
     );
   }
 }

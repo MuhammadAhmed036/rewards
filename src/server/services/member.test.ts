@@ -139,5 +139,26 @@ describe("Customer Membership & Staff QR Scan (M3)", () => {
     const newResolve = await resolveMemberQrForStaff(staffCtx, revoked.qrToken);
     expect(newResolve.displayName).toBe("Charlie B.");
   });
+
+  it("rejects duplicate email during customer join if account already exists", async () => {
+    const slug = `dup-email-${Date.now()}`;
+    const ownerEmail = `owner-${Date.now()}@coffee.com`;
+    await registerOwnerAndTenant({
+      email: ownerEmail,
+      password: "Password123!",
+      name: "Owner John",
+      businessName: "Duplicate Test Coffee",
+      slug,
+    });
+
+    // Attempting to join as customer with owner's email must fail
+    await expect(
+      joinProgramme({
+        tenantSlug: slug,
+        email: ownerEmail,
+        name: "Impersonator",
+      })
+    ).rejects.toThrow(/already exists/i);
+  });
 });
 
