@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { guardCronRequest } from "@/server/auth/cron-guard";
 import { processOutbox } from "@/server/services/email";
 
-export async function POST(request: NextRequest) {
+async function handleRequest(request: NextRequest) {
   const denied = guardCronRequest(request);
   if (denied) return denied;
 
@@ -13,4 +13,6 @@ export async function POST(request: NextRequest) {
   const result = await processOutbox(batchSize);
   return NextResponse.json({ success: true, ...result });
 }
+
+export { handleRequest as GET, handleRequest as POST };
 
