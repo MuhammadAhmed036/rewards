@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
-    const list = await getCampaignQrs(guard.ctx);
+    const list = await getCampaignQrs(guard.ctx, request);
     return NextResponse.json({ data: list });
   } catch (err) {
     return NextResponse.json(
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = createSchema.parse(body);
 
-    const created = await createCampaignQr(guard.ctx, validated);
+    const created = await createCampaignQr(guard.ctx, validated, request);
     return NextResponse.json({ data: created }, { status: 201 });
   } catch (err) {
     return NextResponse.json(

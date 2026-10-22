@@ -12,6 +12,7 @@ import {
 import { RequestContext, assertCan } from "../security/permissions";
 import { generateQrDataUrl } from "../qr";
 import { env } from "@/lib/env";
+import { getBaseUrl } from "@/lib/url";
 import { eq, and, desc, sql, lt } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -33,7 +34,8 @@ export interface CreateCampaignQrInput {
  */
 export async function createCampaignQr(
   ctx: RequestContext,
-  input: CreateCampaignQrInput
+  input: CreateCampaignQrInput,
+  request?: Request | { headers: Headers } | null
 ) {
   if (!ctx.tenantId) throw new Error("tenantId is required");
 
@@ -70,7 +72,7 @@ export async function createCampaignQr(
   const expiresAt = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
   const code = `QR_${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
 
-  const baseUrl = env.APP_URL || "http://localhost:3000";
+  const baseUrl = getBaseUrl(request);
   const scanUrl = `${baseUrl}/b/${tenant.slug}?claimQr=${code}`;
   const qrDataUrl = await generateQrDataUrl(scanUrl);
 
@@ -104,7 +106,10 @@ export async function createCampaignQr(
 /**
  * Lists all promotional QR codes created by a store with auto-expiry check.
  */
-export async function getCampaignQrs(ctx: RequestContext) {
+export async function getCampaignQrs(
+  ctx: RequestContext,
+  request?: Request | { headers: Headers } | null
+) {
   if (!ctx.tenantId) throw new Error("tenantId is required");
 
   const now = new Date();
@@ -121,11 +126,43 @@ export async function getCampaignQrs(ctx: RequestContext) {
       )
     );
 
-  return await db
+  const items = await db
     .select()
     .from(promoQrCodes)
     .where(eq(promoQrCodes.tenantId, ctx.tenantId))
     .orderBy(desc(promoQrCodes.createdAt));
+
+  const [tenant] = await db
+    .select({ slug: tenants.slug })
+    .from(tenants)
+    .where(eq(tenants.id, ctx.tenantId))
+    .limit(1);
+
+  const tenantSlug = tenant?.slug || "";
+  const baseUrl = getBaseUrl(request);
+
+  return await Promise.all(
+    items.map(async (item) => {
+      const expectedScanUrl = `${baseUrl}/b/${tenantSlug}?claimQr=${item.code}`;
+      const hasLocalhostMismatch =
+        item.scanUrl.includes("localhost") && !baseUrl.includes("localhost");
+
+      if (hasLocalhostMismatch) {
+        const updatedQrDataUrl = await generateQrDataUrl(expectedScanUrl);
+        await db
+          .update(promoQrCodes)
+          .set({ scanUrl: expectedScanUrl, qrDataUrl: updatedQrDataUrl })
+          .where(eq(promoQrCodes.id, item.id));
+
+        return {
+          ...item,
+          scanUrl: expectedScanUrl,
+          qrDataUrl: updatedQrDataUrl,
+        };
+      }
+      return item;
+    })
+  );
 }
 
 /**

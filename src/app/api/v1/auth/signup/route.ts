@@ -5,6 +5,7 @@ import { hashPassword, createSession } from "@/server/auth";
 import { registerOwnerAndTenant } from "@/server/services/tenant";
 import { queueEmail, processOutbox } from "@/server/services/email";
 import { env } from "@/lib/env";
+import { getBaseUrl } from "@/lib/url";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -66,7 +67,8 @@ export async function POST(request: NextRequest) {
         maxStaff: totalRequestedStaff,
       });
 
-      const storeUrl = `${env.APP_URL || "http://localhost:3000"}/b/${result.tenant.slug}`;
+      const baseUrl = getBaseUrl(request);
+      const storeUrl = `${baseUrl}/b/${result.tenant.slug}`;
 
       // Send owner welcome email with dedicated store path per client request
       try {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBaseUrl } from "@/lib/url";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -6,7 +7,7 @@ export async function GET(request: NextRequest) {
   const role = searchParams.get("role") || (returnTo === "/me" ? "customer" : "owner");
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getBaseUrl(request);
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${appUrl}/api/v1/auth/google/callback`;
 
   if (!clientId || clientId.startsWith("dev_mock") || clientId.startsWith("mock-")) {

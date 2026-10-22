@@ -7,13 +7,15 @@ import { registerOwnerAndTenant } from "@/server/services/tenant";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 
+import { getBaseUrl } from "@/lib/url";
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const code = searchParams.get("code");
   const stateRaw = searchParams.get("state");
   const error = searchParams.get("error");
 
-  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getBaseUrl(request);
 
   let returnTo = "/dashboard";
   let targetRole: "owner" | "customer" | "staff" = "owner";

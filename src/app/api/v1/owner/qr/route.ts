@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { locations, tenants } from "@/server/db/schema";
 import { generateQrDataUrl } from "@/server/qr";
 import { env } from "@/lib/env";
+import { getBaseUrl } from "@/lib/url";
 import { eq, and } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
@@ -51,7 +52,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const joinUrl = `${env.APP_URL}/b/${tenant.slug}?loc=${locationPublicId}&src=qr`;
+  const baseUrl = getBaseUrl(request);
+  const joinUrl = `${baseUrl}/b/${tenant.slug}?loc=${locationPublicId}&src=qr`;
   const qrPng = await generateQrDataUrl(joinUrl, "png");
   const qrSvg = await generateQrDataUrl(joinUrl, "svg");
 

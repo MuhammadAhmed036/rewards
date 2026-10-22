@@ -1186,13 +1186,14 @@ export default function PlatformAdminPage() {
                     <label className="text-[11px] font-bold uppercase text-slate-500 block">Customer Webpage URL</label>
                     <div className="flex items-center justify-between gap-2 mt-1 p-2 rounded-lg bg-slate-900 border border-slate-800">
                       <span className="font-mono text-indigo-300 truncate">
-                        http://localhost:3000/b/{createdTenantData.slug}
+                        {typeof window !== "undefined" ? window.location.origin : ""}/b/{createdTenantData.slug}
                       </span>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText(`http://localhost:3000/b/${createdTenantData.slug}`);
+                            const origin = typeof window !== "undefined" ? window.location.origin : "";
+                            navigator.clipboard.writeText(`${origin}/b/${createdTenantData.slug}`);
                             setCopiedLink(true);
                             setTimeout(() => setCopiedLink(false), 2000);
                           }}
