@@ -249,11 +249,16 @@ export async function scanAndClaimCampaignQr(
     .limit(1);
 
   if (alreadyApproved) {
-    throw new Error(
-      `You have already claimed this promotional offer on ${new Date(
-        alreadyApproved.approvedAt || alreadyApproved.scannedAt
-      ).toLocaleDateString()}. Each customer can claim this perk once.`
-    );
+    return {
+      success: true,
+      isIntermediateVisit: false,
+      isAlreadyClaimed: true,
+      currentVisit: qr.requiredVisits || 1,
+      requiredVisits: qr.requiredVisits || 1,
+      campaignTitle: qr.title,
+      productRewardName: qr.productRewardName,
+      message: `🎉 You have already claimed this offer! Each customer can claim this perk once.`,
+    };
   }
 
   // 4. Check if member already has a pending claim waiting for staff approval
@@ -302,6 +307,28 @@ export async function scanAndClaimCampaignQr(
         eq(promoQrScans.status, "visit_logged")
       )
     );
+
+  // Prevent multiple scans during the same visit (12-hour cooldown per visit)
+  if (previousVisits.length > 0) {
+    const recentScan = [...previousVisits].sort(
+      (a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime()
+    )[0];
+
+    const hoursSinceLast = (now.getTime() - new Date(recentScan.scannedAt).getTime()) / (1000 * 60 * 60);
+    if (hoursSinceLast < 12) {
+      return {
+        success: true,
+        isIntermediateVisit: true,
+        isAlreadyScannedToday: true,
+        currentVisit: previousVisits.length,
+        requiredVisits,
+        visitsRemaining: Math.max(0, requiredVisits - previousVisits.length),
+        campaignTitle: qr.title,
+        productRewardName: qr.productRewardName,
+        message: `✅ Visit ${previousVisits.length} of ${requiredVisits} is already logged for today! Next visit can be logged on your next store visit.`,
+      };
+    }
+  }
 
   const currentVisit = previousVisits.length + 1;
 

@@ -264,15 +264,20 @@ export default function BusinessHubPage(props: {
         }
         setClaimResult(json.data);
         setClaimStatus("success");
+        setScannedClaimCode(null);
         // Reload balance and ledger history
         await fetchHubData();
       } catch (err) {
         setClaimError(err instanceof Error ? err.message : "Failed to claim offer");
         setClaimStatus("error");
+        setScannedClaimCode(null);
       }
     },
     [scannedClaimCode, hubData, fetchHubData]
   );
+
+  // Track processed claim codes in memory to prevent repeated prompts/scans
+  const processedCodeRef = React.useRef<string | null>(null);
 
   // Read URL query param ?claimQr=...
   useEffect(() => {
@@ -280,6 +285,15 @@ export default function BusinessHubPage(props: {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get("claimQr");
       if (code) {
+        // Strip ?claimQr from URL immediately so refresh or history doesn't prompt in loop
+        urlParams.delete("claimQr");
+        const remainingQuery = urlParams.toString();
+        const cleanUrl = window.location.pathname + (remainingQuery ? `?${remainingQuery}` : "");
+        window.history.replaceState({}, "", cleanUrl);
+
+        if (processedCodeRef.current === code) return;
+        processedCodeRef.current = code;
+
         setScannedClaimCode(code);
         fetch(`/api/v1/customer/claim-promo-qr?slug=${encodeURIComponent(slug)}&code=${encodeURIComponent(code)}`)
           .then((res) => res.json())
@@ -300,7 +314,16 @@ export default function BusinessHubPage(props: {
           .catch((e) => console.error("Error reading claim QR info", e));
       }
     }
-  }, [slug, hubData?.member]);
+  }, [slug]);
+
+  // Prompt once member data is available if promo QR was scanned prior to logging in
+  useEffect(() => {
+    if (hubData?.member && scannedClaimCode && claimStatus === "idle" && scannedOfferInfo) {
+      if (!scannedOfferInfo.isExpired && !scannedOfferInfo.isDeactivated) {
+        setClaimStatus("prompt");
+      }
+    }
+  }, [hubData?.member, scannedClaimCode, claimStatus, scannedOfferInfo]);
 
   // Handle New Customer Join
   const handleJoin = async (e: React.FormEvent) => {
@@ -1339,7 +1362,9 @@ export default function BusinessHubPage(props: {
                       {/* Google Quick Join Button */}
                       <div>
                         <a
-                          href={`/api/v1/auth/google?role=customer&returnTo=${encodeURIComponent(`/b/${slug}`)}`}
+                          href={`/api/v1/auth/google?role=customer&returnTo=${encodeURIComponent(
+                            scannedClaimCode ? `/b/${slug}?claimQr=${scannedClaimCode}` : `/b/${slug}`
+                          )}`}
                           className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-2xl border border-slate-300 hover:bg-slate-50 transition-all font-bold text-xs shadow-2xs text-slate-800"
                         >
                           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
