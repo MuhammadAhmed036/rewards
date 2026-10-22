@@ -32,7 +32,7 @@ export async function runMigrations() {
     await db.execute(sql`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'loyalty_rls_user') THEN
-          CREATE ROLE loyalty_rls_user WITH LOGIN PASSWORD 'test' NOINHERIT;
+          CREATE ROLE loyalty_rls_user WITH LOGIN PASSWORD 'Loyalty_Rls_Pass!2026#Secure' NOINHERIT;
         END IF;
       END $$;
       GRANT USAGE ON SCHEMA public TO loyalty_rls_user;
