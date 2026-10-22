@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { registerOwnerAndTenant } from "./tenant";
 import { getProgramme, publishRuleVersion, setProgrammeStatus } from "./programme";
 import { createReward, getRewards, updateReward } from "./rewards";
-import { earn, previewEarn, requestRedemption } from "./ledger";
+import { earn, previewEarn, requestRedemption, validateRedemptionCode, confirmRedemption } from "./ledger";
 import { joinProgramme, suspendMembership, reactivateMembership } from "./member";
 import { RequestContext } from "../security/permissions";
 import crypto from "crypto";
@@ -304,6 +304,106 @@ describe("Programme & Rewards Services (M2)", () => {
       managerOverrideReason: "Reactivated member verification earn",
     });
     expect(reEarned.pointsDelta).toBe(10);
+  });
+
+  it("executes the full PRS 5.4 reward claim flow end-to-end: owner creates reward, member earns points, unlocks voucher, staff validates & confirms atomically", async () => {
+    const slug = `prs54-${Date.now()}`;
+    const result = await registerOwnerAndTenant({
+      email: `prs54-owner-${Date.now()}@test.com`,
+      password: "Password123!",
+      name: "Cafe Owner Max",
+      businessName: "Max Roastery",
+      slug,
+      programmeType: "points",
+    });
+
+    const ownerCtx: RequestContext = {
+      userId: result.user.id,
+      tenantId: result.tenant.id,
+      role: "owner",
+      requestId: "req-prs-owner",
+    };
+
+    // 1. Owner creates a 1-point reward ("Free Espresso")
+    const reward = await createReward(ownerCtx, {
+      title: "Free Espresso",
+      costPoints: 1,
+      type: "free_item",
+      description: "Enjoy a rich shot of artisan espresso on us",
+    });
+    expect(reward.id).toBeDefined();
+    expect(reward.costPoints).toBe(1);
+
+    // 2. Customer joins the programme (initial balance = 0)
+    const member = await joinProgramme({
+      tenantSlug: slug,
+      email: `prs54-cust-${Date.now()}@example.com`,
+      name: "Alice Coffee Lover",
+    });
+
+    const custCtx: RequestContext = {
+      userId: member.membership.userId,
+      tenantId: result.tenant.id,
+      role: "customer",
+      requestId: "req-prs-cust",
+    };
+
+    // 3. Reward check at 0 points: should be locked with shortfall = 1
+    const initialRewards = await getRewards(result.tenant.id, { memberBalance: 0 });
+    const rewardForAliceInitial = initialRewards.find((r) => r.id === reward.id);
+    expect(rewardForAliceInitial?.eligible).toBe(false);
+    expect(rewardForAliceInitial?.pointsShortfall).toBe(1);
+
+    // 4. Staff awards 1 point to Alice
+    const earnResult = await earn(ownerCtx, {
+      membershipId: member.membership.id,
+      locationId: result.location.id,
+      amountMinor: 100, // £1.00 -> 1 point
+      idempotencyKey: crypto.randomUUID(),
+    });
+    expect(earnResult.pointsDelta).toBe(1);
+
+    // 5. Reward check at 1 point: should now be ELIGIBLE (pointsShortfall = 0)
+    const eligibleRewards = await getRewards(result.tenant.id, { memberBalance: 1 });
+    const rewardForAliceUnlocked = eligibleRewards.find((r) => r.id === reward.id);
+    expect(rewardForAliceUnlocked?.eligible).toBe(true);
+    expect(rewardForAliceUnlocked?.pointsShortfall).toBe(0);
+
+    // 6. Alice taps "Claim Reward": initiates pending redemption with 8-char code
+    const redemption = await requestRedemption(custCtx, {
+      membershipId: member.membership.id,
+      rewardId: reward.id,
+    });
+    expect(redemption.code).toHaveLength(8);
+    expect(redemption.costPoints).toBe(1);
+    expect(redemption.rewardTitle).toBe("Free Espresso");
+
+    // 7. Staff validates the code on scanner terminal
+    const validation = await validateRedemptionCode(ownerCtx, redemption.code);
+    expect(validation.reward.title).toBe("Free Espresso");
+    expect(validation.reward.costPoints).toBe(1);
+    expect(validation.hasSufficientBalance).toBe(true);
+    expect(validation.redemption.membershipId).toBe(member.membership.id);
+
+    // 8. Staff confirms redemption: atomic transaction deducts point, balance becomes 0
+    const confirmResult = await confirmRedemption(ownerCtx, {
+      code: redemption.code,
+      locationId: result.location.id,
+      idempotencyKey: crypto.randomUUID(),
+    });
+    expect(confirmResult.redemptionId).toBe(redemption.redemptionId);
+    expect(confirmResult.pointsDeducted).toBe(1);
+    expect(confirmResult.newBalance).toBe(0);
+    expect(confirmResult.rewardTitle).toBe("Free Espresso");
+
+    // 9. Attempting to confirm the same code again must fail (prevent double spend)
+    await expect(
+      confirmRedemption(ownerCtx, {
+        code: redemption.code,
+        locationId: result.location.id,
+        idempotencyKey: crypto.randomUUID(),
+      })
+    ).rejects.toThrow(/CODE_ALREADY_USED/);
   });
 });
 

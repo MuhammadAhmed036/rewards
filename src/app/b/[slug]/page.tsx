@@ -126,6 +126,9 @@ export default function BusinessHubPage(props: {
     expiresAt: string;
   } | null>(null);
   const [redemptionSuccess, setRedemptionSuccess] = useState(false);
+  const [redemptionQrUrl, setRedemptionQrUrl] = useState<string | null>(null);
+  const [redemptionTimeLeft, setRedemptionTimeLeft] = useState<string>("");
+  const [redemptionExpired, setRedemptionExpired] = useState<boolean>(false);
 
   // Feedback form state
   const [feedbackMessage, setFeedbackMessage] = useState("");
@@ -200,6 +203,41 @@ export default function BusinessHubPage(props: {
 
     return () => clearInterval(interval);
   }, [activeRedemption, fetchHubData]);
+
+  // Generate QR & Live Countdown for active redemption voucher
+  useEffect(() => {
+    if (!activeRedemption) {
+      setRedemptionQrUrl(null);
+      setRedemptionTimeLeft("");
+      setRedemptionExpired(false);
+      return;
+    }
+
+    import("qrcode")
+      .then((QRCode) => {
+        QRCode.toDataURL(activeRedemption.code, { margin: 1, width: 220 })
+          .then(setRedemptionQrUrl)
+          .catch((e) => console.error("QR gen error", e));
+      })
+      .catch((e) => console.error("QRCode import error", e));
+
+    const updateCountdown = () => {
+      const diff = new Date(activeRedemption.expiresAt).getTime() - Date.now();
+      if (diff <= 0) {
+        setRedemptionTimeLeft("00:00");
+        setRedemptionExpired(true);
+        return;
+      }
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setRedemptionTimeLeft(`${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`);
+      setRedemptionExpired(false);
+    };
+
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 1000);
+    return () => clearInterval(timer);
+  }, [activeRedemption]);
 
   const handleClaimPromoQr = useCallback(
     async (codeToClaim?: string, explicitMemberId?: string, explicitTenantId?: string) => {
@@ -1684,7 +1722,7 @@ export default function BusinessHubPage(props: {
         </div>
       )}
 
-      {/* Redemption Code One-Time Modal (With Live Polling) */}
+      {/* Redemption Code One-Time Modal (With Live Polling & Countdown) */}
       {activeRedemption && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in zoom-in-95">
           <div className="bg-white text-slate-900 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl relative border border-slate-200">
@@ -1700,21 +1738,46 @@ export default function BusinessHubPage(props: {
             </div>
 
             <h3 className="text-xl font-black text-slate-900">{activeRedemption.rewardTitle}</h3>
-            <p className="text-xs text-slate-500 mb-3">Present this voucher code to staff at counter</p>
+            <p className="text-xs text-slate-500 mb-2">Present this voucher code to staff at counter</p>
 
-            <div className="my-3 py-3 px-4 bg-slate-100 rounded-2xl font-mono text-3xl font-black tracking-widest text-slate-900 border border-slate-200">
+            {/* Voucher QR Code */}
+            {redemptionQrUrl && (
+              <div className="my-2.5 flex justify-center">
+                <div className="p-2.5 bg-white rounded-2xl border-2 border-slate-200 shadow-xs inline-block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={redemptionQrUrl} alt="Voucher QR Code" className="w-36 h-36 mx-auto rounded-lg" />
+                </div>
+              </div>
+            )}
+
+            <div className="my-2.5 py-2.5 px-4 bg-slate-100 rounded-2xl font-mono text-2xl font-black tracking-widest text-slate-900 border border-slate-200">
               {activeRedemption.code}
             </div>
 
-            <div className="flex items-center justify-center space-x-1 text-xs text-amber-700 font-bold mb-3">
-              <Clock className="h-3.5 w-3.5" />
-              <span>Valid for 10 minutes</span>
-            </div>
+            {redemptionExpired ? (
+              <div className="py-2 px-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-700 mb-3">
+                This voucher code has expired. Tap close to claim again.
+              </div>
+            ) : (
+              <div className="flex items-center justify-center space-x-1.5 text-xs text-amber-700 font-bold mb-2.5">
+                <Clock className="h-3.5 w-3.5" />
+                <span>Expires in {redemptionTimeLeft || "10:00"}</span>
+              </div>
+            )}
 
-            <div className="text-xs text-slate-500 flex items-center justify-center space-x-2">
+            <div className="text-xs text-slate-500 flex items-center justify-center space-x-2 mb-3">
               <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>Awaiting staff scanner confirmation...</span>
             </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setActiveRedemption(null)}
+              className="w-full text-xs font-bold border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl cursor-pointer"
+            >
+              Cancel Voucher
+            </Button>
           </div>
         </div>
       )}

@@ -200,8 +200,16 @@ export default function StaffPage() {
 
   // Resolve QR scan
   const handleResolveScan = async (tokenToResolve?: string) => {
-    const token = tokenToResolve || qrInput.trim();
-    if (!token) return;
+    const rawToken = tokenToResolve || qrInput.trim();
+    if (!rawToken) return;
+
+    // Detect if scanned code is an 8-character voucher code (Crockford Base32)
+    const cleanToken = rawToken.trim().toUpperCase();
+    if (cleanToken.length === 8 && /^[0-9A-HJ-NP-Z]{8}$/i.test(cleanToken)) {
+      setQrInput("");
+      await handleValidateRedeemCode(cleanToken);
+      return;
+    }
 
     setLoading(true);
     setErrorMsg(null);
@@ -209,7 +217,7 @@ export default function StaffPage() {
       const res = await fetch("/api/v1/staff/scan/resolve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, locationId: selectedLocationId }),
+        body: JSON.stringify({ token: rawToken, locationId: selectedLocationId }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -336,8 +344,9 @@ export default function StaffPage() {
   };
 
   // Validate Redemption Code
-  const handleValidateRedeemCode = async () => {
-    if (!redeemCodeInput.trim()) return;
+  const handleValidateRedeemCode = async (codeOverride?: string) => {
+    const code = (typeof codeOverride === "string" ? codeOverride : redeemCodeInput).trim().toUpperCase();
+    if (!code) return;
     setValidatingRedeemCode(true);
     setErrorMsg(null);
     setRedeemValidation(null);
@@ -345,15 +354,87 @@ export default function StaffPage() {
       const res = await fetch("/api/v1/staff/redemptions/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: redeemCodeInput.trim() }),
+        body: JSON.stringify({ code }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Validation failed");
       setRedeemValidation(json.data);
+      setRedeemCodeInput(code);
+      setActiveTab("code");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Error validating code");
     } finally {
       setValidatingRedeemCode(false);
+    }
+  };
+
+  // Staff-Initiated Direct Redemption (PRS 5.4 Alternative)
+  const handleStaffDirectRedeem = async (reward: { id: string; title: string; costPoints: number }) => {
+    if (!activeMember || !selectedLocationId) return;
+    if (
+      !confirm(
+        `Confirm redemption of "${reward.title}" for ${activeMember.displayName}? This will deduct ${reward.costPoints} points from the customer's balance.`
+      )
+    ) {
+      return;
+    }
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      // 1. Initiate redemption voucher
+      const reqRes = await fetch("/api/v1/customer/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          membershipId: activeMember.membershipId,
+          rewardId: reward.id,
+        }),
+      });
+      const reqJson = await reqRes.json();
+      if (!reqRes.ok) throw new Error(reqJson.error?.message || "Failed to initiate redemption");
+
+      const code = reqJson.data.code;
+
+      // 2. Atomically confirm redemption at counter
+      const confirmRes = await fetch("/api/v1/staff/redemptions/confirm", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          code,
+          locationId: selectedLocationId,
+        }),
+      });
+      const confirmJson = await confirmRes.json();
+      if (!confirmRes.ok) throw new Error(confirmJson.error?.message || "Failed to confirm redemption");
+
+      setSuccessData({
+        title: "Reward Redeemed by Staff!",
+        message: `Successfully confirmed "${reward.title}" for ${activeMember.displayName}.`,
+        newBalance: confirmJson.data.newBalance,
+        pointsDelta: -confirmJson.data.pointsDeducted,
+      });
+
+      // Update active member's balance and recompute reward eligibility
+      const updatedBalance = confirmJson.data.newBalance;
+      setActiveMember({
+        ...activeMember,
+        balance: updatedBalance,
+        availableRewards: activeMember.availableRewards.map((r) => {
+          const eligible = updatedBalance >= r.costPoints;
+          return {
+            ...r,
+            eligible,
+            pointsShortfall: eligible ? 0 : r.costPoints - updatedBalance,
+          };
+        }),
+      });
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to redeem reward");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -880,7 +961,19 @@ export default function StaffPage() {
                           </div>
                         </div>
                         {reward.eligible ? (
-                          <Badge variant="success" className="bg-emerald-100 text-emerald-800 border-emerald-300 font-bold text-[10px]">Eligible</Badge>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="success" className="bg-emerald-100 text-emerald-800 border-emerald-300 font-bold text-[10px]">
+                              Eligible
+                            </Badge>
+                            <Button
+                              size="sm"
+                              onClick={() => handleStaffDirectRedeem(reward)}
+                              disabled={loading}
+                              className="h-7 text-[10px] font-black bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-2.5 cursor-pointer shadow-2xs"
+                            >
+                              Redeem Now →
+                            </Button>
+                          </div>
                         ) : (
                           <Badge variant="secondary" className="text-[10px]">
                             Need {reward.pointsShortfall} more
@@ -1130,7 +1223,7 @@ export default function StaffPage() {
                 <Button
                   variant="outline"
                   className="w-full font-bold text-xs rounded-xl border-slate-300 hover:bg-slate-50 cursor-pointer"
-                  onClick={handleValidateRedeemCode}
+                  onClick={() => handleValidateRedeemCode()}
                   disabled={validatingRedeemCode || redeemCodeInput.length < 8}
                 >
                   {validatingRedeemCode ? "Checking ledger..." : "Verify Code Validity"}
