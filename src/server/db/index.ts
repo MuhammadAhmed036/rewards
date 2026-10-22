@@ -15,9 +15,10 @@ const globalForDb = globalThis as unknown as {
 export const queryClient =
   globalForDb.queryClient ??
   postgres(connectionString, {
-    max: 20,
+    max: process.env.NODE_ENV === "production" ? 10 : 20,
     idle_timeout: 20,
-    connect_timeout: 10,
+    connect_timeout: 15,
+    prepare: false, // Required for Supabase/Neon connection poolers (PgBouncer port 6543)
   });
 
 if (process.env.NODE_ENV !== "production") {
