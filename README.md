@@ -228,3 +228,10 @@ pnpm build
 * **Atomic Concurrency Control:** Redemptions and point awards use PostgreSQL row-level locks (`SELECT FOR UPDATE`) to prevent race conditions and duplicate claims.
 * **Append-Only Triggers:** Database triggers prevent `UPDATE` or `DELETE` operations on verified ledger entries.
 * **Tenant Isolation:** All queries enforce strict tenant scoping (`tenant_id`), preventing cross-tenant data leakage.
+
+## 🔒 Security & Data Integrity Highlights
+* **Zero Floating-Point Arithmetic:** All financial spend is stored in integer pence (`minor`) and points in exact integers.
+* **Atomic Concurrency Control:** Redemptions and point awards use PostgreSQL row-level locks (`SELECT FOR UPDATE`) to prevent race conditions and duplicate claims.
+* **Append-Only Triggers:** Database triggers prevent `UPDATE` or `DELETE` operations on verified ledger entries.
+* **Tenant Isolation:** All queries enforce strict tenant scoping (`tenant_id`), preventing cross-tenant data leakage.
+
