@@ -22,15 +22,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 variant === "default",
               "bg-[var(--brand,#0f172a)] text-[var(--brand-foreground,#ffffff)] hover:opacity-90 active:scale-[0.98]":
                 variant === "brand",
-              "border border-slate-300 dark:border-slate-700 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800":
+              "border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 shadow-2xs":
                 variant === "outline",
-              "bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100":
+              "bg-zinc-100 text-zinc-900 hover:bg-zinc-200":
                 variant === "secondary",
               "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.98]":
                 variant === "success",
               "bg-rose-600 text-white hover:bg-rose-700 active:scale-[0.98]":
                 variant === "destructive",
-              "hover:bg-slate-100 dark:hover:bg-slate-800": variant === "ghost",
+              "hover:bg-zinc-100 text-zinc-700": variant === "ghost",
               "min-h-[38px] text-sm px-3 py-1.5": size === "sm",
               "min-h-[54px] text-lg px-6 py-4 font-semibold": size === "lg",
               "min-h-[48px] min-w-[48px] p-0": size === "icon",

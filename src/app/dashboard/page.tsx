@@ -1707,16 +1707,16 @@ export default function OwnerDashboardPage() {
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <div className="relative flex-1 sm:w-72">
-                    <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                    <Search className="w-4 h-4 absolute left-3 top-3 text-zinc-400 stroke-[1.8]" />
                     <Input
                       placeholder="Search member # or name..."
                       value={memberSearch}
                       onChange={(e) => setMemberSearch(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && loadMembers()}
-                      className="pl-9 bg-white border-slate-300 text-xs"
+                      className="pl-9 bg-white border-zinc-200 text-xs text-zinc-900 rounded-xl"
                     />
                   </div>
-                  <Button size="sm" onClick={loadMembers} className="bg-indigo-600 hover:bg-indigo-700 font-bold text-xs text-white">
+                  <Button size="sm" onClick={loadMembers} className="bg-zinc-950 hover:bg-zinc-800 font-semibold text-xs text-white rounded-xl shadow-xs transition-colors">
                     Search
                   </Button>
                 </div>
@@ -2321,62 +2321,62 @@ export default function OwnerDashboardPage() {
 
       {/* Add Product / Item Modal */}
       {showAddProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="max-w-md w-full p-6 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-950">Add Product or Service Item</h3>
-            <p className="text-xs text-slate-500 mt-1 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-white border border-zinc-200/90 text-zinc-900 shadow-xl">
+            <h3 className="text-lg font-bold text-zinc-950 tracking-tight">Add Product or Service Item</h3>
+            <p className="text-xs text-zinc-500 mt-1 mb-4">
               Add an item to your menu or catalog with pricing and points rewarded.
             </p>
 
             <div className="space-y-3.5 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Item / Service Name</label>
+                <label className="font-semibold text-zinc-800 block mb-1">Item / Service Name</label>
                 <Input
                   placeholder="e.g. Cappuccino, Skin Fade, Margherita Pizza"
                   value={newProductName}
                   onChange={(e) => setNewProductName(e.target.value)}
-                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                  className="bg-white border-zinc-200 text-xs text-zinc-900 rounded-xl focus:ring-1 focus:ring-zinc-900 font-medium"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Category</label>
+                <label className="font-semibold text-zinc-800 block mb-1">Category</label>
                 <Input
                   placeholder="e.g. Hot Drinks, Bakery, Haircut, Food"
                   value={newProductCategory}
                   onChange={(e) => setNewProductCategory(e.target.value)}
-                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                  className="bg-white border-zinc-200 text-xs text-zinc-900 rounded-xl focus:ring-1 focus:ring-zinc-900 font-medium"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Price (£)</label>
+                  <label className="font-semibold text-zinc-800 block mb-1">Price (£)</label>
                   <Input
                     type="number"
                     step="0.01"
                     placeholder="e.g. 3.50"
                     value={newProductPrice}
                     onChange={(e) => setNewProductPrice(e.target.value)}
-                    className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                    className="bg-white border-zinc-200 text-xs text-zinc-900 rounded-xl focus:ring-1 focus:ring-zinc-900 font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Points Given</label>
+                  <label className="font-semibold text-zinc-800 block mb-1">Points Given</label>
                   <Input
                     type="number"
                     min="1"
                     placeholder="e.g. 3"
                     value={newProductPoints}
                     onChange={(e) => setNewProductPoints(e.target.value)}
-                    className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                    className="bg-white border-zinc-200 text-xs text-zinc-900 rounded-xl focus:ring-1 focus:ring-zinc-900 font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Special Discount (%) - Optional</label>
+                <label className="font-semibold text-zinc-800 block mb-1">Special Discount (%) - Optional</label>
                 <Input
                   type="number"
                   min="0"
@@ -2384,20 +2384,20 @@ export default function OwnerDashboardPage() {
                   placeholder="e.g. 10"
                   value={newProductDiscount}
                   onChange={(e) => setNewProductDiscount(e.target.value)}
-                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                  className="bg-white border-zinc-200 text-xs text-zinc-900 rounded-xl focus:ring-1 focus:ring-zinc-900 font-medium"
                 />
               </div>
 
               <div className="flex gap-2.5 pt-3">
                 <Button
                   variant="outline"
-                  className="flex-1 bg-white border-slate-300 text-xs font-bold text-slate-700"
+                  className="flex-1 bg-white border-zinc-200 text-xs font-semibold text-zinc-700 rounded-xl shadow-2xs hover:bg-zinc-50 cursor-pointer"
                   onClick={() => setShowAddProduct(false)}
                 >
                   Cancel
                 </Button>
                 <Button
-                  className="flex-1 font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="flex-1 font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
                   onClick={handleAddProduct}
                   disabled={loading || !newProductName.trim()}
                 >
@@ -2411,35 +2411,35 @@ export default function OwnerDashboardPage() {
 
       {/* Generate Promotional / Offer QR Code Modal */}
       {showCreatePromoQr && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="max-w-md w-full p-6 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-white border border-zinc-200/90 text-zinc-900 shadow-xl">
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
-                <QrCode className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold">
+                <QrCode className="w-4 h-4 stroke-[1.8]" />
               </div>
-              <h3 className="text-lg font-black text-slate-950">Generate Offer QR Code</h3>
+              <h3 className="text-lg font-bold text-zinc-950 tracking-tight">Generate Offer QR Code</h3>
             </div>
-            <p className="text-xs text-slate-500 mb-4">
+            <p className="text-xs text-zinc-500 mb-4">
               Configure what customers receive upon camera scan, and set the QR validity duration.
             </p>
 
             <div className="space-y-3.5 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Campaign Title / Offer Description</label>
+                <label className="font-semibold text-zinc-800 block mb-1">Campaign Title / Offer Description</label>
                 <Input
                   placeholder="e.g. Buy 3 coffees get 1 free, Weekend VIP Bonus, 20% Off"
                   value={promoTitle}
                   onChange={(e) => setPromoTitle(e.target.value)}
-                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                  className="bg-white border-zinc-200 text-xs text-zinc-900 rounded-xl focus:ring-1 focus:ring-zinc-900 font-medium"
                 />
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Offer Type</label>
+                <label className="font-semibold text-zinc-800 block mb-1">Offer Type</label>
                 <select
                   value={promoOfferType}
                   onChange={(e) => setPromoOfferType(e.target.value as any)}
-                  className="w-full h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs text-slate-900 font-semibold"
+                  className="w-full h-10 rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-900 font-semibold focus:outline-none focus:ring-1 focus:ring-zinc-900"
                 >
                   <option value="points_bonus">Bonus Points upon Scan</option>
                   <option value="free_product">Free Product / Item Reward</option>
@@ -2450,11 +2450,11 @@ export default function OwnerDashboardPage() {
 
               {promoOfferType === "free_product" && (
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Select Free Product / Item</label>
+                  <label className="font-semibold text-zinc-800 block mb-1">Select Free Product / Item</label>
                   <select
                     value={promoSelectedProdId}
                     onChange={(e) => setPromoSelectedProdId(e.target.value)}
-                    className="w-full h-10 rounded-xl border border-purple-300 bg-purple-50/50 px-3 text-xs text-slate-900 font-semibold"
+                    className="w-full h-10 rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-900 font-semibold focus:outline-none focus:ring-1 focus:ring-zinc-900"
                   >
                     <option value="">-- Choose from your product menu --</option>
                     {productsList.map((p) => (
@@ -2463,7 +2463,7 @@ export default function OwnerDashboardPage() {
                       </option>
                     ))}
                   </select>
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-[11px] text-zinc-500 mt-1">
                     Customer gets this item unlocked and recorded on their digital pass when scanned.
                   </p>
                 </div>
@@ -2471,16 +2471,16 @@ export default function OwnerDashboardPage() {
 
               {promoOfferType === "points_bonus" && (
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Points Credited to Pass</label>
+                  <label className="font-semibold text-zinc-800 block mb-1">Points Credited to Pass</label>
                   <Input
                     type="number"
                     min="1"
                     placeholder="e.g. 15"
                     value={promoPointsAward}
                     onChange={(e) => setPromoPointsAward(e.target.value)}
-                    className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                    className="bg-white border-zinc-200 text-xs text-zinc-900 rounded-xl focus:ring-1 focus:ring-zinc-900 font-medium"
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-[11px] text-zinc-500 mt-1">
                     Awarded instantly to customer's balance through the immutable ledger.
                   </p>
                 </div>
@@ -2488,7 +2488,7 @@ export default function OwnerDashboardPage() {
 
               {promoOfferType === "discount_promo" && (
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Discount Percentage (%)</label>
+                  <label className="font-semibold text-zinc-800 block mb-1">Discount Percentage (%)</label>
                   <Input
                     type="number"
                     min="1"
@@ -2496,13 +2496,13 @@ export default function OwnerDashboardPage() {
                     placeholder="e.g. 20"
                     value={promoDiscountPct}
                     onChange={(e) => setPromoDiscountPct(e.target.value)}
-                    className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                    className="bg-white border-zinc-200 text-xs text-zinc-900 rounded-xl focus:ring-1 focus:ring-zinc-900 font-medium"
                   />
                 </div>
               )}
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">
+                <label className="font-semibold text-zinc-800 block mb-1">
                   Purchases / Visits Required (e.g. 3 for &quot;Buy 3 Get 1 Free&quot;)
                 </label>
                 <div className="flex items-center gap-2">
@@ -2513,9 +2513,9 @@ export default function OwnerDashboardPage() {
                     placeholder="3"
                     value={promoRequiredVisits}
                     onChange={(e) => setPromoRequiredVisits(e.target.value)}
-                    className="bg-slate-50 border-slate-300 text-xs text-slate-900 font-bold w-24"
+                    className="bg-white border-zinc-200 text-xs text-zinc-900 font-semibold w-24 rounded-xl focus:ring-1 focus:ring-zinc-900"
                   />
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-zinc-500">
                     {parseInt(promoRequiredVisits || "1", 10) > 1
                       ? `Customer must scan ${promoRequiredVisits} times to unlock the free reward`
                       : "Instant reward on single scan"}
@@ -2524,11 +2524,11 @@ export default function OwnerDashboardPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Validity Period (Expiry)</label>
+                <label className="font-semibold text-zinc-800 block mb-1">Validity Period (Expiry)</label>
                 <select
                   value={promoValidityDays}
                   onChange={(e) => setPromoValidityDays(e.target.value)}
-                  className="w-full h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs text-slate-900"
+                  className="w-full h-10 rounded-xl border border-zinc-200 bg-white px-3 text-xs text-zinc-900 font-semibold focus:outline-none focus:ring-1 focus:ring-zinc-900"
                 >
                   <option value="3">3 Days (Flash Promo)</option>
                   <option value="7">7 Days (1 Week)</option>
@@ -2539,7 +2539,7 @@ export default function OwnerDashboardPage() {
                   <option value="180">180 Days (Half Year)</option>
                   <option value="365">365 Days (1 Year)</option>
                 </select>
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-zinc-500 mt-1">
                   Once expired, customer scans will be politely rejected. You can also manually deactivate at any time.
                 </p>
               </div>
@@ -2547,13 +2547,13 @@ export default function OwnerDashboardPage() {
               <div className="flex gap-2.5 pt-3">
                 <Button
                   variant="outline"
-                  className="flex-1 bg-white border-slate-300 text-xs font-bold text-slate-700"
+                  className="flex-1 bg-white border-zinc-200 text-xs font-semibold text-zinc-700 rounded-xl hover:bg-zinc-50 shadow-2xs cursor-pointer"
                   onClick={() => setShowCreatePromoQr(false)}
                 >
                   Cancel
                 </Button>
                 <Button
-                  className="flex-1 font-bold text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                  className="flex-1 font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
                   onClick={handleCreatePromoQr}
                   disabled={loading || !promoTitle.trim()}
                 >

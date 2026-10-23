@@ -11,7 +11,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         type={type}
         className={twMerge(
           clsx(
-            "flex min-h-[48px] w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base shadow-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus-visible:ring-slate-300",
+            "flex min-h-[44px] w-full rounded-xl border border-zinc-200 bg-white text-zinc-900 px-3.5 py-2.5 text-sm shadow-2xs transition-colors placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50 font-medium",
             className
           )
         )}

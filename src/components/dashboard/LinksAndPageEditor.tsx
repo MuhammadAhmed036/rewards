@@ -95,7 +95,7 @@ export function LinksAndPageEditor({
               return (
                 <div
                   key={link.type}
-                  className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-3"
+                  className="p-4 rounded-2xl border border-zinc-200 bg-zinc-50/50 space-y-3"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
@@ -134,7 +134,7 @@ export function LinksAndPageEditor({
                       <Input
                         value={link.label}
                         onChange={(e) => handleUpdate(idx, { label: e.target.value })}
-                        className="text-sm bg-white dark:bg-slate-950"
+                        className="text-sm bg-white"
                       />
                     </div>
 
@@ -147,7 +147,7 @@ export function LinksAndPageEditor({
                         placeholder="https://..."
                         value={link.url}
                         onChange={(e) => handleUpdate(idx, { url: e.target.value })}
-                        className="text-sm bg-white dark:bg-slate-950 font-mono"
+                        className="text-sm bg-white font-mono"
                       />
                     </div>
 
@@ -188,16 +188,16 @@ export function LinksAndPageEditor({
       {/* Live Preview Panel (Right 6 Cols) */}
       <div className="lg:col-span-6 space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
+          <span className="text-sm font-bold text-zinc-800">
             Live Customer Preview
           </span>
-          <div className="flex p-1 bg-slate-200 dark:bg-slate-800 rounded-xl space-x-1">
+          <div className="flex p-1 bg-zinc-200 rounded-xl space-x-1">
             <button
               onClick={() => setPreviewMode("mobile")}
               className={`p-2 rounded-lg text-xs font-semibold flex items-center space-x-1 ${
                 previewMode === "mobile"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white"
-                  : "text-slate-500"
+                  ? "bg-white text-zinc-900 shadow-sm"
+                  : "text-zinc-500"
               }`}
             >
               <Smartphone className="h-4 w-4" />
@@ -207,8 +207,8 @@ export function LinksAndPageEditor({
               onClick={() => setPreviewMode("desktop")}
               className={`p-2 rounded-lg text-xs font-semibold flex items-center space-x-1 ${
                 previewMode === "desktop"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white"
-                  : "text-slate-500"
+                  ? "bg-white text-zinc-900 shadow-sm"
+                  : "text-zinc-500"
               }`}
             >
               <Monitor className="h-4 w-4" />
@@ -220,12 +220,12 @@ export function LinksAndPageEditor({
         {/* Frame Device */}
         <div className="flex justify-center">
           <div
-            className={`border-4 border-slate-900 rounded-[2.5rem] p-2 bg-slate-900 shadow-2xl transition-all ${
+            className={`border-4 border-zinc-900 rounded-[2.5rem] p-2 bg-zinc-900 shadow-2xl transition-all ${
               previewMode === "mobile" ? "w-[340px]" : "w-full max-w-lg"
             }`}
           >
             {/* Screen View */}
-            <div className="bg-slate-50 dark:bg-slate-950 rounded-[2rem] overflow-hidden text-slate-900 dark:text-slate-100 min-h-[500px]">
+            <div className="bg-zinc-50 rounded-[2rem] overflow-hidden text-zinc-900 min-h-[500px]">
               {/* Header */}
               <div
                 className="p-4 text-white text-center"
@@ -237,8 +237,8 @@ export function LinksAndPageEditor({
 
               {/* Sample Member Card */}
               <div className="p-4 space-y-4">
-                <div className="rounded-2xl bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 shadow-sm">
-                  <div className="text-xs uppercase text-slate-400 font-semibold">
+                <div className="rounded-2xl bg-white p-4 border border-zinc-200 shadow-sm">
+                  <div className="text-xs uppercase text-zinc-400 font-semibold">
                     Sample Member Card
                   </div>
                   <div className="text-2xl font-black mt-1">45 points</div>
@@ -249,11 +249,11 @@ export function LinksAndPageEditor({
 
                 {/* Preview of Social / Review Buttons */}
                 <div className="space-y-2">
-                  <div className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">
+                  <div className="text-xs font-bold text-zinc-500 uppercase tracking-wider pl-1">
                     Connect & Review
                   </div>
                   {enabledLinks.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic p-3 text-center border border-dashed rounded-xl">
+                    <p className="text-xs text-zinc-400 italic p-3 text-center border border-dashed rounded-xl">
                       No buttons currently enabled.
                     </p>
                   ) : (
@@ -266,7 +266,7 @@ export function LinksAndPageEditor({
                       return (
                         <div
                           key={link.type}
-                          className="flex items-center justify-between p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs font-semibold shadow-xs"
+                          className="flex items-center justify-between p-3 rounded-xl border border-zinc-200 bg-white text-xs font-semibold shadow-xs"
                         >
                           <span className="flex items-center space-x-2">
                             <Icon

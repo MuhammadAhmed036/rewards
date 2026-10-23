@@ -17,17 +17,17 @@ export function Badge({
         clsx(
           "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none select-none",
           {
-            "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900":
+            "bg-zinc-950 text-white":
               variant === "default",
-            "bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100":
+            "bg-zinc-100 text-zinc-800 border border-zinc-200/60":
               variant === "secondary",
-            "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300":
+            "bg-emerald-50 text-emerald-800 border border-emerald-200":
               variant === "success",
-            "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300":
+            "bg-amber-50 text-amber-800 border border-amber-200":
               variant === "warning",
-            "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300":
+            "bg-rose-50 text-rose-800 border border-rose-200":
               variant === "destructive",
-            "border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200":
+            "border border-zinc-200 text-zinc-800 bg-white shadow-2xs":
               variant === "outline",
           },
           className
