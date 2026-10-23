@@ -670,9 +670,9 @@ export default function BusinessHubPage(props: {
                     variant="default"
                     size="sm"
                     onClick={() => setShowQrModal(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-sm cursor-pointer"
+                    className="bg-zinc-950 hover:bg-zinc-800 text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer transition-colors"
                   >
-                    <QrCode className="h-4 w-4 mr-1.5" />
+                    <QrCode className="h-4 w-4 mr-1.5 stroke-[1.8]" />
                     Show QR
                   </Button>
                   <button
@@ -804,7 +804,7 @@ export default function BusinessHubPage(props: {
                     <div className="space-y-2">
                       <Button
                         onClick={() => handleClaimPromoQr()}
-                        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl py-3 text-xs shadow-md cursor-pointer"
+                        className="w-full bg-zinc-950 hover:bg-zinc-800 text-white font-semibold rounded-xl py-3 text-xs shadow-xs cursor-pointer transition-colors"
                       >
                         Claim Offer to My Pass →
                       </Button>
@@ -1042,9 +1042,9 @@ export default function BusinessHubPage(props: {
                           variant="default"
                           size="sm"
                           onClick={() => setShowQrModal(true)}
-                          className="rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white text-xs shadow-xs cursor-pointer"
+                          className="rounded-xl font-semibold bg-zinc-950 hover:bg-zinc-800 text-white text-xs shadow-xs cursor-pointer transition-colors"
                         >
-                          <QrCode className="h-3.5 w-3.5 mr-1.5" />
+                          <QrCode className="h-3.5 w-3.5 mr-1.5 stroke-[1.8]" />
                           Tap to Scan QR
                         </Button>
                       </div>
@@ -1266,50 +1266,50 @@ export default function BusinessHubPage(props: {
                 </div>
               ) : (
                 /* PUBLIC CUSTOMER JOIN / SIGN IN ENTERPRISE 2-COLUMN VIEW */
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                   {/* Left Column: Store Value Proposition & Teaser Rewards (6 cols) */}
                   <div className="lg:col-span-6 space-y-6">
-                    <div className="bg-white rounded-3xl border border-slate-200/90 p-8 shadow-sm relative overflow-hidden">
-                      <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mb-4 shadow-xs">
-                        <Sparkles className="h-7 w-7 text-amber-500" />
+                    <div className="bg-white rounded-2xl border border-zinc-200/90 p-6 sm:p-8 shadow-xs relative overflow-hidden">
+                      <div className="w-10 h-10 rounded-xl bg-zinc-100 border border-zinc-200/60 text-zinc-900 flex items-center justify-center mb-4 shadow-2xs">
+                        <Sparkles className="h-5 w-5 stroke-[1.8]" />
                       </div>
 
-                      <h2 className="text-3xl font-black text-slate-900 tracking-tight leading-tight">
+                      <h2 className="text-2xl sm:text-3xl font-bold text-zinc-950 tracking-tight leading-tight">
                         Join {hubData.tenant.name} &amp; Collect Rewards
                       </h2>
 
-                      <p className="mt-3 text-sm text-slate-600 leading-relaxed">
+                      <p className="mt-3 text-xs sm:text-sm text-zinc-600 leading-relaxed">
                         Earn {isStamps ? "stamps" : "loyalty points"} every time you make a purchase at our store. Exchange your balance for complimentary food, drinks, and VIP perks.
                       </p>
 
-                      <div className="mt-6 pt-5 border-t border-slate-100 flex items-center gap-4 text-xs text-slate-500">
-                        <div className="flex items-center gap-1.5 font-bold text-slate-700">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          Instant Digital Pass
+                      <div className="mt-6 pt-5 border-t border-zinc-100 flex flex-wrap items-center gap-4 text-xs text-zinc-600">
+                        <div className="flex items-center gap-1.5 font-medium text-zinc-900">
+                          <CheckCircle2 className="w-4 h-4 text-zinc-900 stroke-[1.8]" />
+                          <span>Instant Digital Pass</span>
                         </div>
-                        <div className="flex items-center gap-1.5 font-bold text-slate-700">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          No App Download Needed
+                        <div className="flex items-center gap-1.5 font-medium text-zinc-900">
+                          <CheckCircle2 className="w-4 h-4 text-zinc-900 stroke-[1.8]" />
+                          <span>No App Download Needed</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Featured Rewards Preview */}
                     {hubData.rewards.length > 0 && (
-                      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 space-y-3">
-                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                      <div className="bg-white rounded-2xl border border-zinc-200/90 shadow-xs p-5 sm:p-6 space-y-3">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 block">
                           Featured Rewards to Unlock
                         </span>
-                        <div className="space-y-2.5">
+                        <div className="space-y-2">
                           {hubData.rewards.slice(0, 4).map((r) => (
                             <div
                               key={r.id}
-                              className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-center justify-between text-xs shadow-2xs"
+                              className="p-3 rounded-xl border border-zinc-200/80 bg-zinc-50/60 flex items-center justify-between text-xs shadow-2xs"
                             >
-                              <div className="font-bold text-slate-900">{r.title}</div>
-                              <Badge variant="outline" className="font-bold bg-white text-indigo-700 border-indigo-200">
+                              <div className="font-semibold text-zinc-900">{r.title}</div>
+                              <span className="font-mono text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white text-zinc-800 border border-zinc-200">
                                 {r.costPoints} {isStamps ? "stamps" : "pts"}
-                              </Badge>
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -1319,13 +1319,13 @@ export default function BusinessHubPage(props: {
 
                   {/* Right Column: Customer Join / Sign In Card (6 cols) */}
                   <div className="lg:col-span-6">
-                    <div className="bg-white rounded-3xl shadow-xl p-8 border border-slate-200/90 space-y-5">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <div className="bg-white rounded-2xl shadow-xs p-6 sm:p-8 border border-zinc-200/90 space-y-5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
                         <div>
-                          <h3 className="text-xl font-black text-slate-900">
+                          <h3 className="text-lg sm:text-xl font-bold text-zinc-950">
                             {customerAuthMode === "join" ? "Get Your Digital Pass" : "Customer Sign In"}
                           </h3>
-                          <p className="text-xs text-slate-500 mt-0.5">
+                          <p className="text-xs text-zinc-500 mt-0.5">
                             {customerAuthMode === "join"
                               ? "Enter details below to launch your digital pass"
                               : "Enter your email & password to view balance and rewards"}
@@ -1333,14 +1333,14 @@ export default function BusinessHubPage(props: {
                         </div>
 
                         {/* Customer Mode Switcher */}
-                        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold">
+                        <div className="flex bg-zinc-100 p-1 rounded-xl border border-zinc-200 text-xs font-semibold self-start sm:self-auto">
                           <button
                             type="button"
                             onClick={() => setCustomerAuthMode("join")}
-                            className={`py-1.5 px-3 rounded-lg transition-all cursor-pointer ${
+                            className={`py-1.5 px-3 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                               customerAuthMode === "join"
-                                ? "bg-white text-indigo-700 shadow-2xs font-black"
-                                : "text-slate-600 hover:text-slate-900"
+                                ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                                : "text-zinc-600 hover:text-zinc-900"
                             }`}
                           >
                             Join (New)
@@ -1348,10 +1348,10 @@ export default function BusinessHubPage(props: {
                           <button
                             type="button"
                             onClick={() => setCustomerAuthMode("signin")}
-                            className={`py-1.5 px-3 rounded-lg transition-all cursor-pointer ${
+                            className={`py-1.5 px-3 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                               customerAuthMode === "signin"
-                                ? "bg-white text-indigo-700 shadow-2xs font-black"
-                                : "text-slate-600 hover:text-slate-900"
+                                ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                                : "text-zinc-600 hover:text-zinc-900"
                             }`}
                           >
                             Sign In
@@ -1359,14 +1359,15 @@ export default function BusinessHubPage(props: {
                         </div>
                       </div>
 
-                      {/* Google Quick Join Button */}
+                      {/* Google Quick Join Button with PRESERVED COLOURED GOOGLE LOGO */}
                       <div>
                         <a
                           href={`/api/v1/auth/google?role=customer&returnTo=${encodeURIComponent(
                             scannedClaimCode ? `/b/${slug}?claimQr=${scannedClaimCode}` : `/b/${slug}`
                           )}`}
-                          className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-2xl border border-slate-300 hover:bg-slate-50 transition-all font-bold text-xs shadow-2xs text-slate-800"
+                          className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border border-zinc-200 hover:border-zinc-300 bg-white hover:bg-zinc-50 transition-all font-semibold text-xs shadow-2xs text-zinc-800"
                         >
+                          {/* Coloured Google Logo explicitly preserved */}
                           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                             <path
                               fill="#4285F4"
@@ -1391,19 +1392,19 @@ export default function BusinessHubPage(props: {
                         </a>
 
                         <div className="flex items-center my-4">
-                          <div className="flex-1 border-t border-slate-200" />
-                          <span className="px-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                          <div className="flex-1 border-t border-zinc-200" />
+                          <span className="px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 font-mono">
                             or with email
                           </span>
-                          <div className="flex-1 border-t border-slate-200" />
+                          <div className="flex-1 border-t border-zinc-200" />
                         </div>
                       </div>
 
                       {customerAuthMode === "join" ? (
                         /* JOIN FORM */
-                        <form onSubmit={handleJoin} className="space-y-4">
+                        <form onSubmit={handleJoin} className="space-y-3.5">
                           <div>
-                            <label className="text-xs font-bold text-slate-800 block mb-1">
+                            <label className="text-xs font-semibold text-zinc-800 block mb-1">
                               Email Address <span className="text-rose-500">*</span>
                             </label>
                             <Input
@@ -1412,12 +1413,12 @@ export default function BusinessHubPage(props: {
                               placeholder="name@example.com"
                               value={joinEmail}
                               onChange={(e) => setJoinEmail(e.target.value)}
-                              className="text-xs rounded-xl bg-slate-50 border-slate-200"
+                              className="text-xs rounded-xl bg-zinc-50/70 border-zinc-200 focus:bg-white focus:ring-1 focus:ring-zinc-900 font-medium text-zinc-900"
                             />
                           </div>
 
                           <div>
-                            <label className="text-xs font-bold text-slate-700 block mb-1">
+                            <label className="text-xs font-semibold text-zinc-800 block mb-1">
                               Your Name (Optional)
                             </label>
                             <Input
@@ -1425,12 +1426,12 @@ export default function BusinessHubPage(props: {
                               placeholder="First & Last Name"
                               value={joinName}
                               onChange={(e) => setJoinName(e.target.value)}
-                              className="text-xs rounded-xl bg-slate-50 border-slate-200"
+                              className="text-xs rounded-xl bg-zinc-50/70 border-zinc-200 focus:bg-white focus:ring-1 focus:ring-zinc-900 font-medium text-zinc-900"
                             />
                           </div>
 
                           <div>
-                            <label className="text-xs font-bold text-slate-700 block mb-1">
+                            <label className="text-xs font-semibold text-zinc-800 block mb-1">
                               Create Password (Optional)
                             </label>
                             <Input
@@ -1438,30 +1439,30 @@ export default function BusinessHubPage(props: {
                               placeholder="Min 6 characters to sign in anytime"
                               value={joinPassword}
                               onChange={(e) => setJoinPassword(e.target.value)}
-                              className="text-xs rounded-xl bg-slate-50 border-slate-200"
+                              className="text-xs rounded-xl bg-zinc-50/70 border-zinc-200 focus:bg-white focus:ring-1 focus:ring-zinc-900 font-medium text-zinc-900"
                             />
                           </div>
 
                           <div className="space-y-2 pt-1">
-                            <label className="flex items-start space-x-2 text-xs text-slate-600 cursor-pointer">
+                            <label className="flex items-start space-x-2 text-xs text-zinc-600 cursor-pointer">
                               <input
                                 type="checkbox"
                                 required
                                 checked={termsAgreed}
                                 onChange={(e) => setTermsAgreed(e.target.checked)}
-                                className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                className="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
                               />
                               <span>
                                 I accept the programme terms and privacy policy. Points hold no cash value.
                               </span>
                             </label>
 
-                            <label className="flex items-start space-x-2 text-xs text-slate-600 cursor-pointer">
+                            <label className="flex items-start space-x-2 text-xs text-zinc-600 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={marketingOptIn}
                                 onChange={(e) => setMarketingOptIn(e.target.checked)}
-                                className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                className="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
                               />
                               <span>
                                 (Optional) Keep me informed with special offers and birthday perks.
@@ -1473,7 +1474,7 @@ export default function BusinessHubPage(props: {
                             type="submit"
                             variant="default"
                             size="lg"
-                            className="w-full font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md h-12 cursor-pointer"
+                            className="w-full font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
                             disabled={joining || !joinEmail}
                           >
                             {joining ? "Generating Digital Pass..." : "Join & Get My Pass →"}
@@ -1481,9 +1482,9 @@ export default function BusinessHubPage(props: {
                         </form>
                       ) : (
                         /* SIGN IN FORM */
-                        <form onSubmit={handleCustomerLogin} className="space-y-4">
+                        <form onSubmit={handleCustomerLogin} className="space-y-3.5">
                           <div>
-                            <label className="text-xs font-bold text-slate-800 block mb-1">
+                            <label className="text-xs font-semibold text-zinc-800 block mb-1">
                               Email Address
                             </label>
                             <Input
@@ -1492,12 +1493,12 @@ export default function BusinessHubPage(props: {
                               placeholder="customer@example.com"
                               value={customerLoginEmail}
                               onChange={(e) => setCustomerLoginEmail(e.target.value)}
-                              className="text-xs rounded-xl bg-slate-50 border-slate-200"
+                              className="text-xs rounded-xl bg-zinc-50/70 border-zinc-200 focus:bg-white focus:ring-1 focus:ring-zinc-900 font-medium text-zinc-900"
                             />
                           </div>
 
                           <div>
-                            <label className="text-xs font-bold text-slate-800 block mb-1">
+                            <label className="text-xs font-semibold text-zinc-800 block mb-1">
                               Password
                             </label>
                             <Input
@@ -1506,7 +1507,7 @@ export default function BusinessHubPage(props: {
                               placeholder="••••••••"
                               value={customerLoginPassword}
                               onChange={(e) => setCustomerLoginPassword(e.target.value)}
-                              className="text-xs rounded-xl bg-slate-50 border-slate-200"
+                              className="text-xs rounded-xl bg-zinc-50/70 border-zinc-200 focus:bg-white focus:ring-1 focus:ring-zinc-900 font-medium text-zinc-900"
                             />
                           </div>
 
@@ -1514,7 +1515,7 @@ export default function BusinessHubPage(props: {
                             type="submit"
                             variant="default"
                             size="lg"
-                            className="w-full font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md h-12 cursor-pointer"
+                            className="w-full font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
                             disabled={customerLoggingIn || !customerLoginEmail || !customerLoginPassword}
                           >
                             {customerLoggingIn ? "Signing In..." : "Sign In to View Pass →"}
@@ -1532,57 +1533,57 @@ export default function BusinessHubPage(props: {
           {/* VIEW 2: FRONTLINE STAFF LOGIN (ENTERPRISE SPREAD)         */}
           {/* ======================================================== */}
           {activePortalRole === "staff" && (
-            <div className="max-w-2xl mx-auto bg-white rounded-3xl shadow-xl p-8 border border-slate-200/90 space-y-6">
-              <div className="text-center pb-3 border-b border-slate-100">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-3 shadow-xs">
-                  <Smartphone className="w-7 h-7" />
+            <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xs p-6 sm:p-8 border border-zinc-200/90 space-y-5 animate-in fade-in">
+              <div className="text-center pb-3 border-b border-zinc-100">
+                <div className="w-11 h-11 rounded-xl bg-zinc-100 border border-zinc-200/60 text-zinc-900 flex items-center justify-center mx-auto mb-2.5 shadow-2xs">
+                  <Smartphone className="w-5 h-5 stroke-[1.8]" />
                 </div>
-                <h2 className="text-2xl font-black text-slate-900">Frontline Staff Scanner Terminal</h2>
-                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                  Enter your frontline staff credentials provisioned by {hubData.tenant.name} to launch the high-speed optical barcode/QR terminal.
+                <h2 className="text-xl sm:text-2xl font-bold text-zinc-950 tracking-tight">Frontline Staff Scanner</h2>
+                <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                  Enter your staff credentials provisioned by {hubData.tenant.name} to launch the scanner terminal.
                 </p>
               </div>
 
-              <form onSubmit={handleStaffLogin} className="space-y-4">
+              <form onSubmit={handleStaffLogin} className="space-y-3.5">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Staff Email Address</label>
+                  <label className="text-xs font-semibold text-zinc-800 block mb-1">Staff Email Address</label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <Mail className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3 stroke-[1.8]" />
                     <Input
                       type="email"
                       required
                       placeholder="staff@store.com"
                       value={staffEmail}
                       onChange={(e) => setStaffEmail(e.target.value)}
-                      className="pl-10 text-xs rounded-xl bg-slate-50 border-slate-200"
+                      className="pl-10 text-xs rounded-xl bg-zinc-50/70 border-zinc-200 focus:bg-white focus:ring-1 focus:ring-zinc-900 font-medium text-zinc-900"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Staff Password</label>
+                  <label className="text-xs font-semibold text-zinc-800 block mb-1">Staff Password</label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <Lock className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3 stroke-[1.8]" />
                     <Input
                       type="password"
                       required
                       placeholder="••••••••"
                       value={staffPassword}
                       onChange={(e) => setStaffPassword(e.target.value)}
-                      className="pl-10 text-xs rounded-xl bg-slate-50 border-slate-200"
+                      className="pl-10 text-xs rounded-xl bg-zinc-50/70 border-zinc-200 focus:bg-white focus:ring-1 focus:ring-zinc-900 font-medium text-zinc-900"
                     />
                   </div>
                 </div>
 
-                <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 leading-relaxed">
-                  <span className="font-bold text-slate-800">Quick 1-Click Demo Staff Logins:</span> Use{" "}
+                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 text-xs text-zinc-600 leading-relaxed">
+                  <span className="font-semibold text-zinc-900">Demo Staff Logins:</span> Use{" "}
                   <button
                     type="button"
                     onClick={() => {
                       setStaffEmail("coffee-staff@platform.local");
                       setStaffPassword("Password123!");
                     }}
-                    className="font-mono text-indigo-600 font-bold hover:underline cursor-pointer"
+                    className="font-mono text-zinc-900 font-semibold underline hover:text-black cursor-pointer"
                   >
                     coffee-staff@platform.local
                   </button>{" "}
@@ -1593,7 +1594,7 @@ export default function BusinessHubPage(props: {
                       setStaffEmail("barber-staff@platform.local");
                       setStaffPassword("Password123!");
                     }}
-                    className="font-mono text-indigo-600 font-bold hover:underline cursor-pointer"
+                    className="font-mono text-zinc-900 font-semibold underline hover:text-black cursor-pointer"
                   >
                     barber-staff@platform.local
                   </button>
@@ -1603,7 +1604,7 @@ export default function BusinessHubPage(props: {
                   type="submit"
                   variant="default"
                   size="lg"
-                  className="w-full font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md h-12 cursor-pointer"
+                  className="w-full font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
                   disabled={staffLoggingIn || !staffEmail || !staffPassword}
                 >
                   {staffLoggingIn ? "Authenticating Staff..." : "Launch Staff Terminal →"}
@@ -1616,57 +1617,57 @@ export default function BusinessHubPage(props: {
           {/* VIEW 3: BUSINESS OWNER PORTAL LOGIN                      */}
           {/* ======================================================== */}
           {activePortalRole === "owner" && (
-            <div className="max-w-2xl mx-auto bg-white rounded-3xl shadow-xl p-8 border border-slate-200/90 space-y-6">
-              <div className="text-center pb-3 border-b border-slate-100">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto mb-3 shadow-xs">
-                  <Store className="w-7 h-7" />
+            <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xs p-6 sm:p-8 border border-zinc-200/90 space-y-5 animate-in fade-in">
+              <div className="text-center pb-3 border-b border-zinc-100">
+                <div className="w-11 h-11 rounded-xl bg-zinc-100 border border-zinc-200/60 text-zinc-900 flex items-center justify-center mx-auto mb-2.5 shadow-2xs">
+                  <Store className="w-5 h-5 stroke-[1.8]" />
                 </div>
-                <h2 className="text-2xl font-black text-slate-900">Store Owner Dashboard</h2>
-                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                  Access store analytics, product catalog, today&apos;s discounts, staff RBAC credentials, and customer ledger.
+                <h2 className="text-xl sm:text-2xl font-bold text-zinc-950 tracking-tight">Store Owner Dashboard</h2>
+                <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                  Access store analytics, product catalog, discounts, staff RBAC credentials, and customer ledger.
                 </p>
               </div>
 
-              <form onSubmit={handleOwnerLogin} className="space-y-4">
+              <form onSubmit={handleOwnerLogin} className="space-y-3.5">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Owner Email Address</label>
+                  <label className="text-xs font-semibold text-zinc-800 block mb-1">Owner Email Address</label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <Mail className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3 stroke-[1.8]" />
                     <Input
                       type="email"
                       required
                       placeholder="owner@store.com"
                       value={ownerEmail}
                       onChange={(e) => setOwnerEmail(e.target.value)}
-                      className="pl-10 text-xs rounded-xl bg-slate-50 border-slate-200"
+                      className="pl-10 text-xs rounded-xl bg-zinc-50/70 border-zinc-200 focus:bg-white focus:ring-1 focus:ring-zinc-900 font-medium text-zinc-900"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Password</label>
+                  <label className="text-xs font-semibold text-zinc-800 block mb-1">Password</label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <Lock className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3 stroke-[1.8]" />
                     <Input
                       type="password"
                       required
                       placeholder="••••••••"
                       value={ownerPassword}
                       onChange={(e) => setOwnerPassword(e.target.value)}
-                      className="pl-10 text-xs rounded-xl bg-slate-50 border-slate-200"
+                      className="pl-10 text-xs rounded-xl bg-zinc-50/70 border-zinc-200 focus:bg-white focus:ring-1 focus:ring-zinc-900 font-medium text-zinc-900"
                     />
                   </div>
                 </div>
 
-                <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 leading-relaxed">
-                  <span className="font-bold text-slate-800">Quick 1-Click Demo Owner Logins:</span> Use{" "}
+                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 text-xs text-zinc-600 leading-relaxed">
+                  <span className="font-semibold text-zinc-900">Demo Owner Logins:</span> Use{" "}
                   <button
                     type="button"
                     onClick={() => {
                       setOwnerEmail("coffee-owner@platform.local");
                       setOwnerPassword("Password123!");
                     }}
-                    className="font-mono text-indigo-600 font-bold hover:underline cursor-pointer"
+                    className="font-mono text-zinc-900 font-semibold underline hover:text-black cursor-pointer"
                   >
                     coffee-owner@platform.local
                   </button>{" "}
@@ -1677,7 +1678,7 @@ export default function BusinessHubPage(props: {
                       setOwnerEmail("barber-owner@platform.local");
                       setOwnerPassword("Password123!");
                     }}
-                    className="font-mono text-indigo-600 font-bold hover:underline cursor-pointer"
+                    className="font-mono text-zinc-900 font-semibold underline hover:text-black cursor-pointer"
                   >
                     barber-owner@platform.local
                   </button>
@@ -1687,7 +1688,7 @@ export default function BusinessHubPage(props: {
                   type="submit"
                   variant="default"
                   size="lg"
-                  className="w-full font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md h-12 cursor-pointer"
+                  className="w-full font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
                   disabled={ownerLoggingIn || !ownerEmail || !ownerPassword}
                 >
                   {ownerLoggingIn ? "Opening Portal..." : "Open Owner Dashboard →"}
