@@ -129,7 +129,7 @@ export default function CustomerMePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-zinc-900 py-6 sm:py-10 px-4 sm:px-6 selection:bg-zinc-900 selection:text-white">
+    <div className="min-h-screen bg-[#fafafa] text-zinc-900 py-6 sm:py-10 px-4 sm:px-6 selection:bg-zinc-900 selection:text-white overflow-x-hidden w-full max-w-full">
       <div className="max-w-3xl mx-auto space-y-6 sm:space-y-8">
         {/* Navigation Breadcrumb */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">

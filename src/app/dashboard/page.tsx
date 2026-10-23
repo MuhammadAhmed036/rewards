@@ -727,7 +727,7 @@ export default function OwnerDashboardPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-zinc-900 flex flex-col font-sans selection:bg-zinc-900 selection:text-white">
+    <div className="min-h-screen bg-[#fafafa] text-zinc-900 flex flex-col font-sans selection:bg-zinc-900 selection:text-white overflow-x-hidden w-full max-w-full">
       {/* Top Enterprise Bar */}
       <header className="h-16 border-b border-zinc-200/80 bg-white/95 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40 shadow-2xs">
         <div className="flex items-center gap-2.5">
@@ -1312,7 +1312,8 @@ export default function OwnerDashboardPage() {
                   </div>
                   <span className="text-xs text-slate-500 font-mono font-semibold">{productsList.length} items configured</span>
                 </div>
-                <table className="w-full text-left text-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
                     <tr>
                       <th className="p-4">Item Name</th>
@@ -1391,6 +1392,7 @@ export default function OwnerDashboardPage() {
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               {/* DYNAMIC PROMOTIONAL & OFFER QR CODES GRID */}
@@ -1994,7 +1996,8 @@ export default function OwnerDashboardPage() {
               </div>
 
               <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xs">
-                <table className="w-full text-left text-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
                     <tr>
                       <th className="p-4">Name</th>
@@ -2039,6 +2042,7 @@ export default function OwnerDashboardPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}

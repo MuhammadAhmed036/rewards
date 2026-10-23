@@ -327,7 +327,7 @@ export default function PlatformAdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-zinc-900 flex flex-col font-sans selection:bg-zinc-900 selection:text-white">
+    <div className="min-h-screen bg-[#fafafa] text-zinc-900 flex flex-col font-sans selection:bg-zinc-900 selection:text-white overflow-x-hidden w-full max-w-full">
       {/* Top Header */}
       <header className="border-b border-zinc-200/80 bg-white/95 backdrop-blur sticky top-0 z-30 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-0 sm:h-16 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

@@ -679,7 +679,7 @@ export default function StaffPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-zinc-900 pb-20 selection:bg-zinc-900 selection:text-white font-sans">
+    <div className="min-h-screen bg-[#fafafa] text-zinc-900 pb-20 selection:bg-zinc-900 selection:text-white font-sans overflow-x-hidden w-full max-w-full">
       {/* Top Header Bar - High-End POS Shell */}
       <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-white/95 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-3 shadow-2xs">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">

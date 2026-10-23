@@ -7,7 +7,7 @@ import { QrCode, ArrowLeft } from "lucide-react";
 
 export default function SignUpPage() {
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col justify-between selection:bg-zinc-900 selection:text-white">
+    <div className="min-h-screen bg-[#fafafa] flex flex-col justify-between selection:bg-zinc-900 selection:text-white overflow-x-hidden w-full max-w-full">
       {/* Top Global Navigation Bar */}
       <header className="border-b border-zinc-200/80 bg-white/90 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-3 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">

@@ -581,7 +581,7 @@ export default function BusinessHubPage(props: {
 
   return (
     <div
-      className="min-h-screen bg-[#f8fafc] text-slate-900 pb-20 selection:bg-indigo-500 selection:text-white flex flex-col justify-between"
+      className="min-h-screen bg-[#f8fafc] text-slate-900 pb-20 selection:bg-zinc-900 selection:text-white flex flex-col justify-between overflow-x-hidden w-full max-w-full"
       style={{ "--brand": brandColor } as React.CSSProperties}
     >
       {/* Brand Header - Full Enterprise Widescreen Bar */}
