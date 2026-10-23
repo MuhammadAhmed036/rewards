@@ -5,17 +5,12 @@ import Link from "next/link";
 import {
   QrCode,
   ShieldCheck,
-  LayoutDashboard,
-  Smartphone,
   ArrowRight,
-  ArrowUpRight,
   Receipt,
   Scale,
   ChevronRight,
   Coffee,
   Scissors,
-  Building2,
-  Users,
   BarChart3,
   Check,
   ShoppingBag,
@@ -25,7 +20,6 @@ import {
   HelpCircle,
   Activity,
   Layers,
-  Sparkles,
   Lock,
   Star,
   CheckCircle2,
@@ -78,7 +72,7 @@ export default function Home() {
               v2.4 Live
             </span>
             <span className="text-zinc-400 hidden sm:inline">
-              Enterprise Multi-Tenant QR Loyalty & Double-Entry Ledger.
+              Enterprise Multi-Tenant QR Loyalty &amp; Double-Entry Ledger.
             </span>
           </div>
           <Link
@@ -120,16 +114,6 @@ export default function Home() {
             <a href="#architecture" className="hover:text-zinc-950 transition-colors">
               Ledger Architecture
             </a>
-            <a href="#sandboxes" className="hover:text-zinc-950 transition-colors">
-              Live Sandboxes
-            </a>
-            <Link
-              href="/admin"
-              className="text-zinc-500 hover:text-zinc-900 transition-colors flex items-center gap-1.5"
-            >
-              <Building2 className="w-3.5 h-3.5 stroke-[1.8]" />
-              Platform Admin
-            </Link>
           </nav>
 
           {/* Action CTAs */}
@@ -180,35 +164,8 @@ export default function Home() {
             PostgreSQL double-entry ledger, anti-gating Google Review growth, and native multi-tenant isolation.
           </p>
 
-          {/* Primary Action Buttons */}
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/signup?role=owner"
-              className="inline-flex items-center justify-center gap-2 bg-zinc-950 hover:bg-zinc-800 text-white font-medium px-6 py-3.5 rounded-xl text-sm transition-all shadow-sm ring-1 ring-zinc-900/10 group"
-            >
-              <span>Deploy Business Programme</span>
-              <ArrowRight className="w-4 h-4 text-zinc-400 group-hover:translate-x-0.5 transition-transform stroke-[1.8]" />
-            </Link>
-
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center gap-2 bg-white hover:bg-zinc-50 text-zinc-800 border border-zinc-200 font-medium px-5 py-3.5 rounded-xl text-sm transition-all shadow-2xs hover:border-zinc-300"
-            >
-              <LayoutDashboard className="w-4 h-4 text-zinc-500 stroke-[1.8]" />
-              <span>Owner ERP Console</span>
-            </Link>
-
-            <Link
-              href="/staff"
-              className="inline-flex items-center justify-center gap-2 bg-zinc-100 hover:bg-zinc-200/70 text-zinc-800 border border-zinc-200/60 font-medium px-5 py-3.5 rounded-xl text-sm transition-all"
-            >
-              <Smartphone className="w-4 h-4 text-zinc-500 stroke-[1.8]" />
-              <span>Staff POS Scanner</span>
-            </Link>
-          </div>
-
           {/* Enterprise Trust Row */}
-          <div className="mt-12 pt-8 border-t border-zinc-200/70 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs text-zinc-600">
+          <div className="mt-10 pt-8 border-t border-zinc-200/70 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs text-zinc-600">
             <div className="flex items-center gap-2 font-medium">
               <CheckCircle2 className="w-4 h-4 text-zinc-900 stroke-[1.8]" />
               <span>Zero App Downloads Required</span>
@@ -223,7 +180,7 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-2 font-medium">
               <ShieldCheck className="w-4 h-4 text-zinc-900 stroke-[1.8]" />
-              <span>UK GDPR & ICO Compliant</span>
+              <span>UK GDPR &amp; ICO Compliant</span>
             </div>
           </div>
         </div>
@@ -516,7 +473,7 @@ export default function Home() {
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                   Spend-Based Points Engine
                 </span>
-                <h3 className="text-xl font-bold text-zinc-950 mt-1">Full Service Dining & Bistros</h3>
+                <h3 className="text-xl font-bold text-zinc-950 mt-1">Full Service Dining &amp; Bistros</h3>
                 <p className="text-xs text-zinc-600 mt-2.5 leading-relaxed">
                   Customers earn 1 point per £1 spent on food and beverages. Waiters enter bill totals at checkout, tips are cleanly separated, and guests redeem £10, £25, or complimentary dessert rewards.
                 </p>
@@ -552,7 +509,7 @@ export default function Home() {
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                   Digital Punch Card Engine
                 </span>
-                <h3 className="text-xl font-bold text-zinc-950 mt-1">Speciality Coffee & Bakeries</h3>
+                <h3 className="text-xl font-bold text-zinc-950 mt-1">Speciality Coffee &amp; Bakeries</h3>
                 <p className="text-xs text-zinc-600 mt-2.5 leading-relaxed">
                   Replace easily lost paper stamp cards with a friction-free digital pass. 1 hot drink = 1 stamp. After 8 stamps, the customer unlocks a free coffee or pastry of their choice.
                 </p>
@@ -594,7 +551,7 @@ export default function Home() {
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
                   Service Milestones Engine
                 </span>
-                <h3 className="text-xl font-bold text-zinc-950 mt-1">Barbershops & Hair Salons</h3>
+                <h3 className="text-xl font-bold text-zinc-950 mt-1">Barbershops &amp; Hair Salons</h3>
                 <p className="text-xs text-zinc-600 mt-2.5 leading-relaxed">
                   Reward repeat grooming appointments and pomade/product sales. Incentivize recurring 3-week bookings with VIP tier perks and complimentary hot towel treatments.
                 </p>
@@ -615,7 +572,7 @@ export default function Home() {
               </div>
               <div className="p-6 rounded-xl bg-zinc-50 border border-zinc-200/70 text-center">
                 <div className="text-[11px] text-zinc-500 font-semibold uppercase mb-1.5">Member Grooming Pass</div>
-                <div className="text-xl font-bold text-zinc-950">Skin Fade & Beard Sculpt</div>
+                <div className="text-xl font-bold text-zinc-950">Skin Fade &amp; Beard Sculpt</div>
                 <div className="text-xs text-zinc-700 font-semibold mt-1">120 Lifetime Points</div>
                 <div className="mt-4 pt-4 border-t border-zinc-200 text-xs text-zinc-600">
                   Unlocked Perk: <span className="text-emerald-700 font-semibold">Free Beard Oil Treatment</span>
@@ -628,9 +585,9 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
               <div>
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-                  Fleet & Wash Passes
+                  Fleet &amp; Wash Passes
                 </span>
-                <h3 className="text-xl font-bold text-zinc-950 mt-1">Car Washes & Auto Valeting</h3>
+                <h3 className="text-xl font-bold text-zinc-950 mt-1">Car Washes &amp; Auto Valeting</h3>
                 <p className="text-xs text-zinc-600 mt-2.5 leading-relaxed">
                   Track wash visits, valeting packages, and corporate fleet accounts. Bay operators scan windshield QR codes or customer mobile phones in seconds.
                 </p>
@@ -651,7 +608,7 @@ export default function Home() {
               </div>
               <div className="p-6 rounded-xl bg-zinc-50 border border-zinc-200/70 text-center">
                 <div className="text-[11px] text-zinc-500 font-semibold uppercase mb-1.5">Bay Terminal Scan</div>
-                <div className="text-xl font-bold text-zinc-950">Full Valet & Polish</div>
+                <div className="text-xl font-bold text-zinc-950">Full Valet &amp; Polish</div>
                 <div className="text-xs text-zinc-700 font-semibold mt-1">Bay #2 Operator Scan</div>
                 <div className="mt-4 pt-4 border-t border-zinc-200 text-xs text-zinc-600">
                   Status: <span className="text-emerald-700 font-semibold">Pass Validated ✓</span>
@@ -662,116 +619,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Live Interactive Sandboxes Grid */}
-      <section id="sandboxes" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-zinc-200/80">
-        <div className="text-center max-w-2xl mx-auto mb-14">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-100 border border-zinc-200 text-zinc-800 text-xs font-semibold mb-3">
-            <Sparkles className="w-3.5 h-3.5 stroke-[1.8]" />
-            <span>Live Sandboxes</span>
-          </div>
-          <h2 className="text-3xl sm:text-4xl font-bold text-zinc-950 tracking-tight">
-            Test Every Role in Real Time
-          </h2>
-          <p className="mt-2 text-sm text-zinc-600">
-            Click on any live sandbox below to test the full end-to-end customer, cashier, owner, and admin flows.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {/* Card 1: Barber Customer Hub */}
-          <Link
-            href="/b/demo-barber"
-            className="p-5 rounded-xl bg-white border border-zinc-200/90 hover:border-zinc-300 hover:shadow-md transition-all flex flex-col justify-between group"
-          >
-            <div>
-              <div className="w-10 h-10 rounded-lg bg-zinc-100 text-zinc-800 border border-zinc-200/60 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                <Scissors className="w-5 h-5 stroke-[1.8]" />
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                Points Engine
-              </span>
-              <h3 className="text-base font-bold text-zinc-950 mt-1">Barber Customer Hub</h3>
-              <p className="text-xs text-zinc-600 mt-2 leading-relaxed">
-                Mobile loyalty card with real-time balance, OTP redemption codes, and review links.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-xs font-semibold text-zinc-900">
-              <span>Launch Pass</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform stroke-[1.8]" />
-            </div>
-          </Link>
-
-          {/* Card 2: Coffee Customer Hub */}
-          <Link
-            href="/b/demo-coffee"
-            className="p-5 rounded-xl bg-white border border-zinc-200/90 hover:border-zinc-300 hover:shadow-md transition-all flex flex-col justify-between group"
-          >
-            <div>
-              <div className="w-10 h-10 rounded-lg bg-zinc-100 text-zinc-800 border border-zinc-200/60 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                <Coffee className="w-5 h-5 stroke-[1.8]" />
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                Stamps Engine
-              </span>
-              <h3 className="text-base font-bold text-zinc-950 mt-1">Coffee Customer Hub</h3>
-              <p className="text-xs text-zinc-600 mt-2 leading-relaxed">
-                Digital punch card interface with visit progress ring and reward catalogue.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-xs font-semibold text-zinc-900">
-              <span>Launch Pass</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform stroke-[1.8]" />
-            </div>
-          </Link>
-
-          {/* Card 3: Frontline Staff Terminal */}
-          <Link
-            href="/staff"
-            className="p-5 rounded-xl bg-white border border-zinc-200/90 hover:border-zinc-300 hover:shadow-md transition-all flex flex-col justify-between group"
-          >
-            <div>
-              <div className="w-10 h-10 rounded-lg bg-zinc-100 text-zinc-800 border border-zinc-200/60 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                <Smartphone className="w-5 h-5 stroke-[1.8]" />
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                Frontline POS
-              </span>
-              <h3 className="text-base font-bold text-zinc-950 mt-1">Cashier Scanner Terminal</h3>
-              <p className="text-xs text-zinc-600 mt-2 leading-relaxed">
-                Camera QR scanner, spend converter, and 1-tap reward validation at checkout.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-xs font-semibold text-zinc-900">
-              <span>Open Scanner</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform stroke-[1.8]" />
-            </div>
-          </Link>
-
-          {/* Card 4: Platform Super Admin */}
-          <Link
-            href="/admin"
-            className="p-5 rounded-xl bg-white border border-zinc-200/90 hover:border-zinc-300 hover:shadow-md transition-all flex flex-col justify-between group"
-          >
-            <div>
-              <div className="w-10 h-10 rounded-lg bg-zinc-100 text-zinc-800 border border-zinc-200/60 flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
-                <Building2 className="w-5 h-5 stroke-[1.8]" />
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                Super Admin
-              </span>
-              <h3 className="text-base font-bold text-zinc-950 mt-1">Platform Admin Console</h3>
-              <p className="text-xs text-zinc-600 mt-2 leading-relaxed">
-                Multi-tenant onboarding wizard, system health telemetry, and tamper-proof global audit.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-xs font-semibold text-zinc-900">
-              <span>Open Console</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform stroke-[1.8]" />
-            </div>
-          </Link>
-        </div>
-      </section>
-
       {/* Architecture & Engineering Pillars */}
       <section id="architecture" className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-b border-zinc-200/80">
         <div className="text-center max-w-3xl mx-auto mb-16">
@@ -779,7 +626,7 @@ export default function Home() {
             Engineering Integrity
           </span>
           <h2 className="text-3xl sm:text-4xl font-bold text-zinc-950 mt-3 tracking-tight">
-            Financial & Legal Architecture You Can Trust
+            Financial &amp; Legal Architecture You Can Trust
           </h2>
           <p className="mt-3 text-sm text-zinc-600 leading-relaxed">
             Unlike legacy loyalty apps that leak customer data or store balances as mutable counters, LoyaltyPlatform Enterprise runs on strict financial and legal foundations.
@@ -813,7 +660,7 @@ export default function Home() {
             </div>
             <h3 className="text-sm font-bold text-zinc-950">Anti-Gating Review Policy</h3>
             <p className="text-xs text-zinc-600 mt-2 leading-relaxed">
-              100% compliant with Google Review Guidelines and UK Competition & Markets Authority (CMA) policies. Review links are never filtered by sentiment or conditioned on rewards.
+              100% compliant with Google Review Guidelines and UK Competition &amp; Markets Authority (CMA) policies. Review links are never filtered by sentiment or conditioned on rewards.
             </p>
           </div>
 
@@ -913,7 +760,7 @@ export default function Home() {
               </div>
               <div>
                 <span className="font-bold text-zinc-950 text-sm">LoyaltyPlatform Enterprise</span>
-                <span className="text-zinc-400 block text-[11px]">UK High-Street Loyalty & Review Infrastructure</span>
+                <span className="text-zinc-400 block text-[11px]">UK High-Street Loyalty &amp; Review Infrastructure</span>
               </div>
             </div>
 
@@ -929,9 +776,6 @@ export default function Home() {
               </Link>
               <Link href="/staff" className="hover:text-zinc-950 transition-colors">
                 Staff Terminal
-              </Link>
-              <Link href="/admin" className="hover:text-zinc-950 transition-colors">
-                Platform Admin
               </Link>
             </div>
           </div>
