@@ -613,18 +613,18 @@ export default function BusinessHubPage(props: {
             </div>
 
             {/* Header Right Actions / Role Switcher */}
-            <div className="flex items-center gap-3 self-end sm:self-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
               {/* Role Navigation Switcher (Customer / Staff / Owner) */}
-              <div className="flex bg-slate-100 p-1 border border-slate-200 rounded-2xl text-xs font-bold">
+              <div className="flex bg-slate-100 p-1 border border-slate-200 rounded-xl text-xs font-semibold w-full sm:w-auto overflow-x-auto">
                 <button
                   type="button"
                   onClick={() => {
                     setActivePortalRole("customer");
                     setErrorMsg(null);
                   }}
-                  className={`py-1.5 px-3 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 sm:flex-initial py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
                     activePortalRole === "customer"
-                      ? "bg-white text-indigo-700 shadow-2xs font-black"
+                      ? "bg-white text-zinc-950 shadow-2xs font-bold"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -637,9 +637,9 @@ export default function BusinessHubPage(props: {
                     setActivePortalRole("staff");
                     setErrorMsg(null);
                   }}
-                  className={`py-1.5 px-3 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 sm:flex-initial py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
                     activePortalRole === "staff"
-                      ? "bg-white text-indigo-700 shadow-2xs font-black"
+                      ? "bg-white text-zinc-950 shadow-2xs font-bold"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -652,9 +652,9 @@ export default function BusinessHubPage(props: {
                     setActivePortalRole("owner");
                     setErrorMsg(null);
                   }}
-                  className={`py-1.5 px-3 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 sm:flex-initial py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
                     activePortalRole === "owner"
-                      ? "bg-white text-indigo-700 shadow-2xs font-black"
+                      ? "bg-white text-zinc-950 shadow-2xs font-bold"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >

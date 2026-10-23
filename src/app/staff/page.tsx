@@ -679,38 +679,38 @@ export default function StaffPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 pb-20 selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-[#fafafa] text-zinc-900 pb-20 selection:bg-zinc-900 selection:text-white font-sans">
       {/* Top Header Bar - High-End POS Shell */}
-      <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-3 shadow-2xs">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
+      <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-white/95 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-3 shadow-2xs">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white flex items-center justify-center font-black text-sm shadow-sm shadow-indigo-500/20">
-              <QrCode className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-lg bg-zinc-950 text-white flex items-center justify-center font-bold text-sm shadow-xs ring-1 ring-zinc-900/10">
+              <QrCode className="w-4 h-4 stroke-[1.8]" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-base tracking-tight text-slate-900">Staff POS Terminal</span>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="font-bold text-sm sm:text-base tracking-tight text-zinc-950">Staff POS Terminal</span>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                   LIVE
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium">Frontline Cashier • Double-Entry Ledger</p>
+              <p className="text-[10px] sm:text-[11px] text-zinc-500 font-medium">Frontline Cashier • Double-Entry Ledger</p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 shrink-0">
             {/* Location Selector */}
             {locations.length > 0 && (
-              <div className="flex items-center space-x-1 text-xs bg-slate-50 border border-slate-200 px-2 py-1 rounded-xl">
-                <MapPin className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+              <div className="flex items-center space-x-1 text-xs bg-zinc-50 border border-zinc-200 px-2 py-1 rounded-lg">
+                <MapPin className="h-3.5 w-3.5 text-zinc-700 shrink-0 stroke-[1.8]" />
                 <select
                   value={selectedLocationId}
                   onChange={(e) => handleSelectLocation(e.target.value)}
-                  className="bg-transparent font-bold text-slate-800 text-xs py-0.5 focus:outline-none cursor-pointer"
+                  className="bg-transparent font-semibold text-zinc-800 text-xs py-0.5 focus:outline-none cursor-pointer max-w-[110px] sm:max-w-none truncate"
                 >
                   {locations.map((loc) => (
-                    <option key={loc.id} value={loc.id} className="text-slate-900 font-medium">
+                    <option key={loc.id} value={loc.id} className="text-zinc-900 font-medium">
                       {loc.name}
                     </option>
                   ))}
@@ -723,9 +723,9 @@ export default function StaffPage() {
                 window.location.href = "/login";
               }}
               title="Sign Out"
-              className="text-slate-400 hover:text-rose-600 p-2 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer"
+              className="text-zinc-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-4 w-4 stroke-[1.8]" />
             </button>
           </div>
         </div>
@@ -989,67 +989,67 @@ export default function StaffPage() {
         ) : (
           /* Main Tab Navigation */
           <div>
-            <div className="grid grid-cols-5 gap-1 p-1 mb-5 bg-slate-200/80 rounded-2xl border border-slate-300/60 shadow-2xs">
+            <div className="grid grid-cols-5 gap-1 p-1 mb-5 bg-zinc-100 rounded-xl border border-zinc-200 shadow-2xs">
               <button
                 onClick={() => setActiveTab("scan")}
-                className={`flex flex-col items-center justify-center py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === "scan"
-                    ? "bg-white text-indigo-600 shadow-sm font-black"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    : "text-zinc-600 hover:text-zinc-900"
                 }`}
               >
-                <QrCode className="h-4 w-4 mb-1" />
-                Scan QR
+                <QrCode className="h-4 w-4 mb-1 stroke-[1.8]" />
+                <span className="truncate">Scan QR</span>
               </button>
               <button
                 onClick={() => {
                   setActiveTab("search");
                   handleSearch("");
                 }}
-                className={`flex flex-col items-center justify-center py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === "search"
-                    ? "bg-white text-indigo-600 shadow-sm font-black"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    : "text-zinc-600 hover:text-zinc-900"
                 }`}
               >
-                <Search className="h-4 w-4 mb-1" />
-                Customers
+                <Search className="h-4 w-4 mb-1 stroke-[1.8]" />
+                <span className="truncate">Customers</span>
               </button>
               <button
                 onClick={() => setActiveTab("code")}
-                className={`flex flex-col items-center justify-center py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === "code"
-                    ? "bg-white text-indigo-600 shadow-sm font-black"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    : "text-zinc-600 hover:text-zinc-900"
                 }`}
               >
-                <Gift className="h-4 w-4 mb-1" />
-                Redeem
+                <Gift className="h-4 w-4 mb-1 stroke-[1.8]" />
+                <span className="truncate">Redeem</span>
               </button>
               <button
                 onClick={() => {
                   setActiveTab("products");
                   fetchProducts();
                 }}
-                className={`flex flex-col items-center justify-center py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === "products"
-                    ? "bg-white text-indigo-600 shadow-sm font-black"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    : "text-zinc-600 hover:text-zinc-900"
                 }`}
               >
-                <Package className="h-4 w-4 mb-1" />
-                Products
+                <Package className="h-4 w-4 mb-1 stroke-[1.8]" />
+                <span className="truncate">Products</span>
               </button>
               <button
                 onClick={handleLoadHistory}
-                className={`flex flex-col items-center justify-center py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
                   activeTab === "history"
-                    ? "bg-white text-indigo-600 shadow-sm font-black"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    : "text-zinc-600 hover:text-zinc-900"
                 }`}
               >
-                <History className="h-4 w-4 mb-1" />
-                Audit Log
+                <History className="h-4 w-4 mb-1 stroke-[1.8]" />
+                <span className="truncate">Audit Log</span>
               </button>
             </div>
 

@@ -727,42 +727,42 @@ export default function OwnerDashboardPage() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      {/* Top Enterprise Bar (Light Theme) */}
-      <header className="h-16 border-b border-slate-200 bg-white/95 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-indigo-600/20">
-            LP
+    <div className="min-h-screen bg-[#fafafa] text-zinc-900 flex flex-col font-sans selection:bg-zinc-900 selection:text-white">
+      {/* Top Enterprise Bar */}
+      <header className="h-16 border-b border-zinc-200/80 bg-white/95 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40 shadow-2xs">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-zinc-950 text-white flex items-center justify-center font-bold text-sm shadow-xs ring-1 ring-zinc-900/10">
+            <QrCode className="w-4 h-4 stroke-[1.8]" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm text-slate-900 tracking-tight">Enterprise Loyalty ERP</span>
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="font-bold text-sm text-zinc-950 tracking-tight">Enterprise ERP</span>
+              <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                 Active Production
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
+            <p className="text-[11px] text-zinc-500 font-medium hidden sm:block">
               PostgreSQL Double-Entry • UK Minor Pence Engine
             </p>
           </div>
         </div>
 
         {/* Global Action Tools */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <Link
             href="/staff"
-            className="hidden md:inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-xl transition-all shadow-2xs"
+            className="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-800 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 px-3 py-1.5 rounded-lg transition-all shadow-2xs"
           >
-            <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+            <Smartphone className="w-3.5 h-3.5 text-zinc-700 stroke-[1.8]" />
             <span>Open Staff Scanner</span>
           </Link>
 
           <button
             onClick={() => handleTabChange("reports")}
-            className="hidden lg:inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer"
+            className="hidden lg:inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-800 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 px-3 py-1.5 rounded-lg transition-all shadow-2xs cursor-pointer"
           >
-            <FileDown className="w-3.5 h-3.5 text-indigo-600" />
+            <FileDown className="w-3.5 h-3.5 text-zinc-700 stroke-[1.8]" />
             <span>Export Audit Pack</span>
           </button>
 
@@ -771,20 +771,52 @@ export default function OwnerDashboardPage() {
               await fetch("/api/v1/auth/logout", { method: "POST" });
               window.location.href = "/login";
             }}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className="w-3.5 h-3.5 stroke-[1.8]" />
             <span className="hidden sm:inline">Sign Out</span>
           </button>
         </div>
       </header>
 
+      {/* Mobile Horizontal Navigation Bar */}
+      <div className="md:hidden border-b border-zinc-200/80 bg-white px-3 py-2 overflow-x-auto flex space-x-1.5 sticky top-16 z-30 shadow-2xs">
+        {[
+          { id: "overview", label: "Overview", icon: LayoutDashboard },
+          { id: "rewards", label: "Rewards", icon: Gift },
+          { id: "products", label: "Products", icon: Sparkles },
+          { id: "members", label: "Members", icon: Users },
+          { id: "ledger", label: "Ledger", icon: Receipt },
+          { id: "links", label: "Reviews", icon: Share2 },
+          { id: "qr", label: "QR Signage", icon: QrCode },
+          { id: "team", label: "Team", icon: UserCheck },
+          { id: "reports", label: "Exports", icon: FileDown },
+        ].map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => handleTabChange(item.id as typeof activeTab)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors shrink-0 cursor-pointer ${
+                isActive
+                  ? "bg-zinc-950 text-white shadow-2xs"
+                  : "bg-zinc-50 text-zinc-600 hover:text-zinc-900 border border-zinc-200/60"
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5 stroke-[1.8]" />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex flex-1 flex-col md:flex-row">
-        {/* Left ERP Sidebar (Light Theme) */}
-        <aside className="w-full md:w-64 border-r border-slate-200 bg-white p-4 shrink-0 flex flex-col justify-between">
+        {/* Left ERP Sidebar (Desktop Only) */}
+        <aside className="hidden md:flex md:w-64 border-r border-zinc-200/80 bg-white p-4 shrink-0 flex-col justify-between">
           <div>
             <div className="px-3 py-2 mb-2">
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 block">
                 Command Console
               </span>
             </div>
@@ -807,17 +839,17 @@ export default function OwnerDashboardPage() {
                   <button
                     key={item.id}
                     onClick={() => handleTabChange(item.id as typeof activeTab)}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                       isActive
-                        ? "bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                        ? "bg-zinc-950 text-white shadow-2xs"
+                        : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <Icon className={`w-4 h-4 ${isActive ? "text-indigo-600" : "text-slate-400"}`} />
+                      <Icon className={`w-4 h-4 ${isActive ? "text-zinc-300" : "text-zinc-400"}`} />
                       <span>{item.label}</span>
                     </div>
-                    {isActive && <ChevronRight className="w-3.5 h-3.5 text-indigo-600" />}
+                    {isActive && <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />}
                   </button>
                 );
               })}

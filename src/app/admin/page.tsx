@@ -327,79 +327,101 @@ export default function PlatformAdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#fafafa] text-zinc-900 flex flex-col font-sans selection:bg-zinc-900 selection:text-white">
       {/* Top Header */}
-      <header className="border-b border-slate-200 bg-white/95 backdrop-blur sticky top-0 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-xl">
-              <ShieldAlert className="w-5 h-5" />
+      <header className="border-b border-zinc-200/80 bg-white/95 backdrop-blur sticky top-0 z-30 shadow-2xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-0 sm:h-16 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-zinc-950 text-white rounded-lg flex items-center justify-center font-bold text-sm shadow-xs ring-1 ring-zinc-900/10">
+                <ShieldAlert className="w-4 h-4 stroke-[1.8]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-sm sm:text-base font-bold text-zinc-950 leading-tight">Platform Admin Console</h1>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-600 border border-zinc-200">
+                    Cluster
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-500 font-medium">UK Multi-Tenant Loyalty Platform Management</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-base font-bold text-slate-950 leading-tight">Platform Admin Console</h1>
-              <p className="text-xs text-slate-500">UK Loyalty Platform System Management</p>
-            </div>
+
+            {/* Mobile Sign Out */}
+            <button
+              onClick={async () => {
+                await fetch("/api/v1/auth/logout", { method: "POST" });
+                window.location.href = "/login";
+              }}
+              title="Sign Out"
+              className="sm:hidden flex items-center p-2 text-rose-700 hover:bg-rose-50 rounded-lg border border-rose-200 text-xs font-semibold cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="flex space-x-1 p-1 bg-slate-100 rounded-xl border border-slate-200">
-            <button
-              onClick={() => setTab("tenants")}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                tab === "tenants"
-                  ? "bg-white text-indigo-700 shadow-xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Building2 className="w-4 h-4" />
-              <span>Tenants</span>
-            </button>
-            <button
-              onClick={() => setTab("customers")}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                tab === "customers"
-                  ? "bg-white text-indigo-700 shadow-xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <User className="w-4 h-4" />
-              <span>Customers</span>
-            </button>
-            <button
-              onClick={() => setTab("health")}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                tab === "health"
-                  ? "bg-white text-indigo-700 shadow-xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Activity className="w-4 h-4" />
-              <span>System Health</span>
-            </button>
-            <button
-              onClick={() => setTab("audit")}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                tab === "audit"
-                  ? "bg-white text-indigo-700 shadow-xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <History className="w-4 h-4" />
-              <span>Global Audit</span>
-            </button>
-          </nav>
+          <div className="flex items-center space-x-2">
+            {/* Navigation Tabs */}
+            <nav className="flex space-x-1 p-1 bg-zinc-100 rounded-xl border border-zinc-200 w-full sm:w-auto overflow-x-auto">
+              <button
+                onClick={() => setTab("tenants")}
+                className={`flex-1 sm:flex-initial flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+                  tab === "tenants"
+                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    : "text-zinc-600 hover:text-zinc-900"
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5 stroke-[1.8]" />
+                <span>Tenants</span>
+              </button>
+              <button
+                onClick={() => setTab("customers")}
+                className={`flex-1 sm:flex-initial flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+                  tab === "customers"
+                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    : "text-zinc-600 hover:text-zinc-900"
+                }`}
+              >
+                <User className="w-3.5 h-3.5 stroke-[1.8]" />
+                <span>Customers</span>
+              </button>
+              <button
+                onClick={() => setTab("health")}
+                className={`flex-1 sm:flex-initial flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+                  tab === "health"
+                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    : "text-zinc-600 hover:text-zinc-900"
+                }`}
+              >
+                <Activity className="w-3.5 h-3.5 stroke-[1.8]" />
+                <span>System Health</span>
+              </button>
+              <button
+                onClick={() => setTab("audit")}
+                className={`flex-1 sm:flex-initial flex items-center justify-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap ${
+                  tab === "audit"
+                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    : "text-zinc-600 hover:text-zinc-900"
+                }`}
+              >
+                <History className="w-3.5 h-3.5 stroke-[1.8]" />
+                <span>Global Audit</span>
+              </button>
+            </nav>
 
-          <button
-            onClick={async () => {
-              await fetch("/api/v1/auth/logout", { method: "POST" });
-              window.location.href = "/login";
-            }}
-            title="Sign Out"
-            className="flex items-center space-x-1.5 text-xs text-rose-600 hover:text-rose-700 font-semibold px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 transition-colors ml-3 cursor-pointer"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
-          </button>
+            {/* Desktop Sign Out */}
+            <button
+              onClick={async () => {
+                await fetch("/api/v1/auth/logout", { method: "POST" });
+                window.location.href = "/login";
+              }}
+              title="Sign Out"
+              className="hidden sm:flex items-center space-x-1.5 text-xs text-rose-700 hover:text-rose-800 font-semibold px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 transition-colors ml-2 cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5 stroke-[1.8]" />
+              <span>Sign Out</span>
+            </button>
+          </div>
         </div>
       </header>
 

@@ -4,23 +4,20 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  QrCode,
   Lock,
   Mail,
   ArrowRight,
   AlertCircle,
   CheckCircle2,
   ShieldCheck,
-  Sparkles,
-  Store,
   Building2,
-  ExternalLink,
   Search,
   Copy,
   Check,
-  Smartphone,
+  Store,
   UserPlus,
   KeyRound,
+  ArrowUpRight,
 } from "lucide-react";
 
 export type AuthMode = "signin" | "signup";
@@ -139,7 +136,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
       const isAdmin = json.data?.user?.isPlatformAdmin;
 
       if (!isAdmin) {
-        setError("This login is restricted to Platform Super Admins. Business owners and staff must log in directly on their store page.");
+        setError("This login is restricted to Platform Super Admins. Business owners and staff log in directly on their store page.");
         return;
       }
 
@@ -162,7 +159,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
     }
 
     if (!signupBusinessName.trim()) {
-      setError("Please enter your business or restaurant name.");
+      setError("Please enter your business or shop name.");
       return;
     }
 
@@ -233,93 +230,93 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
   };
 
   return (
-    <div className="w-full h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-      {/* Enterprise Tight Grid */}
+    <div className="w-full h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-4">
+      {/* Enterprise Two-Column Responsive Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         {/* ======================================================== */}
-        {/* LEFT COLUMN: REGISTERED STORES DIRECTORY (NO FLUFF)     */}
+        {/* LEFT COLUMN: REGISTERED STORES DIRECTORY                 */}
         {/* ======================================================== */}
-        <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 flex flex-col justify-between">
+        <div className="lg:col-span-6 bg-white rounded-2xl border border-zinc-200/90 shadow-sm p-5 sm:p-6 flex flex-col justify-between">
           <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
-                  <Building2 className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 flex items-center justify-center font-bold">
+                  <Building2 className="w-4 h-4 stroke-[1.8]" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-slate-900 leading-tight">
+                  <h2 className="text-sm font-bold text-zinc-950 leading-tight">
                     Registered Businesses &amp; Storefronts
                   </h2>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    Store owners, staff &amp; customers log in directly on their store page:
+                  <p className="text-[11px] text-zinc-500 font-medium">
+                    Store owners, staff &amp; customers access via their dedicated link:
                   </p>
                 </div>
               </div>
 
-              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+              <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200/60 font-mono">
                 {registeredTenants.length} Stores
               </span>
             </div>
 
-            {/* Compact Search Bar */}
+            {/* Search Bar */}
             <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5 stroke-[1.8]" />
               <input
                 type="text"
-                placeholder="Search registered stores by name or category..."
+                placeholder="Search registered stores by name or industry..."
                 value={storeSearchQuery}
                 onChange={(e) => setStoreSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
               />
             </div>
 
-            {/* Tight Scrollable Stores List */}
+            {/* Scrollable Stores List */}
             {loadingStores ? (
-              <div className="py-12 text-center text-xs text-slate-400 font-medium">
+              <div className="py-12 text-center text-xs text-zinc-400 font-medium">
                 Loading stores directory...
               </div>
             ) : filteredStores.length === 0 ? (
-              <div className="py-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                <Store className="w-6 h-6 text-slate-300 mx-auto mb-1.5" />
-                <p className="text-xs font-bold text-slate-700">No stores found.</p>
-                <p className="text-[11px] text-slate-400">Register a new store using the form on the right.</p>
+              <div className="py-8 text-center bg-zinc-50 rounded-xl border border-dashed border-zinc-200">
+                <Store className="w-6 h-6 text-zinc-400 mx-auto mb-1.5 stroke-[1.8]" />
+                <p className="text-xs font-semibold text-zinc-800">No stores found.</p>
+                <p className="text-[11px] text-zinc-500">Register a new store using the form on the right.</p>
               </div>
             ) : (
               <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
                 {filteredStores.map((store) => {
-                  const brandColor = store.brandPrimaryHex || "#4f46e5";
+                  const brandColor = store.brandPrimaryHex || "#18181b";
                   const storeUrl = `/b/${store.slug}`;
                   const isPending = store.status === "pending";
 
                   return (
                     <div
                       key={store.id}
-                      className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-white hover:border-indigo-400 hover:shadow-sm transition-all flex items-center justify-between gap-3 group"
+                      className="p-3 rounded-xl border border-zinc-200/80 bg-zinc-50/50 hover:bg-white hover:border-zinc-300 hover:shadow-xs transition-all flex items-center justify-between gap-3 group"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <span
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-black text-xs shadow-2xs shrink-0"
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-2xs shrink-0"
                           style={{ backgroundColor: brandColor }}
                         >
                           {store.name.slice(0, 1)}
                         </span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <h3 className="font-extrabold text-xs text-slate-900 truncate">
+                            <h3 className="font-bold text-xs text-zinc-950 truncate">
                               {store.name}
                             </h3>
                             <span
-                              className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded shrink-0 ${
+                              className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.2 rounded shrink-0 border ${
                                 isPending
-                                  ? "bg-amber-100 text-amber-800"
-                                  : "bg-emerald-100 text-emerald-800"
+                                  ? "bg-amber-50 text-amber-800 border-amber-200"
+                                  : "bg-emerald-50 text-emerald-800 border-emerald-200"
                               }`}
                             >
                               {isPending ? "Pending" : "Active"}
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-400 font-mono truncate">
+                          <p className="text-[10px] text-zinc-400 font-mono truncate">
                             /b/{store.slug}
                           </p>
                         </div>
@@ -327,9 +324,10 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
 
                       <Link
                         href={storeUrl}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-indigo-600 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-lg shadow-2xs transition-colors shrink-0"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-zinc-800 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-lg shadow-2xs transition-colors shrink-0 group-hover:border-zinc-300"
                       >
-                        Visit Store <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                        <span>Visit Store</span>
+                        <ArrowRight className="w-3 h-3 text-zinc-500 group-hover:translate-x-0.5 transition-transform stroke-[1.8]" />
                       </Link>
                     </div>
                   );
@@ -338,14 +336,14 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
             )}
           </div>
 
-          {/* Quick Informational Pill */}
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+          {/* Bottom Security Pill */}
+          <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-[11px] text-zinc-500">
             <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-              Multi-tenant isolation &amp; double-entry ledger
+              <ShieldCheck className="w-3.5 h-3.5 text-zinc-900 stroke-[1.8]" />
+              Strict Multi-Tenant RLS &amp; Ledger Audit
             </span>
-            <span className="text-slate-400 font-mono text-[10px]">
-              Postgres 16 RLS
+            <span className="text-zinc-400 font-mono text-[10px]">
+              PostgreSQL 16
             </span>
           </div>
         </div>
@@ -353,24 +351,24 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
         {/* ======================================================== */}
         {/* RIGHT COLUMN: SUPER ADMIN LOGIN OR OWNER REGISTER        */}
         {/* ======================================================== */}
-        <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 sm:p-6 flex flex-col justify-between">
+        <div className="lg:col-span-6 bg-white rounded-2xl border border-zinc-200/90 shadow-sm p-5 sm:p-6 flex flex-col justify-between">
           <div>
-            {/* Top Mode Tabs: Super Admin Login vs Register Business */}
-            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 mb-4">
+            {/* Mode Switcher Tabs */}
+            <div className="flex bg-zinc-100 p-1 rounded-xl border border-zinc-200 mb-4">
               <button
                 type="button"
                 onClick={() => {
                   setMode("signin");
                   setError(null);
                 }}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   mode === "signin"
-                    ? "bg-white text-indigo-700 shadow-2xs font-black"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    : "text-zinc-600 hover:text-zinc-900"
                 }`}
               >
-                <KeyRound className="w-3.5 h-3.5" />
-                Super Admin Login
+                <KeyRound className="w-3.5 h-3.5 stroke-[1.8]" />
+                <span>Super Admin Login</span>
               </button>
               <button
                 type="button"
@@ -378,46 +376,46 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                   setMode("signup");
                   setError(null);
                 }}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   mode === "signup"
-                    ? "bg-white text-indigo-700 shadow-2xs font-black"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    : "text-zinc-600 hover:text-zinc-900"
                 }`}
               >
-                <UserPlus className="w-3.5 h-3.5 text-amber-500" />
-                Register Business (Sign Up)
+                <UserPlus className="w-3.5 h-3.5 stroke-[1.8]" />
+                <span>Register Business</span>
               </button>
             </div>
 
             {/* Error Notification */}
             {error && (
-              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 stroke-[1.8]" />
                 <span className="font-medium">{error}</span>
               </div>
             )}
 
-            {/* VIEW A: SUCCESS STATE (AFTER REGISTERING BUSINESS) */}
+            {/* VIEW A: SUCCESS STATE */}
             {pendingApprovalSuccess && createdStoreData ? (
-              <div className="p-5 text-center space-y-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl animate-in zoom-in-95">
-                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mx-auto shadow-inner">
-                  <CheckCircle2 className="w-7 h-7" />
+              <div className="p-5 text-center space-y-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl animate-in zoom-in-95">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center mx-auto shadow-inner">
+                  <CheckCircle2 className="w-6 h-6 stroke-[1.8]" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-200/60 px-2 py-0.5 rounded-full">
-                    Welcome Email Dispatched
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-800 bg-emerald-200/60 px-2 py-0.5 rounded-full">
+                    Storefront Created
                   </span>
-                  <h3 className="font-black text-base text-slate-900 mt-1.5">
+                  <h3 className="font-bold text-base text-zinc-950 mt-1.5">
                     {createdStoreData.name} Registered!
                   </h3>
-                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                    Your business has been created. A welcome email containing your direct store URL and login instructions has been sent to your email.
+                  <p className="text-xs text-zinc-600 mt-1 leading-relaxed">
+                    Your business has been provisioned. A confirmation with your dedicated store URL and credentials has been sent to your email.
                   </p>
                 </div>
 
                 {/* Direct Store URL Box */}
                 <div className="bg-white p-3 rounded-xl border border-emerald-300 text-left space-y-1 shadow-2xs">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 block">
                     Your Dedicated Store Website Link:
                   </span>
                   <div className="flex items-center gap-1.5">
@@ -425,12 +423,12 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       type="text"
                       readOnly
                       value={createdStoreData.storeUrl}
-                      className="flex-1 font-mono text-xs bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-slate-900 select-all font-bold"
+                      className="flex-1 font-mono text-xs bg-zinc-50 p-2 rounded-lg border border-zinc-200 text-zinc-900 select-all font-medium"
                     />
                     <button
                       type="button"
                       onClick={handleCopyLink}
-                      className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
+                      className="p-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg transition-colors cursor-pointer"
                       title="Copy Link"
                     >
                       {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
@@ -438,13 +436,14 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                   </div>
                 </div>
 
-                {/* Action Button */}
+                {/* Action Buttons */}
                 <div className="pt-1 space-y-2">
                   <Link
                     href={`/b/${createdStoreData.slug}`}
-                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-sm"
+                    className="w-full py-2.5 px-4 bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl font-medium text-xs flex items-center justify-center gap-2 transition-colors shadow-xs"
                   >
-                    Open Your Store Website Page →
+                    <span>Open Your Store Website Page</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                   <button
                     type="button"
@@ -453,21 +452,21 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       setMode("signin");
                       setError(null);
                     }}
-                    className="text-xs text-slate-500 hover:text-slate-800 font-semibold underline cursor-pointer"
+                    className="text-xs text-zinc-500 hover:text-zinc-900 font-medium underline cursor-pointer"
                   >
                     Return to Super Admin Login
                   </button>
                 </div>
               </div>
             ) : mode === "signin" ? (
-              /* VIEW B: STRICTLY SUPER ADMIN CONSOLE LOGIN */
+              /* VIEW B: PLATFORM SUPER ADMIN CONSOLE LOGIN */
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-base font-black text-slate-900">
+                  <h3 className="text-base font-bold text-zinc-950">
                     Platform Super Admin Console
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Restricted platform access to review pending businesses, audit ledgers, and manage limits.
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Restricted platform access to audit multi-tenant ledgers, configure rate limits, and inspect health.
                   </p>
                 </div>
 
@@ -475,17 +474,18 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                 <button
                   type="button"
                   onClick={() => handleAdminLogin("admin@platform.local", "Password123!")}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50/70 border border-slate-200 hover:border-indigo-300 transition-all text-left cursor-pointer group shadow-2xs"
+                  className="w-full flex items-center justify-between p-3 rounded-xl bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 transition-all text-left cursor-pointer group shadow-2xs"
                 >
                   <div className="flex items-center gap-2.5">
-                    <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <ShieldCheck className="w-4 h-4 text-zinc-900 shrink-0 stroke-[1.8]" />
                     <div>
-                      <p className="font-bold text-xs text-slate-900">1-Click Platform Super Admin</p>
-                      <p className="text-[10px] text-slate-400 font-mono">admin@platform.local</p>
+                      <p className="font-semibold text-xs text-zinc-900">1-Click Platform Super Admin Demo</p>
+                      <p className="text-[10px] text-zinc-500 font-mono">admin@platform.local</p>
                     </div>
                   </div>
-                  <span className="text-[11px] font-bold text-indigo-600 group-hover:translate-x-0.5 transition-transform">
-                    Sign In →
+                  <span className="text-[11px] font-semibold text-zinc-800 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
+                    <span>Sign In</span>
+                    <ArrowRight className="w-3 h-3 text-zinc-500" />
                   </span>
                 </button>
 
@@ -497,35 +497,35 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                   className="space-y-3 pt-1"
                 >
                   <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                    <label className="text-xs font-semibold text-zinc-700 block mb-1">
                       Administrator Email
                     </label>
                     <div className="relative">
-                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <Mail className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5 stroke-[1.8]" />
                       <input
                         type="email"
                         value={adminEmail}
                         onChange={(e) => setAdminEmail(e.target.value)}
                         placeholder="admin@platform.local"
                         required
-                        className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                        className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                    <label className="text-xs font-semibold text-zinc-700 block mb-1">
                       Password
                     </label>
                     <div className="relative">
-                      <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <Lock className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5 stroke-[1.8]" />
                       <input
                         type="password"
                         value={adminPassword}
                         onChange={(e) => setAdminPassword(e.target.value)}
                         placeholder="••••••••"
                         required
-                        className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                        className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
                       />
                     </div>
                   </div>
@@ -533,25 +533,25 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50 cursor-pointer pt-2.5"
+                    className="w-full py-2.5 px-4 bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl font-medium text-xs flex items-center justify-center gap-2 shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     {loading ? "Signing in..." : "Sign In to Super Admin Console →"}
                   </button>
                 </form>
 
                 {/* Explicit Guidance for Store Owners */}
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600 leading-relaxed">
-                  <span className="font-bold text-slate-800">Business Owner Notice:</span> Owners and staff log in directly on their store&apos;s page (e.g. <span className="font-mono text-indigo-600 font-semibold">/b/your-store</span>), not on the platform console. Select your store on the left to open its portal.
+                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 text-[11px] text-zinc-600 leading-relaxed">
+                  <strong className="text-zinc-900 font-semibold">Store Owner Notice:</strong> Owners and staff log in directly on their store website (e.g. <span className="font-mono text-zinc-900 font-semibold">/b/your-store</span>), not on the platform console. Select your store on the left to open its portal.
                 </div>
               </div>
             ) : (
               /* VIEW C: BUSINESS OWNER SIGN UP ONLY */
               <div className="space-y-3.5">
                 <div>
-                  <h3 className="text-base font-black text-slate-900">
+                  <h3 className="text-base font-bold text-zinc-950">
                     Register Business &amp; Launch Store
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-zinc-500 mt-0.5">
                     Your dedicated store loyalty website will be created immediately upon registration.
                   </p>
                 </div>
@@ -559,7 +559,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                 <form onSubmit={handleSignup} className="space-y-2.5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      <label className="text-[11px] font-semibold text-zinc-700 block mb-1">
                         Owner Full Name
                       </label>
                       <input
@@ -568,12 +568,12 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                         value={signupName}
                         onChange={(e) => setSignupName(e.target.value)}
                         required
-                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                        className="w-full px-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
                       />
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      <label className="text-[11px] font-semibold text-zinc-700 block mb-1">
                         Business / Shop Name
                       </label>
                       <input
@@ -582,40 +582,40 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                         value={signupBusinessName}
                         onChange={(e) => setSignupBusinessName(e.target.value)}
                         required
-                        className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                        className="w-full px-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      <label className="text-[11px] font-semibold text-zinc-700 block mb-1">
                         Business Category
                       </label>
                       <select
                         value={signupCategory}
                         onChange={(e) => setSignupCategory(e.target.value)}
-                        className="w-full px-2.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                        className="w-full px-2.5 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
                       >
-                        <option value="Coffee Shop & Cafe">☕ Coffee Shop &amp; Cafe</option>
-                        <option value="Restaurant & Dining">🍽️ Restaurant &amp; Dining</option>
-                        <option value="Barbershop & Grooming">✂️ Barbershop &amp; Grooming</option>
-                        <option value="Salon & Beauty Spa">💅 Salon &amp; Beauty Spa</option>
-                        <option value="Retail Store & Boutique">🛍️ Retail Store &amp; Boutique</option>
-                        <option value="Fitness & Wellness">🏋️ Fitness &amp; Wellness</option>
-                        <option value="Automotive & Car Wash">🚗 Automotive &amp; Car Wash</option>
-                        <option value="Other Commercial Business">🏢 Other Commercial Business</option>
+                        <option value="Coffee Shop & Cafe">Coffee Shop &amp; Cafe</option>
+                        <option value="Restaurant & Dining">Restaurant &amp; Dining</option>
+                        <option value="Barbershop & Grooming">Barbershop &amp; Grooming</option>
+                        <option value="Salon & Beauty Spa">Salon &amp; Beauty Spa</option>
+                        <option value="Retail Store & Boutique">Retail Store &amp; Boutique</option>
+                        <option value="Fitness & Wellness">Fitness &amp; Wellness</option>
+                        <option value="Automotive & Car Wash">Automotive &amp; Car Wash</option>
+                        <option value="Other Commercial Business">Other Commercial Business</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      <label className="text-[11px] font-semibold text-zinc-700 block mb-1">
                         Loyalty Engine
                       </label>
                       <select
                         value={signupProgrammeType}
                         onChange={(e) => setSignupProgrammeType(e.target.value as "points" | "stamps")}
-                        className="w-full px-2.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                        className="w-full px-2.5 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
                       >
                         <option value="points">Points Mode (£1 = 1 Point)</option>
                         <option value="stamps">Stamps Mode (1 Visit = 1 Stamp)</option>
@@ -625,13 +625,13 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      <label className="text-[11px] font-semibold text-zinc-700 block mb-1">
                         Staff Accounts
                       </label>
                       <select
                         value={signupStaffCount}
                         onChange={(e) => setSignupStaffCount(Number(e.target.value))}
-                        className="w-full px-2.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                        className="w-full px-2.5 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
                       >
                         <option value={2}>2 Staff</option>
                         <option value={5}>5 Staff</option>
@@ -641,13 +641,13 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      <label className="text-[11px] font-semibold text-zinc-700 block mb-1">
                         Managers
                       </label>
                       <select
                         value={signupManagerCount}
                         onChange={(e) => setSignupManagerCount(Number(e.target.value))}
-                        className="w-full px-2.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                        className="w-full px-2.5 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
                       >
                         <option value={1}>1 Manager</option>
                         <option value={2}>2 Managers</option>
@@ -657,7 +657,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    <label className="text-[11px] font-semibold text-zinc-700 block mb-1">
                       Owner Email Address
                     </label>
                     <input
@@ -666,12 +666,12 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
                       required
-                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                      className="w-full px-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                    <label className="text-[11px] font-semibold text-zinc-700 block mb-1">
                       Password (min. 8 characters)
                     </label>
                     <input
@@ -681,21 +681,21 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       onChange={(e) => setSignupPassword(e.target.value)}
                       required
                       minLength={8}
-                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                      className="w-full px-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
                     />
                   </div>
 
-                  <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-amber-900 text-[10px] leading-relaxed flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span>Your store link will be generated automatically and emailed to your inbox.</span>
+                  <div className="p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-700 text-[10px] leading-relaxed flex items-center gap-2">
+                    <ShieldCheck className="w-3.5 h-3.5 text-zinc-800 shrink-0 stroke-[1.8]" />
+                    <span>Your store website link will be generated automatically upon submission.</span>
                   </div>
 
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50 cursor-pointer pt-2.5"
+                    className="w-full py-2.5 px-4 bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl font-medium text-xs flex items-center justify-center gap-2 shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
                   >
-                    {loading ? "Registering Business..." : "Register Business & Generate Storefront →"}
+                    {loading ? "Registering Business..." : "Register Business & Launch Storefront →"}
                   </button>
                 </form>
               </div>
@@ -711,7 +711,7 @@ export function AuthPortal({ initialMode = "signin" }: AuthPortalProps) {
   return (
     <Suspense
       fallback={
-        <div className="w-full max-w-lg p-10 bg-white rounded-2xl border border-slate-200 shadow-xl text-center text-slate-500 text-sm">
+        <div className="w-full max-w-lg p-10 bg-white rounded-2xl border border-zinc-200 shadow-sm text-center text-zinc-500 text-sm">
           Loading portal...
         </div>
       }
