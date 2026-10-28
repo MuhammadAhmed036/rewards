@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { BusinessLogo } from "@/components/brand/BusinessLogo";
 import { QrCameraScanner } from "@/components/staff/QrCameraScanner";
+import { BusinessInbox } from "@/components/chat/BusinessInbox";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import {
   Plus,
   Stamp,
   Check,
+  MessageSquare,
 } from "lucide-react";
 
 interface LocationItem {
@@ -129,7 +131,7 @@ interface StaffPromoReportItem {
 export default function StaffPage() {
   const [locations, setLocations] = useState<LocationItem[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"scan" | "search" | "code" | "products" | "history">("scan");
+  const [activeTab, setActiveTab] = useState<"scan" | "search" | "code" | "products" | "history" | "messages">("scan");
 
   // Products state for Staff
   const [productsList, setProductsList] = useState<ProductItem[]>([]);
@@ -156,6 +158,22 @@ export default function StaffPage() {
 
   // Business shown in the header
   const [business, setBusiness] = useState<BusinessInfo | null>(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  const loadUnreadMessages = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/business/conversations/unread", { cache: "no-store" });
+      if (res.ok) setUnreadMessages((await res.json()).data.unread);
+    } catch {
+      // Badge only; try again on the next tick.
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUnreadMessages();
+    const id = setInterval(() => document.visibilityState === "visible" && loadUnreadMessages(), 20000);
+    return () => clearInterval(id);
+  }, [loadUnreadMessages]);
 
   // Scanner & Member state
   const [qrInput, setQrInput] = useState("");
@@ -1145,7 +1163,7 @@ export default function StaffPage() {
         ) : (
           /* Main Tab Navigation */
           <div>
-            <div className="grid grid-cols-5 gap-1 p-1.5 mb-5 bg-white rounded-2xl border border-zinc-200">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 p-1.5 mb-5 bg-white rounded-2xl border border-zinc-200">
               <button
                 onClick={() => setActiveTab("scan")}
                 className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
@@ -1207,7 +1225,30 @@ export default function StaffPage() {
                 <History className="h-4 w-4 mb-1 stroke-[1.8]" />
                 <span className="truncate">Recent</span>
               </button>
+              <button
+                onClick={() => setActiveTab("messages")}
+                className={`relative flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
+                  activeTab === "messages"
+                    ? "bg-evergreen text-white"
+                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+                }`}
+              >
+                <MessageSquare className="h-4 w-4 mb-1 stroke-[1.8]" />
+                <span className="truncate">Messages</span>
+                {unreadMessages > 0 && (
+                  <span
+                    className="absolute top-1 right-2 min-w-5 h-5 px-1 rounded-full bg-marigold text-evergreen-deep text-xs font-bold flex items-center justify-center"
+                    aria-label={`${unreadMessages} unread`}
+                  >
+                    {unreadMessages}
+                  </span>
+                )}
+              </button>
             </div>
+
+            {activeTab === "messages" && (
+              <BusinessInbox businessName={business?.name || "Your shop"} onUnreadChange={loadUnreadMessages} />
+            )}
 
             {/* Tab 1: Scan Screen */}
             {activeTab === "scan" && (

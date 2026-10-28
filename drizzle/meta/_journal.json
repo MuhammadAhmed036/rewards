@@ -36,6 +36,13 @@
       "when": 1792576593127,
       "tag": "0004_safe_calypso",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793175074953,
+      "tag": "0005_conversations",
+      "breakpoints": true
     }
   ]
 }

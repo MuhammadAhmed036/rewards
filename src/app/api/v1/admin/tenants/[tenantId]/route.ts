@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardApiRequest } from "@/server/auth/route-guard";
-import { getTenantDetail, updateTenantByAdmin } from "@/server/services/admin";
+import { getTenantDetail, updateTenantByAdmin, purgeTenantByAdmin } from "@/server/services/admin";
 import { z } from "zod";
 
 export async function GET(
@@ -67,3 +67,40 @@ export async function PATCH(
   }
 }
 
+const purgeSchema = z.object({
+  confirmName: z.string().min(1, "Type the business name to confirm"),
+  reason: z.string().min(1, "A reason is required"),
+});
+
+/** Permanently delete a suspended or pending business (platform admins only). */
+export async function DELETE(
+  request: NextRequest,
+  props: { params: Promise<{ tenantId: string }> }
+) {
+  const params = await props.params;
+  const guard = await guardApiRequest(request, {
+    allowedRoles: ["platform_admin"],
+  });
+  if ("response" in guard) return guard.response;
+
+  try {
+    const validated = purgeSchema.parse(await request.json());
+    const result = await purgeTenantByAdmin(guard.ctx, params.tenantId, validated);
+    return NextResponse.json({ data: result });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "DELETE_FAILED",
+          message:
+            err instanceof z.ZodError
+              ? err.errors[0]?.message || "Missing details"
+              : err instanceof Error
+              ? err.message
+              : "Failed to delete business",
+        },
+      },
+      { status: 400 }
+    );
+  }
+}

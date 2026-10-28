@@ -102,8 +102,9 @@ export default function PlatformAdminPage() {
 
   // Modals
   const [selectedTenant, setSelectedTenant] = useState<TenantSummary | null>(null);
-  const [actionType, setActionType] = useState<"suspend" | "reactivate" | "plan" | null>(null);
+  const [actionType, setActionType] = useState<"suspend" | "reactivate" | "plan" | "delete" | null>(null);
   const [reason, setReason] = useState("");
+  const [confirmName, setConfirmName] = useState("");
   const [newPlan, setNewPlan] = useState<"free" | "pro">("free");
   const [actionError, setActionError] = useState("");
   const [actionSuccess, setActionSuccess] = useState("");
@@ -295,27 +296,44 @@ export default function PlatformAdminPage() {
     setActionSuccess("");
 
     try {
-      const payload: Record<string, unknown> = { reason };
-      if (actionType === "suspend") payload.status = "suspended";
-      if (actionType === "reactivate") payload.status = "active";
-      if (actionType === "plan") payload.plan = newPlan;
-
-      const res = await fetch(`/api/v1/admin/tenants/${selectedTenant.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errJson = await res.json();
-        throw new Error(errJson.error?.message || "Action failed");
+      let res: Response;
+      if (actionType === "delete") {
+        res = await fetch(`/api/v1/admin/tenants/${selectedTenant.id}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason, confirmName }),
+        });
+      } else {
+        const payload: Record<string, unknown> = { reason };
+        if (actionType === "suspend") payload.status = "suspended";
+        if (actionType === "reactivate") payload.status = "active";
+        if (actionType === "plan") payload.plan = newPlan;
+        res = await fetch(`/api/v1/admin/tenants/${selectedTenant.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
       }
 
-      setActionSuccess(`Successfully updated tenant ${selectedTenant.name}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.error?.message || "Action failed");
+      }
+
+      setActionSuccess(
+        actionType === "delete"
+          ? `${selectedTenant.name} was deleted permanently.`
+          : actionType === "suspend"
+          ? `${selectedTenant.name} is suspended.`
+          : actionType === "reactivate"
+          ? `${selectedTenant.name} is active again.`
+          : `${selectedTenant.name}'s plan was updated.`
+      );
       setTimeout(() => {
         setSelectedTenant(null);
         setActionType(null);
         setReason("");
+        setConfirmName("");
         setActionSuccess("");
         fetchTenants();
       }, 1200);
@@ -649,6 +667,23 @@ export default function PlatformAdminPage() {
                             >
                               Plan
                             </Button>
+                            {t.status !== "active" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedTenant(t);
+                                  setActionType("delete");
+                                  setConfirmName("");
+                                  setReason("");
+                                  setActionError("");
+                                }}
+                                className="border-rose-300 text-rose-700 hover:bg-rose-50 text-xs"
+                                title="Permanently delete this business and all its data"
+                              >
+                                Delete
+                              </Button>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -921,6 +956,12 @@ export default function PlatformAdminPage() {
                   <span>Reactivate Tenant: {selectedTenant.name}</span>
                 </>
               )}
+              {actionType === "delete" && (
+                <>
+                  <AlertTriangle className="w-5 h-5 text-rose-500" />
+                  <span>Delete permanently: {selectedTenant.name}</span>
+                </>
+              )}
               {actionType === "plan" && (
                 <>
                   <Building2 className="w-5 h-5 text-indigo-400" />
@@ -930,7 +971,9 @@ export default function PlatformAdminPage() {
             </CardTitle>
 
             <p className="text-xs text-slate-400">
-              {actionType === "suspend"
+              {actionType === "delete"
+                ? "This removes the business and everything in it for good: customer cards, points history, rewards, offers, links and messages. Staff are signed out. This can't be undone."
+                : actionType === "suspend"
                 ? "Suspending this tenant will immediately invalidate all staff sessions and prevent all earn and redemption actions. Historical ledger rows remain permanently preserved."
                 : actionType === "reactivate"
                 ? "Reactivating this tenant will restore full earn and redemption capabilities for its members and staff."
@@ -965,6 +1008,21 @@ export default function PlatformAdminPage() {
               />
             </div>
 
+            {actionType === "delete" && (
+              <div>
+                <label htmlFor="confirm-name" className="text-xs font-semibold text-slate-300 block mb-1">
+                  Type <span className="text-white">{selectedTenant.name}</span> to confirm
+                </label>
+                <Input
+                  id="confirm-name"
+                  value={confirmName}
+                  onChange={(e) => setConfirmName(e.target.value)}
+                  autoComplete="off"
+                  className="bg-slate-950 border-rose-500/60 text-slate-100"
+                />
+              </div>
+            )}
+
             {actionError && <p className="text-xs text-rose-400">{actionError}</p>}
             {actionSuccess && <p className="text-xs text-emerald-400">{actionSuccess}</p>}
 
@@ -976,20 +1034,36 @@ export default function PlatformAdminPage() {
                   setSelectedTenant(null);
                   setActionType(null);
                   setReason("");
+                  setConfirmName("");
                   setActionError("");
                 }}
               >
                 Cancel
               </Button>
               <Button
-                className={`flex-1 font-bold ${
-                  actionType === "suspend"
+                className={`flex-1 font-bold disabled:opacity-60 ${
+                  actionType === "suspend" || actionType === "delete"
                     ? "bg-rose-600 hover:bg-rose-700 text-white"
+                    : actionType === "reactivate"
+                    ? "bg-emerald-600 hover:bg-emerald-700 text-white"
                     : "bg-indigo-600 hover:bg-indigo-700 text-white"
                 }`}
                 onClick={handleUpdateTenant}
-                disabled={loading || !reason.trim()}
+                disabled={
+                  loading ||
+                  !reason.trim() ||
+                  (actionType === "delete" && confirmName.trim() !== selectedTenant.name.trim())
+                }
               >
+                {loading
+                  ? "Working..."
+                  : actionType === "suspend"
+                  ? "Suspend business"
+                  : actionType === "reactivate"
+                  ? "Reactivate business"
+                  : actionType === "delete"
+                  ? "Delete permanently"
+                  : "Save plan"}
               </Button>
             </div>
           </Card>

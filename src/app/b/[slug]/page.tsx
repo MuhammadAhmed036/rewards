@@ -10,7 +10,6 @@ import {
   Gift,
   Star,
   Globe,
-  MessageSquare,
   History,
   CheckCircle2,
   Clock,
@@ -33,6 +32,7 @@ import {
 import { InstagramIcon, FacebookIcon } from "@/components/ui/icons";
 import { BusinessLogo } from "@/components/brand/BusinessLogo";
 import { StampCard, type StampCardData } from "@/components/loyalty/StampCard";
+import { CustomerChat } from "@/components/chat/CustomerChat";
 
 interface HubPayload {
   tenant: {
@@ -132,12 +132,6 @@ export default function BusinessHubPage(props: {
   const [redemptionQrUrl, setRedemptionQrUrl] = useState<string | null>(null);
   const [redemptionTimeLeft, setRedemptionTimeLeft] = useState<string>("");
   const [redemptionExpired, setRedemptionExpired] = useState<boolean>(false);
-
-  // Feedback form state
-  const [feedbackMessage, setFeedbackMessage] = useState("");
-  const [contactBackOk, setContactBackOk] = useState(false);
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
-  const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   // Scanned Promotional QR Code State
   const [scannedClaimCode, setScannedClaimCode] = useState<string | null>(null);
@@ -581,34 +575,6 @@ export default function BusinessHubPage(props: {
       });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Error initiating redemption");
-    }
-  };
-
-  // Handle Feedback Submission
-  const handleSubmitFeedback = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!feedbackMessage.trim() || !hubData) return;
-
-    setSubmittingFeedback(true);
-    try {
-      const res = await fetch("/api/v1/customer/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tenantId: hubData.tenant.id,
-          membershipId: hubData.member?.membershipId,
-          message: feedbackMessage.trim(),
-          contactBackOk,
-        }),
-      });
-      if (res.ok) {
-        setFeedbackSubmitted(true);
-        setFeedbackMessage("");
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setSubmittingFeedback(false);
     }
   };
 
@@ -1227,54 +1193,8 @@ export default function BusinessHubPage(props: {
                       </div>
                     )}
 
-                    {/* Direct Private Message to Manager */}
-                    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 space-y-3">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <h3 className="text-sm font-bold text-slate-900 flex items-center">
-                          <MessageSquare className="h-4 w-4 mr-1.5 text-indigo-600" />
-                          Direct Message to Business
-                        </h3>
-                        <span className="text-xs font-bold text-slate-400">Private &amp; Confidential</span>
-                      </div>
-
-                      {feedbackSubmitted ? (
-                        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-center text-xs font-semibold animate-in fade-in">
-                          <CheckCircle2 className="mx-auto h-7 w-7 text-emerald-600 mb-2" />
-                          Thank you! Your private note has been delivered to the business manager.
-                        </div>
-                      ) : (
-                        <form onSubmit={handleSubmitFeedback} className="space-y-3">
-                          <textarea
-                            rows={3}
-                            maxLength={2000}
-                            placeholder="Have an enquiry or private suggestion? Write directly to the manager..."
-                            value={feedbackMessage}
-                            onChange={(e) => setFeedbackMessage(e.target.value)}
-                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
-                          />
-
-                          <label className="flex items-center space-x-2 text-xs text-slate-600 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={contactBackOk}
-                              onChange={(e) => setContactBackOk(e.target.checked)}
-                              className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <span>You may contact me back regarding this note</span>
-                          </label>
-
-                          <Button
-                            type="submit"
-                            variant="outline"
-                            size="sm"
-                            className="w-full font-bold text-xs rounded-xl border-slate-300 hover:bg-slate-50 cursor-pointer"
-                            disabled={submittingFeedback || !feedbackMessage.trim()}
-                          >
-                            {submittingFeedback ? "Sending message..." : "Send Private Message"}
-                          </Button>
-                        </form>
-                      )}
-                    </div>
+                    {/* Chat with the shop: owner and staff reply, only the customer can end it */}
+                    <CustomerChat membershipId={member.membershipId} businessName={hubData.tenant.name} />
                   </div>
 
                   {/* Right Column: Available Rewards Grid & Ledger History (7 cols) */}

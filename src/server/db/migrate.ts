@@ -16,8 +16,13 @@ export async function runMigrations() {
     console.log("⏳ Setting up ledger immutability trigger...");
     await db.execute(sql`
       CREATE OR REPLACE FUNCTION forbid_ledger_mutation() RETURNS trigger AS $$
-      BEGIN 
-        RAISE EXCEPTION 'ledger_entries is append-only'; 
+      BEGIN
+        -- The only exception: a platform admin permanently deleting a whole business
+        -- (purgeTenantByAdmin sets this for its own transaction). Updates are never allowed.
+        IF TG_OP = 'DELETE' AND current_setting('app.allow_tenant_purge', true) = 'on' THEN
+          RETURN OLD;
+        END IF;
+        RAISE EXCEPTION 'ledger_entries is append-only';
       END $$ LANGUAGE plpgsql;
 
       DROP TRIGGER IF EXISTS ledger_no_update_delete ON ledger_entries;

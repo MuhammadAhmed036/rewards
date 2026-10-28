@@ -11,6 +11,7 @@ import {
   index,
   primaryKey,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // ==========================================
 // 1. Identity & Auth
@@ -463,6 +464,58 @@ export const feedbackMessages = pgTable(
   (table) => [
     index("feedback_messages_tenant_status_created_idx").on(table.tenantId, table.status, table.createdAt),
   ]
+);
+
+/**
+ * Customer <-> business chat. A customer has at most one open conversation per shop;
+ * staff and owners reply but only the customer can end it. Messages are never edited or
+ * deleted through the app, so the full record stays visible to the business afterwards.
+ */
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    membershipId: uuid("membership_id")
+      .notNull()
+      .references(() => memberships.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 16 }).default("open").notNull(), // open, closed
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }).defaultNow().notNull(),
+    lastMessageBy: varchar("last_message_by", { length: 16 }).default("customer").notNull(), // customer, business
+    customerLastReadAt: timestamp("customer_last_read_at", { withTimezone: true }),
+    businessLastReadAt: timestamp("business_last_read_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    closedBy: uuid("closed_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversations_tenant_status_last_idx").on(table.tenantId, table.status, table.lastMessageAt),
+    index("conversations_membership_idx").on(table.membershipId, table.status),
+    uniqueIndex("conversations_one_open_per_member_idx")
+      .on(table.membershipId)
+      .where(sql`status = 'open'`),
+  ]
+);
+
+export const conversationMessages = pgTable(
+  "conversation_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    senderType: varchar("sender_type", { length: 16 }).notNull(), // customer, owner, manager, staff
+    senderUserId: uuid("sender_user_id").references(() => users.id, { onDelete: "set null" }),
+    senderName: varchar("sender_name", { length: 255 }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("conversation_messages_conversation_idx").on(table.conversationId, table.createdAt)]
 );
 
 export const supportReports = pgTable(

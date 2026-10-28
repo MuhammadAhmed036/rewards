@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { LinksAndPageEditor, LinkConfig } from "@/components/dashboard/LinksAndPageEditor";
 import { BusinessLogo } from "@/components/brand/BusinessLogo";
 import { LogoUploader } from "@/components/brand/LogoUploader";
+import { BusinessInbox } from "@/components/chat/BusinessInbox";
 import {
   LayoutDashboard,
   Users,
@@ -32,6 +33,7 @@ import {
   Tag,
   Copy,
   Trash2,
+  MessageSquare,
 } from "lucide-react";
 
 interface OverviewMetrics {
@@ -146,7 +148,7 @@ interface BusinessInfo {
 
 export default function OwnerDashboardPage() {
   const [activeTab, setActiveTab] = useState<
-    "overview" | "members" | "ledger" | "rewards" | "products" | "links" | "qr" | "team" | "reports"
+    "overview" | "members" | "ledger" | "rewards" | "products" | "links" | "qr" | "team" | "reports" | "messages"
   >("overview");
 
   const [metrics, setMetrics] = useState<OverviewMetrics | null>(null);
@@ -160,6 +162,7 @@ export default function OwnerDashboardPage() {
 
   const [loading, setLoading] = useState(false);
   const [business, setBusiness] = useState<BusinessInfo | null>(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [savingLogo, setSavingLogo] = useState(false);
   const [logoMessage, setLogoMessage] = useState<string | null>(null);
   const [memberSearch, setMemberSearch] = useState("");
@@ -233,6 +236,22 @@ export default function OwnerDashboardPage() {
       console.error(e);
     }
   };
+
+  const loadUnreadMessages = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/business/conversations/unread", { cache: "no-store" });
+      if (res.ok) setUnreadMessages((await res.json()).data.unread);
+    } catch {
+      // Badge only; try again on the next tick.
+    }
+  }, []);
+
+  // Keep the Messages badge current while the dashboard is open
+  useEffect(() => {
+    loadUnreadMessages();
+    const id = setInterval(() => document.visibilityState === "visible" && loadUnreadMessages(), 20000);
+    return () => clearInterval(id);
+  }, [loadUnreadMessages]);
 
   const loadBusiness = async () => {
     try {
@@ -805,6 +824,7 @@ export default function OwnerDashboardPage() {
     {
       title: "People",
       items: [
+        { id: "messages", label: "Messages", icon: MessageSquare },
         { id: "members", label: "Customers", icon: Users },
         { id: "team", label: "Staff", icon: UserCheck },
       ],
@@ -915,6 +935,11 @@ export default function OwnerDashboardPage() {
             >
               <Icon className="w-4 h-4" />
               {item.label}
+              {item.id === "messages" && unreadMessages > 0 && (
+                <span className="min-w-5 h-5 px-1.5 rounded-full bg-marigold text-evergreen-deep text-xs font-bold flex items-center justify-center">
+                  {unreadMessages}
+                </span>
+              )}
             </button>
           );
         })}
@@ -940,7 +965,15 @@ export default function OwnerDashboardPage() {
                       }`}
                     >
                       <Icon className={`w-[18px] h-[18px] ${isActive ? "text-evergreen" : "text-zinc-400"}`} />
-                      {item.label}
+                      <span className="flex-1 text-left">{item.label}</span>
+                      {item.id === "messages" && unreadMessages > 0 && (
+                        <span
+                          className="min-w-5 h-5 px-1.5 rounded-full bg-marigold text-evergreen-deep text-xs font-bold flex items-center justify-center"
+                          aria-label={`${unreadMessages} unread`}
+                        >
+                          {unreadMessages}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -1773,6 +1806,21 @@ export default function OwnerDashboardPage() {
                   </table>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* MESSAGES                                                 */}
+          {/* ======================================================== */}
+          {activeTab === "messages" && (
+            <div className="space-y-5">
+              <div>
+                <h2 className="font-display text-3xl font-bold text-evergreen-deep">Messages</h2>
+                <p className="text-zinc-600 mt-1">
+                  Questions from your customers. You and your staff can all reply; only the customer can end a chat.
+                </p>
+              </div>
+              <BusinessInbox businessName={business?.name || "Your shop"} onUnreadChange={loadUnreadMessages} />
             </div>
           )}
 

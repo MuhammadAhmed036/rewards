@@ -269,6 +269,76 @@ export async function updateTenantByAdmin(
   });
 }
 
+/**
+ * Permanently deletes a business and everything that belongs to it: locations, staff access,
+ * customer cards, points history, rewards, offers, links and messages.
+ *
+ * Safety rails: platform admins only; the business must already be suspended (or still
+ * pending approval); the admin must type the exact business name and give a reason.
+ * Customer and staff login accounts are kept (they may use other shops) but staff sessions end.
+ */
+export async function purgeTenantByAdmin(
+  ctx: RequestContext,
+  tenantId: string,
+  input: { confirmName: string; reason: string }
+) {
+  assertCan(ctx, "platform.admin");
+
+  const reason = input.reason?.trim() || "";
+  if (reason.length < 5) throw new Error("Give a reason (at least 5 characters) for deleting this business");
+
+  const [existing] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  if (!existing) throw new Error("Business not found");
+  if (existing.status === "active") {
+    throw new Error("Suspend this business first. Only suspended or pending businesses can be deleted permanently.");
+  }
+  if ((input.confirmName || "").trim() !== existing.name.trim()) {
+    throw new Error(`Type the business name exactly ("${existing.name}") to confirm`);
+  }
+
+  const staffList = await db
+    .select({ userId: staffMembers.userId })
+    .from(staffMembers)
+    .where(eq(staffMembers.tenantId, tenantId));
+
+  const [counts] = await db
+    .select({
+      members: sql<number>`(SELECT count(*)::int FROM memberships WHERE tenant_id = ${tenantId})`,
+      ledgerRows: sql<number>`(SELECT count(*)::int FROM ledger_entries WHERE tenant_id = ${tenantId})`,
+    })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId));
+
+  await db.transaction(async (tx) => {
+    // Lets the append-only ledger trigger accept these deletes for this transaction only.
+    await tx.execute(sql`SET LOCAL app.allow_tenant_purge = 'on'`);
+    await tx.execute(sql`SET LOCAL app.is_platform_admin = 'true'`);
+    // Every tenant-owned table cascades from tenants; audit history keeps its rows with tenant_id cleared.
+    await tx.delete(tenants).where(eq(tenants.id, tenantId));
+  });
+
+  for (const s of staffList) {
+    await invalidateUserSessions(s.userId);
+  }
+
+  // Logged after the business is gone, so the audit row isn't tied to the deleted tenant.
+  await logAuditEvent(ctx, {
+    action: "tenant.deleted_permanently",
+    targetType: "deleted_tenant",
+    targetId: tenantId,
+    reason,
+    metadata: {
+      name: existing.name,
+      slug: existing.slug,
+      previousStatus: existing.status,
+      deletedMembers: counts?.members ?? 0,
+      deletedLedgerRows: counts?.ledgerRows ?? 0,
+    },
+  });
+
+  return { id: tenantId, name: existing.name, deleted: true };
+}
+
 export async function getSystemHealth(ctx: RequestContext) {
   assertCan(ctx, "platform.admin");
 
