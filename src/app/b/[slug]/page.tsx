@@ -33,6 +33,7 @@ import { InstagramIcon, FacebookIcon } from "@/components/ui/icons";
 import { BusinessLogo } from "@/components/brand/BusinessLogo";
 import { StampCard, type StampCardData } from "@/components/loyalty/StampCard";
 import { CustomerChat } from "@/components/chat/CustomerChat";
+import { PointsMenu } from "@/components/rewards/PointsMenu";
 
 interface HubPayload {
   tenant: {
@@ -59,6 +60,7 @@ interface HubPayload {
       id: string;
       type: string;
       pointsDelta: number;
+      note?: string | null;
       occurredAt: string;
     }>;
   } | null;
@@ -68,7 +70,8 @@ interface HubPayload {
     costPoints: number;
     eligible: boolean;
     pointsShortfall: number;
-    description?: string;
+    description?: string | null;
+    productName?: string | null;
   }>;
   links: Array<{
     id: string;
@@ -76,6 +79,16 @@ interface HubPayload {
     label: string;
     url: string;
   }>;
+}
+
+/** Plain words for a points-history row, e.g. "Free Tea" instead of "redeem". */
+function historyLabel(item: { type: string; pointsDelta: number; note?: string | null }) {
+  if (item.type === "redeem") return item.note ? `Used on ${item.note}` : "Reward claimed";
+  if (item.type === "earn") return "Points earned";
+  if (item.type === "adjust") return item.pointsDelta > 0 ? "Points added by the shop" : "Points removed by the shop";
+  if (item.type === "reverse") return "Correction";
+  if (item.type === "expire") return "Points expired";
+  return item.type;
 }
 
 export default function BusinessHubPage(props: {
@@ -1199,72 +1212,13 @@ export default function BusinessHubPage(props: {
 
                   {/* Right Column: Available Rewards Grid & Ledger History (7 cols) */}
                   <div className="lg:col-span-7 space-y-6">
-                    {/* Programme Rewards Grid */}
-                    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 sm:p-7 space-y-4">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                        <div>
-                          <h3 className="text-base font-bold text-slate-900 flex items-center">
-                            <Gift className="h-5 w-5 mr-2 text-indigo-600" />
-                            Available Programme Rewards
-                          </h3>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            Claim complimentary perks using your verified balance
-                          </p>
-                        </div>
-                        <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
-                          {hubData.rewards.length} Rewards Active
-                        </span>
-                      </div>
-
-                      {hubData.rewards.length === 0 ? (
-                        <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                          <Gift className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                          <p className="text-xs font-bold text-slate-600">Rewards are currently being curated.</p>
-                          <p className="text-[11px] text-slate-400 mt-1">Check back shortly to claim perks with your balance!</p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                          {hubData.rewards.map((reward) => (
-                            <div
-                              key={reward.id}
-                              className="p-4 rounded-2xl border border-slate-200/90 bg-slate-50/50 hover:bg-white hover:border-indigo-400 hover:shadow-md transition-all flex flex-col justify-between shadow-2xs"
-                            >
-                              <div>
-                                <div className="font-extrabold text-sm text-slate-900 leading-snug">{reward.title}</div>
-                                {reward.description && (
-                                  <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                                    {reward.description}
-                                  </p>
-                                )}
-                              </div>
-
-                              <div className="mt-4 pt-3 border-t border-slate-200/70 flex items-center justify-between">
-                                <span className="text-xs font-bold text-indigo-700">
-                                  {reward.costPoints} {isStamps ? "stamps" : "points"}
-                                </span>
-
-                                {reward.eligible ? (
-                                  <Button
-                                    variant="default"
-                                    size="sm"
-                                    className="font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs cursor-pointer"
-                                    onClick={() =>
-                                      handleStartRedeem(reward.id, reward.title, reward.costPoints)
-                                    }
-                                  >
-                                    Claim Reward →
-                                  </Button>
-                                ) : (
-                                  <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
-                                    Need {reward.pointsShortfall} more
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    {/* Points menu: what their points get them, with progress towards each item */}
+                    <PointsMenu
+                      rewards={hubData.rewards}
+                      balance={member.balance}
+                      unit={isStamps ? "stamps" : "points"}
+                      onClaim={(reward) => handleStartRedeem(reward.id, reward.title, reward.costPoints)}
+                    />
 
                     {/* Member Transaction History */}
                     {member.recentHistory && member.recentHistory.length > 0 && (
@@ -1284,8 +1238,8 @@ export default function BusinessHubPage(props: {
                               className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-slate-50/60 text-xs shadow-2xs"
                             >
                               <div>
-                                <span className="font-bold capitalize text-slate-800">
-                                  {item.type}
+                                <span className="font-bold text-slate-800">
+                                  {historyLabel(item)}
                                 </span>
                                 <span className="text-slate-400 block text-[11px] mt-0.5">
                                   {new Date(item.occurredAt).toLocaleDateString([], {

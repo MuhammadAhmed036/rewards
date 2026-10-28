@@ -88,6 +88,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Action[]> = {
   ],
   manager: [
     "location.manage",
+    "reward.manage",
     "member.read",
     "member.manage",
     "ledger.earn",
@@ -106,6 +107,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Action[]> = {
     "member.read",
     "ledger.earn",
     "ledger.redeem",
+    // Staff keep the points menu up to date ("100 points = free tea"), like the product list
+    "reward.manage",
   ],
   marketing: [
     "analytics.view",

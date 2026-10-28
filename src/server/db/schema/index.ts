@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   index,
   primaryKey,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -302,6 +303,8 @@ export const rewards = pgTable(
     title: varchar("title", { length: 255 }).notNull(),
     description: text("description"),
     imageUrl: text("image_url"),
+    // Optional menu item this reward hands out (e.g. "Free Tea" for 100 points)
+    productId: uuid("product_id").references((): AnyPgColumn => products.id, { onDelete: "set null" }),
     type: varchar("type", { length: 32 }).default("free_item").notNull(), // free_item, discount, upgrade, fixed_value, custom
     costPoints: integer("cost_points").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }),

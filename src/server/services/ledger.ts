@@ -9,6 +9,7 @@ import {
   rewardLocations,
   redemptions,
   tenants,
+  products,
 } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
 import { calculatePoints, RuleConfig } from "@/lib/points";
@@ -655,6 +656,239 @@ export async function confirmRedemption(
       newBalance,
       rewardTitle: reward.title,
     };
+  });
+}
+
+// ==========================================
+// Spending points at the counter
+// ==========================================
+
+export type RedeemForMemberParams = {
+  membershipId: string;
+  locationId?: string;
+  idempotencyKey: string;
+} & (
+  /** A reward from the points menu, e.g. "Free Tea — 100 points" */
+  | { rewardId: string }
+  /** Anything else staff choose to give, ideally picked from the menu, for points they set */
+  | { productId?: string; title?: string; costPoints: number; note?: string }
+);
+
+export interface RedeemForMemberResult {
+  entryId: string;
+  title: string;
+  pointsDeducted: number;
+  newBalance: number;
+  isDuplicate: boolean;
+}
+
+/**
+ * Staff or the owner spend a customer's points in one step: either on a points-menu reward,
+ * or on something they choose from their own menu when nothing on the points menu fits.
+ */
+export async function redeemForMember(
+  ctx: RequestContext,
+  params: RedeemForMemberParams
+): Promise<RedeemForMemberResult> {
+  assertCan(ctx, "ledger.redeem", params.locationId ? { locationId: params.locationId } : undefined);
+  if (!ctx.tenantId) throw new Error("tenantId required");
+  const tenantId = ctx.tenantId;
+
+  return await db.transaction(async (tx) => {
+    const [tenant] = await tx
+      .select({ status: tenants.status })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+    if (!tenant || tenant.status !== "active") {
+      throw new Error("TENANT_SUSPENDED: Business account is suspended");
+    }
+
+    // A retried request (double tap, flaky network) returns the first result instead of charging twice
+    const [previous] = await tx
+      .select({ id: ledgerEntries.id, pointsDelta: ledgerEntries.pointsDelta, note: ledgerEntries.note })
+      .from(ledgerEntries)
+      .where(and(eq(ledgerEntries.tenantId, tenantId), eq(ledgerEntries.idempotencyKey, params.idempotencyKey)))
+      .limit(1);
+    if (previous) {
+      const [bal] = await tx
+        .select({ balance: membershipBalances.balance })
+        .from(membershipBalances)
+        .where(eq(membershipBalances.membershipId, params.membershipId))
+        .limit(1);
+      return {
+        entryId: previous.id,
+        title: previous.note ?? "Reward",
+        pointsDeducted: -previous.pointsDelta,
+        newBalance: bal?.balance ?? 0,
+        isDuplicate: true,
+      };
+    }
+
+    const [membership] = await tx
+      .select({ id: memberships.id, status: memberships.status })
+      .from(memberships)
+      .where(and(eq(memberships.id, params.membershipId), eq(memberships.tenantId, tenantId)))
+      .limit(1);
+    if (!membership) throw new Error("Customer not found for this business");
+    if (membership.status !== "active") {
+      throw new Error(`MEMBERSHIP_SUSPENDED: Membership is ${membership.status}`);
+    }
+
+    let title: string;
+    let cost: number;
+    let reward: typeof rewards.$inferSelect | undefined;
+    let note: string | null = null;
+
+    if ("rewardId" in params) {
+      [reward] = await tx
+        .select()
+        .from(rewards)
+        .where(and(eq(rewards.id, params.rewardId), eq(rewards.tenantId, tenantId)))
+        .for("update")
+        .limit(1);
+      if (!reward || reward.status !== "active") throw new Error("This reward isn't available right now");
+
+      const now = new Date();
+      if (reward.startsAt && reward.startsAt > now) throw new Error("REWARD_NOT_ACTIVE: This reward hasn't started yet");
+      if (reward.endsAt && reward.endsAt < now) throw new Error("REWARD_EXPIRED: This reward has ended");
+      if (reward.quantityTotal && reward.quantityRedeemed >= reward.quantityTotal) {
+        throw new Error("This reward has run out");
+      }
+
+      if (params.locationId) {
+        const scopes = await tx
+          .select({ locationId: rewardLocations.locationId })
+          .from(rewardLocations)
+          .where(eq(rewardLocations.rewardId, reward.id));
+        if (scopes.length > 0 && !scopes.some((l) => l.locationId === params.locationId)) {
+          throw new Error("This reward can't be given at this location");
+        }
+      }
+
+      if (reward.perMemberLimit) {
+        const [used] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(redemptions)
+          .where(
+            and(
+              eq(redemptions.membershipId, membership.id),
+              eq(redemptions.rewardId, reward.id),
+              eq(redemptions.status, "confirmed")
+            )
+          );
+        if (used.count >= reward.perMemberLimit) {
+          throw new Error(`This customer has already had this reward the maximum ${reward.perMemberLimit} time(s)`);
+        }
+      }
+
+      title = reward.title;
+      cost = reward.costPoints;
+    } else {
+      cost = params.costPoints;
+      if (!Number.isInteger(cost) || cost < 1 || cost > 1_000_000) {
+        throw new Error("Enter how many points this costs (a whole number above 0)");
+      }
+      let productName: string | null = null;
+      if (params.productId) {
+        const [product] = await tx
+          .select({ name: products.name })
+          .from(products)
+          .where(and(eq(products.id, params.productId), eq(products.tenantId, tenantId)))
+          .limit(1);
+        if (!product) throw new Error("That menu item wasn't found");
+        productName = product.name;
+      }
+      title = (params.title?.trim() || (productName ? `Free ${productName}` : "")).slice(0, 200);
+      if (!title) throw new Error("Pick an item from the menu or type what you're giving");
+      note = params.note?.trim().slice(0, 300) || null;
+    }
+
+    const [balanceRow] = await tx
+      .select()
+      .from(membershipBalances)
+      .where(and(eq(membershipBalances.membershipId, membership.id), eq(membershipBalances.tenantId, tenantId)))
+      .for("update");
+    const balance = balanceRow?.balance ?? 0;
+    if (!balanceRow || balance < cost) {
+      throw new Error(
+        `INSUFFICIENT_BALANCE: ${title} costs ${cost} points, but this customer has ${balance}. They need ${cost - balance} more.`
+      );
+    }
+
+    // Points-menu rewards keep a redemption record so per-customer limits and stock stay accurate
+    let redemptionId: string | null = null;
+    if (reward) {
+      const { codeHash, codeLast4 } = generateRedemptionCode();
+      const [redemption] = await tx
+        .insert(redemptions)
+        .values({
+          tenantId,
+          membershipId: membership.id,
+          rewardId: reward.id,
+          rewardVersion: reward.version,
+          costPoints: cost,
+          status: "confirmed",
+          codeHash,
+          codeLast4,
+          expiresAt: new Date(),
+          locationId: params.locationId ?? null,
+          confirmedBy: ctx.userId,
+          confirmedAt: new Date(),
+        })
+        .returning({ id: redemptions.id });
+      redemptionId = redemption.id;
+    }
+
+    const [entry] = await tx
+      .insert(ledgerEntries)
+      .values({
+        tenantId,
+        membershipId: membership.id,
+        type: "redeem",
+        pointsDelta: -cost,
+        rewardId: reward?.id ?? null,
+        redemptionId,
+        locationId: params.locationId ?? null,
+        actorUserId: ctx.userId,
+        reasonCode: reward ? null : "staff_choice",
+        note: note ? `${title} — ${note}` : title,
+        idempotencyKey: params.idempotencyKey,
+      })
+      .returning({ id: ledgerEntries.id });
+
+    if (redemptionId) {
+      await tx.update(redemptions).set({ ledgerEntryId: entry.id }).where(eq(redemptions.id, redemptionId));
+    }
+    if (reward) {
+      await tx
+        .update(rewards)
+        .set({ quantityRedeemed: sql`${rewards.quantityRedeemed} + 1` })
+        .where(eq(rewards.id, reward.id));
+    }
+
+    const newBalance = balance - cost;
+    await tx
+      .update(membershipBalances)
+      .set({
+        balance: newBalance,
+        lifetimeRedeemed: balanceRow.lifetimeRedeemed + cost,
+        updatedAt: new Date(),
+      })
+      .where(eq(membershipBalances.membershipId, membership.id));
+
+    await logAuditEvent(
+      ctx,
+      {
+        action: "ledger.points_spent",
+        targetType: "membership",
+        targetId: membership.id,
+        metadata: { title, cost, rewardId: reward?.id ?? null, newBalance },
+      },
+      tx
+    );
+
+    return { entryId: entry.id, title, pointsDeducted: cost, newBalance, isDuplicate: false };
   });
 }
 

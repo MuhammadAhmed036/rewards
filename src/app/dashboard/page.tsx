@@ -9,6 +9,8 @@ import { LinksAndPageEditor, LinkConfig } from "@/components/dashboard/LinksAndP
 import { BusinessLogo } from "@/components/brand/BusinessLogo";
 import { LogoUploader } from "@/components/brand/LogoUploader";
 import { BusinessInbox } from "@/components/chat/BusinessInbox";
+import { RewardsManager } from "@/components/rewards/RewardsManager";
+import { SpendPointsPanel } from "@/components/rewards/SpendPointsPanel";
 import {
   LayoutDashboard,
   Users,
@@ -32,8 +34,8 @@ import {
   Gift,
   Tag,
   Copy,
-  Trash2,
   MessageSquare,
+  X,
 } from "lucide-react";
 
 interface OverviewMetrics {
@@ -144,6 +146,7 @@ interface BusinessInfo {
   name: string;
   brandPrimaryHex: string | null;
   logoUrl: string | null;
+  programmeType?: "points" | "stamps";
 }
 
 export default function OwnerDashboardPage() {
@@ -168,16 +171,12 @@ export default function OwnerDashboardPage() {
   const [memberSearch, setMemberSearch] = useState("");
   const [ledgerSearch, setLedgerSearch] = useState("");
 
-  // Reward modal state
-  const [showAddReward, setShowAddReward] = useState(false);
-  const [newRewardTitle, setNewRewardTitle] = useState("");
-  const [newRewardDesc, setNewRewardDesc] = useState("");
-  const [newRewardCost, setNewRewardCost] = useState("8");
-  const [newRewardType, setNewRewardType] = useState<"free_item" | "discount" | "upgrade" | "fixed_value" | "custom">("free_item");
-  const [newRewardTotalQty, setNewRewardTotalQty] = useState("");
-  const [newRewardMemberLimit, setNewRewardMemberLimit] = useState("");
+  // Points menu: products table can open the reward form with an item already chosen
+  const [rewardStartProductId, setRewardStartProductId] = useState<string | null>(null);
+  // Member whose points are being used at the counter
+  const [spendingMember, setSpendingMember] = useState<MemberRow | null>(null);
+  const clearRewardStart = useCallback(() => setRewardStartProductId(null), []);
 
-  // Product modal state
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProductName, setNewProductName] = useState("");
   const [newProductCategory, setNewProductCategory] = useState("General");
@@ -354,86 +353,6 @@ export default function OwnerDashboardPage() {
       }
     } catch (e) {
       console.error("Failed to load rewards", e);
-    }
-  };
-
-  const handleCreateReward = async () => {
-    if (!newRewardTitle.trim()) {
-      alert("Please enter a reward title");
-      return;
-    }
-    const cost = parseInt(newRewardCost || "1", 10);
-    if (isNaN(cost) || cost <= 0) {
-      alert("Cost must be at least 1 point/stamp");
-      return;
-    }
-    setLoading(true);
-    try {
-      const body: any = {
-        title: newRewardTitle.trim(),
-        description: newRewardDesc.trim() || undefined,
-        costPoints: cost,
-        type: newRewardType,
-      };
-      if (newRewardTotalQty) {
-        const q = parseInt(newRewardTotalQty, 10);
-        if (!isNaN(q) && q > 0) body.quantityTotal = q;
-      }
-      if (newRewardMemberLimit) {
-        const l = parseInt(newRewardMemberLimit, 10);
-        if (!isNaN(l) && l > 0) body.perMemberLimit = l;
-      }
-
-      const res = await fetch("/api/v1/owner/rewards", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (res.ok) {
-        setShowAddReward(false);
-        setNewRewardTitle("");
-        setNewRewardDesc("");
-        setNewRewardCost("8");
-        setNewRewardTotalQty("");
-        setNewRewardMemberLimit("");
-        loadRewards();
-      } else {
-        const json = await res.json();
-        alert(json.error?.message || "Failed to create reward");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleToggleRewardStatus = async (rewardId: string, currentStatus: string) => {
-    const nextStatus = currentStatus === "active" ? "paused" : "active";
-    try {
-      const res = await fetch("/api/v1/owner/rewards", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: rewardId, status: nextStatus }),
-      });
-      if (res.ok) {
-        loadRewards();
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleArchiveReward = async (rewardId: string) => {
-    if (!confirm("Are you sure you want to archive this reward? Members will no longer see it.")) return;
-    try {
-      const res = await fetch(`/api/v1/owner/rewards?id=${rewardId}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        loadRewards();
-      }
-    } catch (e) {
-      console.error(e);
     }
   };
 
@@ -1190,157 +1109,18 @@ export default function OwnerDashboardPage() {
           {/* ======================================================== */}
           {activeTab === "rewards" && (
             <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div>
-                  <h2 className="font-display text-3xl font-bold text-evergreen-deep">Rewards</h2>
-                  <p className="text-zinc-600 mt-1">What customers can get with their points. Staff confirm each one at the till.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => setShowAddReward(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4 mr-1.5" />
-                    Create New Reward
-                  </Button>
-                </div>
+              <div>
+                <h2 className="font-display text-3xl font-bold text-evergreen-deep">Rewards</h2>
+                <p className="text-zinc-600 mt-1">
+                  What customers can get with their points. Your staff can add to this list too, and give rewards from the counter.
+                </p>
               </div>
-
-              {/* 3 KPI Summary Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-extrabold text-xs">Active Rewards</span>
-                    <Gift className="w-4 h-4 text-indigo-600" />
-                  </div>
-                  <div className="text-3xl font-bold text-slate-950 mt-1.5 tabular-nums">
-                    {rewardsList.filter((r) => r.status === "active").length}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Live in customer pass hub</p>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-extrabold text-xs">Total Redemptions</span>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <div className="text-3xl font-bold text-slate-950 mt-1.5 tabular-nums">
-                    {rewardsList.reduce((acc, r) => acc + (r.quantityRedeemed || 0), 0)}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Confirmed by staff scanner</p>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-extrabold text-xs">Lowest Unlock Cost</span>
-                    <Sparkles className="w-4 h-4 text-amber-500" />
-                  </div>
-                  <div className="text-3xl font-bold text-slate-950 mt-1.5 tabular-nums">
-                    {rewardsList.length > 0
-                      ? `${Math.min(...rewardsList.map((r) => r.costPoints))} pts`
-                      : "—"}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1">Minimum points to claim</p>
-                </div>
-              </div>
-
-              {/* Rewards Grid / Empty State */}
-              {rewardsList.filter((r) => r.status !== "archived").length === 0 ? (
-                <div className="p-12 text-center bg-white rounded-3xl border border-dashed border-slate-200 shadow-sm">
-                  <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 mx-auto flex items-center justify-center mb-3">
-                    <Gift className="w-7 h-7" />
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900">No Active Rewards Configured</h3>
-                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-5">
-                    Your customers currently see &ldquo;0 Rewards Active&rdquo;. Create your first reward (such as &ldquo;Free Coffee&rdquo; at 8 points, or a test reward at 1 point) so customers can unlock and claim rewards!
-                  </p>
-                  <Button
-                    onClick={() => setShowAddReward(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4 mr-1.5" />
-                    Create Your First Reward
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {rewardsList
-                    .filter((r) => r.status !== "archived")
-                    .map((reward) => (
-                      <div
-                        key={reward.id}
-                        className={`p-5 rounded-3xl border bg-white shadow-sm flex flex-col justify-between transition-all ${
-                          reward.status === "active"
-                            ? "border-slate-200/90 hover:border-indigo-400"
-                            : "border-slate-200 opacity-60 bg-slate-50"
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-start justify-between gap-2">
-                            <span className="text-xs font-extrabold capitalize px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                              {reward.type.replace("_", " ")}
-                            </span>
-                            <span
-                              className={`text-xs font-bold capitalize px-2 py-0.5 rounded-full ${
-                                reward.status === "active"
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                  : "bg-amber-50 text-amber-700 border border-amber-200"
-                              }`}
-                            >
-                              {reward.status}
-                            </span>
-                          </div>
-
-                          <h3 className="font-extrabold text-slate-950 text-base mt-2.5 leading-snug">
-                            {reward.title}
-                          </h3>
-
-                          {reward.description && (
-                            <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                              {reward.description}
-                            </p>
-                          )}
-
-                          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                            <span className="text-slate-400 font-semibold">Cost:</span>
-                            <span className="font-bold text-indigo-700 text-sm">
-                              {reward.costPoints} points / stamps
-                            </span>
-                          </div>
-
-                          <div className="mt-1 flex items-center justify-between text-[11px] text-slate-400">
-                            <span>Redeemed so far:</span>
-                            <span className="font-bold text-slate-700">
-                              {reward.quantityRedeemed || 0}
-                              {reward.quantityTotal ? ` / ${reward.quantityTotal}` : " (unlimited)"}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleToggleRewardStatus(reward.id, reward.status)}
-                            className="text-[11px] font-bold h-8 rounded-xl border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
-                          >
-                            {reward.status === "active" ? "Pause Reward" : "Activate Reward"}
-                          </Button>
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleArchiveReward(reward.id)}
-                            className="text-[11px] font-bold h-8 rounded-xl border-rose-200 text-rose-600 hover:bg-rose-50 cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 mr-1" />
-                            Archive
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
+              <RewardsManager
+                unit={business?.programmeType === "stamps" ? "stamps" : "points"}
+                startWithProductId={rewardStartProductId}
+                onStarted={clearRewardStart}
+                onChanged={loadRewards}
+              />
             </div>
           )}
 
@@ -1491,6 +1271,17 @@ export default function OwnerDashboardPage() {
                               >
                                 <QrCode className="w-3.5 h-3.5" />
                                 <span>+ Promo QR</span>
+                              </button>
+                              <span className="text-slate-300">|</span>
+                              <button
+                                onClick={() => {
+                                  setRewardStartProductId(prod.id);
+                                  setActiveTab("rewards");
+                                }}
+                                className="text-xs font-bold text-evergreen hover:text-evergreen-deep hover:underline cursor-pointer flex items-center gap-1"
+                              >
+                                <Gift className="w-3.5 h-3.5" />
+                                <span>Points reward</span>
                               </button>
                               <span className="text-slate-300">|</span>
                               <button
@@ -1920,7 +1711,16 @@ export default function OwnerDashboardPage() {
                             <td className="p-4 text-slate-500 text-[11px]">
                               {new Date(m.joinedAt).toLocaleDateString()}
                             </td>
-                            <td className="p-4 text-right">
+                            <td className="p-4 text-right whitespace-nowrap">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSpendingMember(m)}
+                                disabled={m.status !== "active"}
+                                className="bg-white border-evergreen text-evergreen-deep hover:bg-mist text-xs font-semibold py-1 h-8 mr-2"
+                              >
+                                Use points
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -2879,113 +2679,38 @@ export default function OwnerDashboardPage() {
       )}
 
       {/* Add / Create Reward Modal */}
-      {showAddReward && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-          <div className="max-w-md w-full p-6 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-2xl">
-            <div className="flex items-center gap-2.5 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center">
-                <Gift className="w-4 h-4" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-950">Create Programme Reward</h3>
+      {spendingMember && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-evergreen-deep/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Use points for ${spendingMember.name || spendingMember.memberNumber}`}
+          onClick={(e) => e.target === e.currentTarget && setSpendingMember(null)}
+        >
+          <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 rounded-3xl bg-white border border-zinc-200 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-zinc-500">Customer #{spendingMember.memberNumber}</p>
+              <button
+                type="button"
+                onClick={() => setSpendingMember(null)}
+                className="p-1.5 rounded-full hover:bg-zinc-100 cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <p className="text-xs text-slate-500 mb-4">
-              Set the redemption rules and point cost. Once created, eligible members will see &ldquo;Claim Reward&rdquo; on their pass.
-            </p>
-
-            <div className="space-y-3.5 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Reward Title *</label>
-                <Input
-                  placeholder="e.g. Free Artisan Coffee, 20% Off Bill, Beard Trim"
-                  value={newRewardTitle}
-                  onChange={(e) => setNewRewardTitle(e.target.value)}
-                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Point / Stamp Cost *</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    placeholder="e.g. 8"
-                    value={newRewardCost}
-                    onChange={(e) => setNewRewardCost(e.target.value)}
-                    className="bg-slate-50 border-slate-300 text-xs text-slate-900"
-                  />
-                  <span className="text-xs text-slate-400 mt-0.5 block">Points deducted upon claim</span>
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Reward Type</label>
-                  <select
-                    value={newRewardType}
-                    onChange={(e) => setNewRewardType(e.target.value as any)}
-                    className="w-full h-9 rounded-md border border-slate-300 bg-slate-50 px-3 py-1 text-xs text-slate-900 shadow-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
-                  >
-                    <option value="free_item">Free Item / Product</option>
-                    <option value="discount">Discount Percentage</option>
-                    <option value="fixed_value">Fixed Amount Off</option>
-                    <option value="upgrade">Perk / Upgrade</option>
-                    <option value="custom">Custom Service</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Description (Optional)</label>
-                <Input
-                  placeholder="e.g. Valid for any regular size hot coffee or tea"
-                  value={newRewardDesc}
-                  onChange={(e) => setNewRewardDesc(e.target.value)}
-                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Total Stock (Optional)</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    placeholder="Leave empty for unlimited"
-                    value={newRewardTotalQty}
-                    onChange={(e) => setNewRewardTotalQty(e.target.value)}
-                    className="bg-slate-50 border-slate-300 text-xs text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Limit Per Member (Optional)</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    placeholder="Leave empty for unlimited"
-                    value={newRewardMemberLimit}
-                    onChange={(e) => setNewRewardMemberLimit(e.target.value)}
-                    className="bg-slate-50 border-slate-300 text-xs text-slate-900"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2.5 pt-3 border-t border-slate-100">
-                <Button
-                  variant="outline"
-                  className="flex-1 bg-white border-slate-300 text-xs font-bold text-slate-700"
-                  onClick={() => setShowAddReward(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1 font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
-                  onClick={handleCreateReward}
-                  disabled={loading || !newRewardTitle.trim()}
-                >
-                  {loading ? "Publishing..." : "Publish Reward"}
-                </Button>
-              </div>
-            </div>
+            <SpendPointsPanel
+              membershipId={spendingMember.id}
+              customerName={spendingMember.name || "this customer"}
+              balance={spendingMember.balance}
+              unit={business?.programmeType === "stamps" ? "stamps" : "points"}
+              onSpent={(result) => {
+                setSpendingMember({ ...spendingMember, balance: result.newBalance });
+                setMembers((list) => list.map((m) => (m.id === spendingMember.id ? { ...m, balance: result.newBalance } : m)));
+                loadOverview();
+                loadRewards();
+              }}
+            />
           </div>
         </div>
       )}

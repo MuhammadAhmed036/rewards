@@ -5,7 +5,6 @@ import {
   memberships,
   membershipBalances,
   ledgerEntries,
-  redemptions,
   linkClickEvents,
 } from "@/server/db/schema";
 import { eq, and, sql, gte } from "drizzle-orm";
@@ -57,14 +56,14 @@ export async function GET(request: NextRequest) {
     .from(ledgerEntries)
     .where(and(eq(ledgerEntries.tenantId, tenantId), eq(ledgerEntries.type, "earn")));
 
-  // 5. Redemptions Count & Points
+  // 5. Redemptions Count & Points (points-menu rewards and items staff gave for points)
   const [redemptionsRow] = await db
     .select({
       count: sql<number>`count(*)::int`,
-      pointsRedeemed: sql<number>`COALESCE(SUM(cost_points), 0)::int`,
+      pointsRedeemed: sql<number>`COALESCE(-SUM(points_delta), 0)::int`,
     })
-    .from(redemptions)
-    .where(and(eq(redemptions.tenantId, tenantId), eq(redemptions.status, "confirmed")));
+    .from(ledgerEntries)
+    .where(and(eq(ledgerEntries.tenantId, tenantId), eq(ledgerEntries.type, "redeem")));
 
   // 6. Link Clicks Total
   const [clicksRow] = await db

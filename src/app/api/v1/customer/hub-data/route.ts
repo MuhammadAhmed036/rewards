@@ -115,6 +115,7 @@ export async function GET(request: NextRequest) {
             id: ledgerEntries.id,
             type: ledgerEntries.type,
             pointsDelta: ledgerEntries.pointsDelta,
+            note: ledgerEntries.note,
             occurredAt: ledgerEntries.occurredAt,
           })
           .from(ledgerEntries)

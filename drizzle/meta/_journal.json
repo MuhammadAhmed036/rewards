@@ -43,6 +43,13 @@
       "when": 1793175074953,
       "tag": "0005_conversations",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793197051350,
+      "tag": "0006_reward_products",
+      "breakpoints": true
     }
   ]
 }

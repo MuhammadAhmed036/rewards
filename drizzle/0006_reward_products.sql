@@ -1,0 +1,2 @@
+ALTER TABLE "rewards" ADD COLUMN "product_id" uuid;--> statement-breakpoint
+ALTER TABLE "rewards" ADD CONSTRAINT "rewards_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE set null ON UPDATE no action;

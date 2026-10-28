@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { BusinessLogo } from "@/components/brand/BusinessLogo";
 import { QrCameraScanner } from "@/components/staff/QrCameraScanner";
 import { BusinessInbox } from "@/components/chat/BusinessInbox";
+import { SpendPointsPanel, type SpendResult } from "@/components/rewards/SpendPointsPanel";
+import { RewardsManager } from "@/components/rewards/RewardsManager";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { parsePence } from "@/lib/money";
 import {
   QrCode,
@@ -468,74 +469,19 @@ export default function StaffPage() {
     }
   };
 
-  // Staff-Initiated Direct Redemption (PRS 5.4 Alternative)
-  const handleStaffDirectRedeem = async (reward: { id: string; title: string; costPoints: number }) => {
-    if (!activeMember || !selectedLocationId) return;
-    if (
-      !confirm(
-        `Confirm redemption of "${reward.title}" for ${activeMember.displayName}? This will deduct ${reward.costPoints} points from the customer's balance.`
-      )
-    ) {
-      return;
-    }
-    setLoading(true);
-    setErrorMsg(null);
-    try {
-      // 1. Initiate redemption voucher
-      const reqRes = await fetch("/api/v1/customer/redeem", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          membershipId: activeMember.membershipId,
-          rewardId: reward.id,
-        }),
-      });
-      const reqJson = await reqRes.json();
-      if (!reqRes.ok) throw new Error(reqJson.error?.message || "Failed to initiate redemption");
-
-      const code = reqJson.data.code;
-
-      // 2. Atomically confirm redemption at counter
-      const confirmRes = await fetch("/api/v1/staff/redemptions/confirm", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
-        },
-        body: JSON.stringify({
-          code,
-          locationId: selectedLocationId,
-        }),
-      });
-      const confirmJson = await confirmRes.json();
-      if (!confirmRes.ok) throw new Error(confirmJson.error?.message || "Failed to confirm redemption");
-
-      setSuccessData({
-        title: "Reward Redeemed by Staff!",
-        message: `Successfully confirmed "${reward.title}" for ${activeMember.displayName}.`,
-        newBalance: confirmJson.data.newBalance,
-        pointsDelta: -confirmJson.data.pointsDeducted,
-      });
-
-      // Update active member's balance and recompute reward eligibility
-      const updatedBalance = confirmJson.data.newBalance;
-      setActiveMember({
-        ...activeMember,
-        balance: updatedBalance,
-        availableRewards: activeMember.availableRewards.map((r) => {
-          const eligible = updatedBalance >= r.costPoints;
-          return {
-            ...r,
-            eligible,
-            pointsShortfall: eligible ? 0 : r.costPoints - updatedBalance,
-          };
-        }),
-      });
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to redeem reward");
-    } finally {
-      setLoading(false);
-    }
+  // Points spent from the shared panel: refresh the balance shown for this customer
+  const handlePointsSpent = (result: SpendResult) => {
+    if (!activeMember) return;
+    const updatedBalance = result.newBalance;
+    setActiveMember({
+      ...activeMember,
+      balance: updatedBalance,
+      lifetimeRedeemed: (activeMember.lifetimeRedeemed ?? 0) + result.pointsDeducted,
+      availableRewards: activeMember.availableRewards.map((r) => {
+        const eligible = updatedBalance >= r.costPoints;
+        return { ...r, eligible, pointsShortfall: eligible ? 0 : r.costPoints - updatedBalance };
+      }),
+    });
   };
 
   // Confirm Redemption
@@ -1115,49 +1061,18 @@ export default function StaffPage() {
                 </Button>
               </div>
 
-              {/* Available Rewards Quick Redeem */}
-              {activeMember.availableRewards.length > 0 && (
-                <div className="mt-6 pt-5 border-t border-slate-100">
-                  <h4 className="text-xs font-bold text-slate-700 mb-3 flex items-center">
-                    <Gift className="h-4 w-4 mr-1.5 text-purple-600" />
-                    Available Rewards for Customer
-                  </h4>
-                  <div className="space-y-2">
-                    {activeMember.availableRewards.map((reward) => (
-                      <div
-                        key={reward.id}
-                        className="flex items-center justify-between p-3 rounded-2xl border border-slate-200 bg-slate-50/70"
-                      >
-                        <div>
-                          <div className="font-bold text-xs text-slate-900">{reward.title}</div>
-                          <div className="text-[11px] text-slate-500 font-semibold">
-                            Cost: {reward.costPoints} points
-                          </div>
-                        </div>
-                        {reward.eligible ? (
-                          <div className="flex items-center gap-2">
-                            <Badge variant="success" className="bg-emerald-100 text-emerald-800 border-emerald-300 font-bold text-xs">
-                              Eligible
-                            </Badge>
-                            <Button
-                              size="sm"
-                              onClick={() => handleStaffDirectRedeem(reward)}
-                              disabled={loading}
-                              className="h-7 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-2.5 cursor-pointer shadow-2xs"
-                            >
-                              Redeem Now →
-                            </Button>
-                          </div>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">
-                            Need {reward.pointsShortfall} more
-                          </Badge>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Spend points: points-menu rewards, or any menu item for points staff choose */}
+              <div className="mt-6 pt-5 border-t border-slate-100">
+                <SpendPointsPanel
+                  key={activeMember.membershipId}
+                  membershipId={activeMember.membershipId}
+                  customerName={activeMember.displayName}
+                  balance={activeMember.balance}
+                  locationId={selectedLocationId || undefined}
+                  unit={business?.programmeType === "stamps" ? "stamps" : "points"}
+                  onSpent={handlePointsSpent}
+                />
+              </div>
             </div>
           </div>
         ) : (
@@ -1212,7 +1127,7 @@ export default function StaffPage() {
                 }`}
               >
                 <Package className="h-4 w-4 mb-1 stroke-[1.8]" />
-                <span className="truncate">Products</span>
+                <span className="truncate">Menu &amp; rewards</span>
               </button>
               <button
                 onClick={handleLoadHistory}
@@ -1526,6 +1441,15 @@ export default function StaffPage() {
             )}
 
             {/* Tab 5: Products & Daily Discount Screen */}
+            {activeTab === "products" && (
+              <div className="mb-5">
+                {/* Keyed on the product list so a newly added product shows up in the picker */}
+                <RewardsManager
+                  key={productsList.length}
+                  unit={business?.programmeType === "stamps" ? "stamps" : "points"}
+                />
+              </div>
+            )}
             {activeTab === "products" && (
               <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 space-y-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-3 gap-3">

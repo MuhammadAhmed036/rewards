@@ -1,14 +1,15 @@
 import { db } from "../db";
-import { rewards, rewardLocations, programmes, tenants } from "../db/schema";
+import { rewards, rewardLocations, programmes, tenants, products } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
 import { logAuditEvent } from "./audit";
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, asc, count, getTableColumns } from "drizzle-orm";
 import { z } from "zod";
 
 export const createRewardSchema = z.object({
   title: z.string().min(1, "Title is required").max(255),
   description: z.string().optional(),
   imageUrl: z.string().url().optional(),
+  productId: z.string().uuid().optional(),
   type: z.enum(["free_item", "discount", "upgrade", "fixed_value", "custom"]).default("free_item"),
   costPoints: z.number().int().min(1, "Cost must be at least 1 point/stamp"),
   startsAt: z.date().optional(),
@@ -19,6 +20,17 @@ export const createRewardSchema = z.object({
 });
 
 export type CreateRewardInput = z.input<typeof createRewardSchema>;
+
+/** Confirms a menu item belongs to this business before a reward points at it. */
+async function assertOwnProduct(tenantId: string, productId: string) {
+  const [product] = await db
+    .select({ id: products.id, name: products.name })
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.tenantId, tenantId)))
+    .limit(1);
+  if (!product) throw new Error("That menu item wasn't found");
+  return product;
+}
 
 export async function createReward(ctx: RequestContext, input: CreateRewardInput) {
   assertCan(ctx, "reward.manage");
@@ -46,6 +58,7 @@ export async function createReward(ctx: RequestContext, input: CreateRewardInput
   }
 
   const validated = createRewardSchema.parse(input);
+  if (validated.productId) await assertOwnProduct(ctx.tenantId, validated.productId);
 
   const [prog] = await db
     .select({ id: programmes.id })
@@ -65,6 +78,7 @@ export async function createReward(ctx: RequestContext, input: CreateRewardInput
         title: validated.title,
         description: validated.description || null,
         imageUrl: validated.imageUrl || null,
+        productId: validated.productId || null,
         type: validated.type,
         costPoints: validated.costPoints,
         startsAt: validated.startsAt || null,
@@ -102,10 +116,14 @@ export async function createReward(ctx: RequestContext, input: CreateRewardInput
 export async function updateReward(
   ctx: RequestContext,
   rewardId: string,
-  input: Partial<CreateRewardInput> & { status?: "active" | "paused" | "archived" }
+  input: Omit<Partial<CreateRewardInput>, "productId"> & {
+    productId?: string | null;
+    status?: "active" | "paused" | "archived";
+  }
 ) {
   assertCan(ctx, "reward.manage");
   if (!ctx.tenantId) throw new Error("tenantId required");
+  if (input.productId) await assertOwnProduct(ctx.tenantId, input.productId);
 
   const [existing] = await db
     .select()
@@ -123,6 +141,7 @@ export async function updateReward(
       title: input.title ?? existing.title,
       description: input.description !== undefined ? input.description : existing.description,
       imageUrl: input.imageUrl !== undefined ? input.imageUrl : existing.imageUrl,
+      productId: input.productId !== undefined ? input.productId : existing.productId,
       type: input.type ?? existing.type,
       costPoints: input.costPoints ?? existing.costPoints,
       startsAt: input.startsAt !== undefined ? input.startsAt : existing.startsAt,
@@ -145,7 +164,7 @@ export async function updateReward(
   return updated;
 }
 
-export type RewardItem = typeof rewards.$inferSelect;
+export type RewardItem = typeof rewards.$inferSelect & { productName: string | null };
 export type RewardWithEligibility = RewardItem & {
   eligible: boolean;
   pointsShortfall: number;
@@ -163,17 +182,17 @@ export async function getRewards(
   tenantId: string,
   options: { includeInactive?: boolean; memberBalance?: number } = {}
 ): Promise<RewardItem[] | RewardWithEligibility[]> {
-  const query = db
-    .select()
+  // Cheapest first, so customers see the next thing they can reach at the top
+  const list = await db
+    .select({ ...getTableColumns(rewards), productName: products.name })
     .from(rewards)
+    .leftJoin(products, eq(products.id, rewards.productId))
     .where(
       options.includeInactive
         ? eq(rewards.tenantId, tenantId)
         : and(eq(rewards.tenantId, tenantId), eq(rewards.status, "active"))
     )
-    .orderBy(desc(rewards.costPoints));
-
-  const list = await query;
+    .orderBy(asc(rewards.costPoints), asc(rewards.title));
 
   if (options.memberBalance !== undefined) {
     return list.map((r) => {
