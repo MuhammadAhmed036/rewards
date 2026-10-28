@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { registerOwnerAndTenant } from "./tenant";
 import { joinProgramme } from "./member";
-import { createSession } from "../auth";
+import { createSession, sessionLookupKey } from "../auth";
 import { env } from "@/lib/env";
 import { db } from "../db";
 import { users, sessions, emailOutbox } from "../db/schema";
@@ -74,7 +74,7 @@ describe("Privacy Compliance, Email Outbox & Maintenance Crons (M9)", () => {
     const [sessionBefore] = await db
       .select()
       .from(sessions)
-      .where(eq(sessions.token, userSession.token));
+      .where(eq(sessions.token, (await sessionLookupKey(userSession.token))!));
     expect(sessionBefore).toBeDefined();
 
     // 5. Account deletion and anonymisation
@@ -90,7 +90,7 @@ describe("Privacy Compliance, Email Outbox & Maintenance Crons (M9)", () => {
     const [sessionAfter] = await db
       .select()
       .from(sessions)
-      .where(eq(sessions.token, userSession.token));
+      .where(eq(sessions.token, (await sessionLookupKey(userSession.token))!));
     expect(sessionAfter).toBeUndefined();
   });
 

@@ -4,6 +4,8 @@ import {
   validateLinkUrl,
   recordLinkClick,
   getLinkClickAnalytics,
+  updateBusinessLinks,
+  getAllTenantLinks,
 } from "./links";
 import { submitFeedback, getFeedbackMessages, updateFeedbackStatus } from "./feedback";
 import { registerOwnerAndTenant } from "./tenant";
@@ -12,6 +14,16 @@ import { RequestContext } from "../security/permissions";
 import { db } from "../db";
 import { feedbackMessages, linkClickEvents } from "../db/schema";
 import { eq } from "drizzle-orm";
+
+// New businesses start with their buttons switched off; tests publish a real link first.
+async function publishGoogleLink(business: { user: { id: string }; tenant: { id: string } }, url = "https://g.page/r/test-business/review") {
+  const ctx: RequestContext = { userId: business.user.id, tenantId: business.tenant.id, role: "owner", requestId: "req-links" };
+  await updateBusinessLinks(ctx, [
+    { type: "google_review", label: "Leave a Google review", url, enabled: true, sortOrder: 1 },
+    { type: "instagram", label: "Follow on Instagram", url: "", enabled: false, sortOrder: 2 },
+  ]);
+  return ctx;
+}
 
 describe("Anti-Gating, Review Rules, and Tracked Links (M6)", () => {
   describe("Non-Negotiable Review Rule (NO REVIEW GATING) per Section 1.2 & 11.2", () => {
@@ -30,6 +42,7 @@ describe("Anti-Gating, Review Rules, and Tracked Links (M6)", () => {
         businessName: "Fair Business",
         slug,
       });
+      await publishGoogleLink(business);
 
       // Member 1: Never submitted feedback
       await joinProgramme({
@@ -104,6 +117,7 @@ describe("Anti-Gating, Review Rules, and Tracked Links (M6)", () => {
         businessName: "Tracking Biz",
         slug,
       });
+      await publishGoogleLink(business);
 
       const member = await joinProgramme({
         tenantSlug: slug,
@@ -187,6 +201,55 @@ describe("Anti-Gating, Review Rules, and Tracked Links (M6)", () => {
       // Owner marks as resolved
       const resolved = await updateFeedbackStatus(ownerCtx, fb.id, "resolved");
       expect(resolved.status).toBe("resolved");
+    });
+  });
+
+  describe("Owner link publishing", () => {
+    async function newBusiness(tag: string) {
+      const slug = `${tag}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      return registerOwnerAndTenant({
+        email: `${slug}@test.com`,
+        password: "Password123!",
+        name: "Owner",
+        businessName: "Link Biz",
+        slug,
+      });
+    }
+
+    it("starts new businesses with no live example links", async () => {
+      const business = await newBusiness("fresh-links");
+      expect(await getVisibleLinks(business.tenant.id)).toHaveLength(0);
+      const all = await getAllTenantLinks(business.tenant.id);
+      expect(all.every((l) => !l.enabled)).toBe(true);
+    });
+
+    it("never shows the old example URLs to customers and refuses to publish them", async () => {
+      expect(validateLinkUrl("instagram", "https://instagram.com/example").valid).toBe(false);
+      const business = await newBusiness("placeholder-links");
+      const ctx: RequestContext = { userId: business.user.id, tenantId: business.tenant.id, role: "owner", requestId: "r" };
+      await expect(
+        updateBusinessLinks(ctx, [
+          { type: "facebook", label: "Like us", url: "https://facebook.com/example", enabled: true, sortOrder: 1 },
+        ])
+      ).rejects.toThrow(/example link/i);
+    });
+
+    it("keeps the link id and its click history when the owner edits the URL", async () => {
+      const business = await newBusiness("edit-links");
+      const ctx = await publishGoogleLink(business, "https://g.page/r/first/review");
+      const [before] = await getVisibleLinks(business.tenant.id);
+      await recordLinkClick(before.id, {});
+
+      await updateBusinessLinks(ctx, [
+        { type: "google_review", label: "Review us", url: "https://g.page/r/second/review", enabled: true, sortOrder: 1 },
+      ]);
+      const [after] = await getVisibleLinks(business.tenant.id);
+      expect(after.id).toBe(before.id);
+      expect(after.url).toBe("https://g.page/r/second/review");
+      expect(await recordLinkClick(after.id, {})).toBe("https://g.page/r/second/review");
+
+      const clicks = await db.select().from(linkClickEvents).where(eq(linkClickEvents.linkId, before.id));
+      expect(clicks.length).toBe(2);
     });
   });
 });

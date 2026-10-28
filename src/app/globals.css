@@ -1,58 +1,157 @@
 @import "tailwindcss";
 
+/*
+  Palette — from Color Hunt (#f5f7f8 #f4ce14 #495e57 #45474b)
+  paper     #f5f7f8  page ground
+  evergreen #495e57  primary actions, navigation, staff
+  graphite  #45474b  body text
+  marigold  #f4ce14  points, stamps and rewards only
+*/
+
 :root {
   color-scheme: light;
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #4338ca;
+  --paper: #f5f7f8;
+  --evergreen: #495e57;
+  --evergreen-deep: #26302d;
+  --graphite: #45474b;
+  --marigold: #f4ce14;
+  --mist: #e6ece9;
+
+  --background: var(--paper);
+  --foreground: #25282b;
+  --primary: var(--evergreen);
   --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
-  --muted: #f8fafc;
-  --muted-foreground: #64748b;
-  --accent: #f1f5f9;
-  --accent-foreground: #0f172a;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #4f46e5;
-  --radius: 1rem;
+  --border: #dde2e3;
+  --ring: var(--evergreen);
+  --radius: 0.875rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+/*
+  Every page draws on Tailwind's zinc/slate neutrals and indigo/purple/amber
+  accents, so remapping those scales re-themes the whole app in one place.
+*/
+@theme {
+  /* Neutrals: cool grey anchored on graphite, darkening into evergreen */
+  --color-zinc-50: #f5f7f8;
+  --color-zinc-100: #eceff0;
+  --color-zinc-200: #dde2e3;
+  --color-zinc-300: #c4cbcc;
+  --color-zinc-400: #9aa3a4;
+  --color-zinc-500: #6c7476;
+  --color-zinc-600: #565c5f;
+  --color-zinc-700: #45474b;
+  --color-zinc-800: #34413d;
+  --color-zinc-900: #26302d;
+  --color-zinc-950: #1d2624;
+
+  --color-slate-50: #f5f7f8;
+  --color-slate-100: #eceff0;
+  --color-slate-200: #dde2e3;
+  --color-slate-300: #c4cbcc;
+  --color-slate-400: #9aa3a4;
+  --color-slate-500: #6c7476;
+  --color-slate-600: #565c5f;
+  --color-slate-700: #45474b;
+  --color-slate-800: #34413d;
+  --color-slate-900: #26302d;
+  --color-slate-950: #1d2624;
+
+  /* Primary accent: evergreen */
+  --color-indigo-50: #eef3f1;
+  --color-indigo-100: #dce7e3;
+  --color-indigo-200: #bccfc8;
+  --color-indigo-300: #93b0a6;
+  --color-indigo-400: #6d8e83;
+  --color-indigo-500: #557268;
+  --color-indigo-600: #495e57;
+  --color-indigo-700: #3c4e48;
+  --color-indigo-800: #31403b;
+  --color-indigo-900: #283431;
+  --color-indigo-950: #18201e;
+
+  --color-violet-50: #eef3f1;
+  --color-violet-100: #dce7e3;
+  --color-violet-200: #bccfc8;
+  --color-violet-600: #495e57;
+  --color-violet-700: #3c4e48;
+
+  /* Points & rewards: marigold (dark steps keep text readable on white) */
+  --color-purple-50: #fefbe8;
+  --color-purple-100: #fdf5c4;
+  --color-purple-200: #f9e78a;
+  --color-purple-300: #f6db4a;
+  --color-purple-400: #f4ce14;
+  --color-purple-500: #d8b40a;
+  --color-purple-600: #a88a05;
+  --color-purple-700: #7d6606;
+  --color-purple-800: #66530b;
+  --color-purple-900: #54440e;
+  --color-purple-950: #302605;
+
+  --color-amber-50: #fefbe8;
+  --color-amber-100: #fdf5c4;
+  --color-amber-200: #f9e78a;
+  --color-amber-300: #f6db4a;
+  --color-amber-400: #f4ce14;
+  --color-amber-500: #e0bb0c;
+  --color-amber-600: #a88a05;
+  --color-amber-700: #7d6606;
+  --color-amber-800: #66530b;
+  --color-amber-900: #54440e;
+  --color-amber-950: #302605;
+
+  /* Named palette tokens: bg-evergreen, text-marigold, etc. */
+  --color-paper: #f5f7f8;
+  --color-evergreen: #495e57;
+  --color-evergreen-deep: #26302d;
+  --color-graphite: #45474b;
+  --color-marigold: #f4ce14;
+  --color-mist: #e6ece9;
+
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-html,
-body {
-  overflow-x: hidden;
-  max-width: 100%;
-  width: 100%;
-  background-color: #f8fafc;
-  color: #0f172a;
-  color-scheme: light;
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.015em;
+@layer base {
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100%;
+    width: 100%;
+    background-color: var(--paper);
+    color: var(--foreground);
+    color-scheme: light;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  input,
+  select,
+  textarea {
+    color-scheme: light;
+  }
+
+  ::selection {
+    background: var(--marigold);
+    color: var(--evergreen-deep);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--evergreen);
+    outline-offset: 2px;
+  }
 }
 
-/* Force light form inputs across all mobile browsers */
-input,
-select,
-textarea {
-  color-scheme: light;
-}
-
-/* Custom Enterprise Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -63,85 +162,116 @@ textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #c4cbcc;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #9aa3a4;
 }
 
-/* Custom Light Theme Animations */
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-}
-
-@keyframes pulse-subtle {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.85;
-    transform: scale(1.02);
-  }
-}
-
-@keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-.animate-float {
-  animation: float 4s ease-in-out infinite;
-}
-
-.animate-pulse-subtle {
-  animation: pulse-subtle 3s ease-in-out infinite;
-}
-
-/* Bespoke Light Theme ERP & SaaS Components */
-.light-canvas {
-  background: radial-gradient(circle at 50% 0%, #ffffff 0%, #f8fafc 70%, #f1f5f9 100%);
-}
-
-.enterprise-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.enterprise-card-hover:hover {
-  border-color: #cbd5e1;
-  transform: translateY(-2px);
-  box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.07), 0 4px 8px -2px rgba(15, 23, 42, 0.02);
-}
-
-.glass-pill {
-  backdrop-filter: blur(12px);
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-}
-
-.corporate-gradient-text {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #312e81 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.font-display {
+  font-family: var(--font-display);
 }
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
-/* Soft dot grid background */
-.light-dot-grid {
-  background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-  background-size: 24px 24px;
+/* Kept for pages that still reference them */
+.enterprise-card {
+  background: #ffffff;
+  border: 1px solid #dde2e3;
+}
+
+.glass-pill {
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #dde2e3;
+}
+
+/* ---------- 3D stamp card (home hero) ---------- */
+
+.card-stage {
+  perspective: 1400px;
+}
+
+.card-3d {
+  position: relative;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--rx, 8deg)) rotateY(var(--ry, -16deg)) rotateY(var(--flip, 0deg));
+  transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.card-3d.is-tracking {
+  transition: transform 0.12s linear;
+}
+
+.card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+  border-radius: 1.5rem;
+}
+
+.card-face--back {
+  transform: rotateY(180deg);
+}
+
+.card-lift-1 {
+  transform: translateZ(28px);
+}
+
+.card-lift-2 {
+  transform: translateZ(52px);
+}
+
+.card-shadow {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  bottom: -2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(38, 48, 45, 0.28), transparent);
+  filter: blur(6px);
+  transform: translateZ(-40px);
+}
+
+@keyframes stamp-in {
+  0% {
+    transform: translateZ(80px) scale(1.6) rotate(-14deg);
+    opacity: 0;
+  }
+  60% {
+    transform: translateZ(30px) scale(0.92) rotate(-8deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateZ(28px) scale(1) rotate(-8deg);
+    opacity: 1;
+  }
+}
+
+.stamp-new {
+  animation: stamp-in 0.7s 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* A stamp just earned on a customer's card */
+.stamp-pop {
+  animation: stamp-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-3d,
+  .card-3d.is-tracking {
+    transition: none;
+  }
+  .stamp-new,
+  .stamp-pop {
+    animation: none;
+  }
 }

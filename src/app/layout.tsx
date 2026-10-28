@@ -1,21 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const figtree = Figtree({
+  variable: "--font-figtree",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "LoyaltyPlatform Enterprise — Multi-Tenant QR Loyalty & ERP Engine",
+  title: "LoyaltyPlatform — digital loyalty cards for local shops",
   description:
-    "Enterprise-grade SaaS loyalty platform for independent and multi-location retail, hospitality, salons, and services. Real-time ledger, anti-gating review engine, and UK GDPR compliance.",
+    "Customers scan a QR code, collect points on their phone and claim rewards. No app to download. Built for cafés, barbers, restaurants and other UK high-street businesses.",
 };
 
 export const viewport: Viewport = {
@@ -23,6 +23,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   colorScheme: "light",
+  themeColor: "#495e57",
 };
 
 export default function RootLayout({
@@ -31,9 +32,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="light overflow-x-hidden" style={{ colorScheme: "light" }}>
+    <html lang="en" className={`${bricolage.variable} ${figtree.variable} light overflow-x-hidden`} style={{ colorScheme: "light" }}>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden w-full max-w-full bg-[#fafafa] text-zinc-900`}
+        className={`antialiased overflow-x-hidden w-full max-w-full bg-paper text-zinc-900`}
       >
         {children}
       </body>

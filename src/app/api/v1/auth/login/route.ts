@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { users, tenants } from "@/server/db/schema";
-import { verifyPassword, createSession, getSessionContext } from "@/server/auth";
+import { verifyPassword, createSession, getSessionContext, deleteSession, sessionKindForUser } from "@/server/auth";
+import { setSessionCookie } from "@/server/auth/session-response";
+import { checkPortalAccess } from "@/server/auth/portal-access";
 import { checkLoginRateLimit, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -9,6 +11,9 @@ import { z } from "zod";
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
+  // Which sign-in form was used; each one only lets in the matching kind of account
+  portal: z.enum(["customer", "staff", "owner", "admin"]).optional(),
+  tenantSlug: z.string().min(1).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -47,15 +52,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine session type (staff/owner/admin vs customer)
-    const isStaff = !user.isPlatformAdmin;
+    if (validated.data.portal) {
+      const access = await checkPortalAccess(user.id, validated.data.portal, validated.data.tenantSlug);
+      if (!access.ok) {
+        // Correct password, wrong door: no session is created.
+        return NextResponse.json({ error: { code: access.code, message: access.message } }, { status: 403 });
+      }
+    }
+
+    // Session length depends on who is signing in: admins and staff get short sessions, customers long ones.
+    const kind = await sessionKindForUser(user.id);
     const userAgent = request.headers.get("user-agent") || undefined;
     const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined;
 
-    const { token, expiresAt } = await createSession(user.id, isStaff, userAgent, ipAddress);
+    const session = await createSession(user.id, kind, userAgent, ipAddress);
 
     // Resolve context to get role and tenant
-    const ctx = await getSessionContext(token);
+    const ctx = await getSessionContext(session.token);
 
     // If user is owner or staff, verify business approval status
     if (ctx?.tenantId && !user.isPlatformAdmin) {
@@ -64,6 +77,11 @@ export async function POST(request: NextRequest) {
         .from(tenants)
         .where(eq(tenants.id, ctx.tenantId))
         .limit(1);
+
+      if (tenant?.status === "pending" || tenant?.status === "suspended") {
+        // Don't leave a usable session behind for an account that can't sign in yet.
+        await deleteSession(session.token);
+      }
 
       if (tenant?.status === "pending") {
         return NextResponse.json(
@@ -107,13 +125,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Set HTTP-only session cookie
-    response.cookies.set("loyalty_session", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      expires: expiresAt,
-      path: "/",
-    });
+    setSessionCookie(response, session);
 
     return response;
   } catch (error) {

@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { BusinessLogo } from "@/components/brand/BusinessLogo";
+import { QrCameraScanner } from "@/components/staff/QrCameraScanner";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +22,8 @@ import {
   Package,
   X,
   Plus,
+  Stamp,
+  Check,
 } from "lucide-react";
 
 interface LocationItem {
@@ -35,8 +39,11 @@ interface MemberSummary {
   name?: string;
   email?: string;
   balance: number;
+  lifetimeEarned?: number;
+  lifetimeRedeemed?: number;
   status: string;
   joinedAt?: string;
+  stampCards?: StaffStampCard[];
   availableRewards: Array<{
     id: string;
     title: string;
@@ -44,6 +51,24 @@ interface MemberSummary {
     eligible: boolean;
     pointsShortfall: number;
   }>;
+}
+
+interface StaffStampCard {
+  offerId: string;
+  title: string;
+  rewardName: string;
+  requiredStamps: number;
+  stamps: number;
+  state: "collecting" | "ready" | "pending";
+  rewardsClaimed: number;
+  offerStatus: "active" | "expired" | "deactivated";
+}
+
+interface BusinessInfo {
+  name: string;
+  logoUrl: string | null;
+  brandPrimaryHex: string | null;
+  programmeType: "points" | "stamps";
 }
 
 interface TransactionItem {
@@ -129,8 +154,14 @@ export default function StaffPage() {
   const [promoSelectedProdId, setPromoSelectedProdId] = useState("");
   const [fullscreenQr, setFullscreenQr] = useState<StaffCampaignQrItem | null>(null);
 
+  // Business shown in the header
+  const [business, setBusiness] = useState<BusinessInfo | null>(null);
+
   // Scanner & Member state
   const [qrInput, setQrInput] = useState("");
+  const [customerIdInput, setCustomerIdInput] = useState("");
+  const [stampBusyId, setStampBusyId] = useState<string | null>(null);
+  const [stampNotice, setStampNotice] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<MemberSummary[]>([]);
   const [activeMember, setActiveMember] = useState<MemberSummary | null>(null);
@@ -191,6 +222,11 @@ export default function StaffPage() {
       }
     }
     fetchLocations();
+
+    fetch("/api/v1/business")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => json?.data && setBusiness(json.data))
+      .catch(() => {});
   }, []);
 
   const handleSelectLocation = (locId: string) => {
@@ -224,11 +260,57 @@ export default function StaffPage() {
         throw new Error(json.error?.message || "Failed to resolve QR");
       }
       setActiveMember(json.data);
+      setStampNotice(null);
       setQrInput("");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Error resolving QR");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Open a customer by typed customer ID (walk-ins without their phone) or from search results
+  const openMember = async (lookup: { memberNumber: string } | { membershipId: string }) => {
+    setLoading(true);
+    setErrorMsg(null);
+    setStampNotice(null);
+    try {
+      const res = await fetch("/api/v1/staff/scan/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...lookup, locationId: selectedLocationId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Customer not found");
+      setActiveMember(json.data);
+      setCustomerIdInput("");
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Customer not found");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add a stamp for a qualifying purchase, or hand over a full card's reward
+  const handleStampAction = async (offerId: string, action: "add" | "give_reward") => {
+    if (!activeMember) return;
+    setStampBusyId(offerId);
+    setErrorMsg(null);
+    setStampNotice(null);
+    try {
+      const res = await fetch("/api/v1/staff/stamps", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ membershipId: activeMember.membershipId, offerId, action }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Stamp action failed");
+      setActiveMember((m) => (m ? { ...m, stampCards: json.data.stampCards } : m));
+      setStampNotice(json.data.message);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Stamp action failed");
+    } finally {
+      setStampBusyId(null);
     }
   };
 
@@ -679,23 +761,22 @@ export default function StaffPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-zinc-900 pb-20 selection:bg-zinc-900 selection:text-white font-sans overflow-x-hidden w-full max-w-full">
+    <div className="min-h-screen bg-paper text-zinc-900 pb-20 overflow-x-hidden w-full max-w-full">
       {/* Top Header Bar - High-End POS Shell */}
-      <header className="sticky top-0 z-30 border-b border-zinc-200/80 bg-white/95 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-3 shadow-2xs">
+      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white px-4 sm:px-6 lg:px-8 py-3">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-zinc-950 text-white flex items-center justify-center font-bold text-sm shadow-xs ring-1 ring-zinc-900/10">
-              <QrCode className="w-4 h-4 stroke-[1.8]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <span className="font-bold text-sm sm:text-base tracking-tight text-zinc-950">Staff POS Terminal</span>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  LIVE
-                </span>
-              </div>
-              <p className="text-[10px] sm:text-[11px] text-zinc-500 font-medium">Frontline Cashier • Double-Entry Ledger</p>
+          <div className="flex items-center gap-3 min-w-0">
+            <BusinessLogo
+              name={business?.name || "Business"}
+              logoUrl={business?.logoUrl}
+              brandColor={business?.brandPrimaryHex}
+              size="md"
+            />
+            <div className="min-w-0">
+              <p className="font-display font-bold text-base text-evergreen-deep leading-tight truncate">
+                {business?.name || "Staff scanner"}
+              </p>
+              <p className="text-xs text-zinc-500">Staff scanner</p>
             </div>
           </div>
 
@@ -722,10 +803,10 @@ export default function StaffPage() {
                 await fetch("/api/v1/auth/logout", { method: "POST" });
                 window.location.href = "/login";
               }}
-              title="Sign Out"
-              className="text-zinc-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 px-3 py-1.5 rounded-full hover:bg-zinc-100 transition-colors cursor-pointer"
             >
-              <LogOut className="h-4 w-4 stroke-[1.8]" />
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign out</span>
             </button>
           </div>
         </div>
@@ -753,13 +834,13 @@ export default function StaffPage() {
             <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 mx-auto flex items-center justify-center mb-3 shadow-inner">
               <CheckCircle2 className="h-9 w-9 text-emerald-600" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900">{successData.title}</h2>
+            <h2 className="text-2xl font-bold text-slate-900">{successData.title}</h2>
             <p className="mt-1 text-slate-600 text-xs font-medium">{successData.message}</p>
             <div className="my-4 rounded-2xl bg-emerald-50 border border-emerald-200 p-4">
-              <span className="text-[10px] uppercase tracking-wider text-emerald-700 font-extrabold block">
-                Audited Ledger Balance
+              <span className="text-xs text-emerald-700 font-extrabold block">
+                New balance
               </span>
-              <div className="text-3xl font-black text-emerald-800 mt-1 tabular-nums">
+              <div className="text-3xl font-bold text-emerald-800 mt-1 tabular-nums">
                 {successData.newBalance} pts
               </div>
             </div>
@@ -769,7 +850,7 @@ export default function StaffPage() {
               className="w-full font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md rounded-2xl cursor-pointer"
               onClick={() => setSuccessData(null)}
             >
-              Done / Next Customer →
+              Next customer
             </Button>
           </div>
         )}
@@ -779,10 +860,10 @@ export default function StaffPage() {
           <div className="mb-6 bg-white rounded-3xl border border-slate-200/90 shadow-lg p-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">Active Member</span>
-                <h3 className="text-lg font-black text-slate-900">{activeMember.displayName}</h3>
+                <span className="text-sm text-zinc-500">Serving</span>
+                <h3 className="text-2xl font-bold text-evergreen-deep">{activeMember.displayName}</h3>
                 <div className="text-xs text-slate-400 font-mono mt-0.5">
-                  ID: #{activeMember.memberNumber}
+                  Card #{activeMember.memberNumber}
                 </div>
               </div>
               <Button
@@ -791,32 +872,107 @@ export default function StaffPage() {
                 onClick={() => setActiveMember(null)}
                 className="text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl cursor-pointer"
               >
-                Change Member
+                Change customer
               </Button>
             </div>
 
             <div>
               {/* Balance Banner */}
-              <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-slate-50 to-indigo-50/40 border border-slate-200/80 p-4 mb-4">
-                <span className="text-xs font-bold text-slate-600">
-                  Current Verified Balance
-                </span>
-                <span className="text-2xl font-black text-indigo-700 tabular-nums">
-                  {activeMember.balance} pts
-                </span>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="rounded-2xl bg-marigold p-4 text-evergreen-deep">
+                  <p className="text-sm font-semibold">
+                    {business?.programmeType === "stamps" ? "Stamps to spend" : "Points to spend"}
+                  </p>
+                  <p className="font-display text-3xl font-bold tabular-nums">{activeMember.balance}</p>
+                </div>
+                <div className="rounded-2xl bg-paper border border-zinc-200 p-4 text-evergreen-deep">
+                  <p className="text-sm text-zinc-600">Earned all-time</p>
+                  <p className="font-display text-3xl font-bold tabular-nums">{activeMember.lifetimeEarned ?? 0}</p>
+                </div>
               </div>
+
+              {/* Stamp cards */}
+              {activeMember.stampCards && activeMember.stampCards.length > 0 && (
+                <div className="mb-5">
+                  <h4 className="font-display text-lg font-bold text-evergreen-deep mb-2">Stamp cards</h4>
+                  {stampNotice && (
+                    <p className="mb-2 text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                      {stampNotice}
+                    </p>
+                  )}
+                  <div className="space-y-2.5">
+                    {activeMember.stampCards.map((card) => {
+                      const busy = stampBusyId === card.offerId;
+                      const live = card.offerStatus === "active";
+                      return (
+                        <div key={card.offerId} className="rounded-2xl border border-zinc-200 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-zinc-900">{card.title}</p>
+                              <p className="text-sm text-zinc-500">Reward: free {card.rewardName}</p>
+                            </div>
+                            <span className="font-display text-xl font-bold text-evergreen-deep tabular-nums shrink-0">
+                              {card.stamps}/{card.requiredStamps}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-1.5" aria-hidden>
+                            {Array.from({ length: card.requiredStamps }).map((_, i) => (
+                              <span
+                                key={i}
+                                className={`w-7 h-7 rounded-full flex items-center justify-center ${
+                                  i < card.stamps ? "bg-marigold text-evergreen-deep" : "border-2 border-dashed border-zinc-300"
+                                }`}
+                              >
+                                {i < card.stamps && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
+                              </span>
+                            ))}
+                          </div>
+                          <div className="mt-3">
+                            {card.state === "collecting" ? (
+                              <button
+                                type="button"
+                                disabled={busy || !live}
+                                onClick={() => handleStampAction(card.offerId, "add")}
+                                className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-full bg-evergreen text-white text-sm font-semibold hover:bg-evergreen-deep cursor-pointer disabled:opacity-60"
+                              >
+                                <Stamp className="w-4 h-4" />
+                                {busy ? "Adding..." : live ? "Add a stamp" : "Offer ended"}
+                              </button>
+                            ) : (
+                              <div className="flex flex-wrap items-center gap-3">
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => handleStampAction(card.offerId, "give_reward")}
+                                  className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-full bg-marigold text-evergreen-deep text-sm font-bold hover:brightness-95 cursor-pointer disabled:opacity-60"
+                                >
+                                  <Gift className="w-4 h-4" />
+                                  {busy ? "Saving..." : `Hand over free ${card.rewardName}`}
+                                </button>
+                                <span className="text-sm text-zinc-600">
+                                  {card.state === "pending" ? "Customer has claimed it" : "Card is full"}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Earn Form */}
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-extrabold text-slate-700">
                       Qualifying Spend (£)
                     </label>
                     <span className="text-[11px] text-slate-400 font-medium">Integer minor pence arithmetic</span>
                   </div>
                   <div className="relative">
-                    <span className="absolute left-4 top-3 text-xl font-black text-slate-400">
+                    <span className="absolute left-4 top-3 text-xl font-bold text-slate-400">
                       £
                     </span>
                     <Input
@@ -825,7 +981,7 @@ export default function StaffPage() {
                       placeholder="0.00"
                       value={spendInput}
                       onChange={(e) => setSpendInput(e.target.value)}
-                      className="pl-8 text-2xl font-black tracking-tight text-slate-900 h-13 rounded-2xl bg-slate-50/70 border-slate-200 focus:bg-white"
+                      className="pl-8 text-2xl font-bold tracking-tight text-slate-900 h-13 rounded-2xl bg-slate-50/70 border-slate-200 focus:bg-white"
                     />
                   </div>
 
@@ -847,13 +1003,13 @@ export default function StaffPage() {
                   {productsList.length > 0 && (
                     <div className="mt-3 pt-2.5 border-t border-slate-100">
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                        <span className="text-xs font-extrabold text-slate-500">
                           Tap Menu Item to Add to Bill
                         </span>
                         <button
                           type="button"
                           onClick={() => setSpendInput("0.00")}
-                          className="text-[10px] font-bold text-rose-600 hover:underline cursor-pointer"
+                          className="text-xs font-bold text-rose-600 hover:underline cursor-pointer"
                         >
                           Clear Bill
                         </button>
@@ -872,7 +1028,7 @@ export default function StaffPage() {
                               <span>{prod.name}</span>
                               <span className="font-mono font-bold text-indigo-700">£{finalPrice}</span>
                               {discount > 0 && (
-                                <span className="text-[9px] bg-rose-100 text-rose-700 font-extrabold px-1 rounded-sm">
+                                <span className="text-[11px] bg-rose-100 text-rose-700 font-extrabold px-1 rounded-sm">
                                   -{discount}%
                                 </span>
                               )}
@@ -906,11 +1062,11 @@ export default function StaffPage() {
                   </div>
                 ) : previewPoints !== null ? (
                   <div className="rounded-2xl bg-indigo-50/80 border border-indigo-200 p-3.5 flex items-center justify-between text-indigo-950 shadow-2xs">
-                    <span className="flex items-center text-xs font-extrabold uppercase tracking-wide">
+                    <span className="flex items-center text-xs font-extrabold">
                       <Sparkles className="h-4 w-4 mr-1.5 text-indigo-600" />
                       Will award to ledger:
                     </span>
-                    <span className="text-lg font-black text-indigo-600 tabular-nums">+{previewPoints} points</span>
+                    <span className="text-lg font-bold text-indigo-600 tabular-nums">+{previewPoints} points</span>
                   </div>
                 ) : null}
 
@@ -933,7 +1089,7 @@ export default function StaffPage() {
                 <Button
                   variant="default"
                   size="lg"
-                  className="w-full text-sm font-black shadow-md bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-12 cursor-pointer transition-all"
+                  className="w-full text-sm font-bold shadow-md bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-12 cursor-pointer transition-all"
                   onClick={handleConfirmEarn}
                   disabled={loading || !spendInput}
                 >
@@ -944,7 +1100,7 @@ export default function StaffPage() {
               {/* Available Rewards Quick Redeem */}
               {activeMember.availableRewards.length > 0 && (
                 <div className="mt-6 pt-5 border-t border-slate-100">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 mb-3 flex items-center">
+                  <h4 className="text-xs font-bold text-slate-700 mb-3 flex items-center">
                     <Gift className="h-4 w-4 mr-1.5 text-purple-600" />
                     Available Rewards for Customer
                   </h4>
@@ -962,20 +1118,20 @@ export default function StaffPage() {
                         </div>
                         {reward.eligible ? (
                           <div className="flex items-center gap-2">
-                            <Badge variant="success" className="bg-emerald-100 text-emerald-800 border-emerald-300 font-bold text-[10px]">
+                            <Badge variant="success" className="bg-emerald-100 text-emerald-800 border-emerald-300 font-bold text-xs">
                               Eligible
                             </Badge>
                             <Button
                               size="sm"
                               onClick={() => handleStaffDirectRedeem(reward)}
                               disabled={loading}
-                              className="h-7 text-[10px] font-black bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-2.5 cursor-pointer shadow-2xs"
+                              className="h-7 text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-2.5 cursor-pointer shadow-2xs"
                             >
                               Redeem Now →
                             </Button>
                           </div>
                         ) : (
-                          <Badge variant="secondary" className="text-[10px]">
+                          <Badge variant="secondary" className="text-xs">
                             Need {reward.pointsShortfall} more
                           </Badge>
                         )}
@@ -989,38 +1145,38 @@ export default function StaffPage() {
         ) : (
           /* Main Tab Navigation */
           <div>
-            <div className="grid grid-cols-5 gap-1 p-1 mb-5 bg-zinc-100 rounded-xl border border-zinc-200 shadow-2xs">
+            <div className="grid grid-cols-5 gap-1 p-1.5 mb-5 bg-white rounded-2xl border border-zinc-200">
               <button
                 onClick={() => setActiveTab("scan")}
-                className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
                   activeTab === "scan"
-                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
-                    : "text-zinc-600 hover:text-zinc-900"
+                    ? "bg-evergreen text-white"
+                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
                 }`}
               >
                 <QrCode className="h-4 w-4 mb-1 stroke-[1.8]" />
-                <span className="truncate">Scan QR</span>
+                <span className="truncate">Scan</span>
               </button>
               <button
                 onClick={() => {
                   setActiveTab("search");
                   handleSearch("");
                 }}
-                className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
                   activeTab === "search"
-                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
-                    : "text-zinc-600 hover:text-zinc-900"
+                    ? "bg-evergreen text-white"
+                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
                 }`}
               >
                 <Search className="h-4 w-4 mb-1 stroke-[1.8]" />
-                <span className="truncate">Customers</span>
+                <span className="truncate">Find</span>
               </button>
               <button
                 onClick={() => setActiveTab("code")}
-                className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
                   activeTab === "code"
-                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
-                    : "text-zinc-600 hover:text-zinc-900"
+                    ? "bg-evergreen text-white"
+                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
                 }`}
               >
                 <Gift className="h-4 w-4 mb-1 stroke-[1.8]" />
@@ -1031,10 +1187,10 @@ export default function StaffPage() {
                   setActiveTab("products");
                   fetchProducts();
                 }}
-                className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
                   activeTab === "products"
-                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
-                    : "text-zinc-600 hover:text-zinc-900"
+                    ? "bg-evergreen text-white"
+                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
                 }`}
               >
                 <Package className="h-4 w-4 mb-1 stroke-[1.8]" />
@@ -1042,14 +1198,14 @@ export default function StaffPage() {
               </button>
               <button
                 onClick={handleLoadHistory}
-                className={`flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[11px] sm:text-xs font-semibold transition-all cursor-pointer ${
+                className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
                   activeTab === "history"
-                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
-                    : "text-zinc-600 hover:text-zinc-900"
+                    ? "bg-evergreen text-white"
+                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
                 }`}
               >
                 <History className="h-4 w-4 mb-1 stroke-[1.8]" />
-                <span className="truncate">Audit Log</span>
+                <span className="truncate">Recent</span>
               </button>
             </div>
 
@@ -1057,69 +1213,82 @@ export default function StaffPage() {
             {activeTab === "scan" && (
               <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 className="text-sm font-black text-slate-900">Scan Member QR Code</h3>
-                  <span className="text-[10px] font-bold text-slate-400">High-speed optical scan</span>
+                  <h3 className="text-lg font-bold text-evergreen-deep">Find the customer</h3>
+                  <span className="text-sm text-zinc-500">Scan their QR or type their ID</span>
                 </div>
 
-                {/* Laser Viewport Visualizer */}
-                <div className="border-2 border-dashed border-indigo-200 rounded-2xl p-7 text-center flex flex-col items-center justify-center bg-gradient-to-b from-indigo-50/30 to-white relative overflow-hidden">
-                  <div className="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-3 text-indigo-600 shadow-inner">
-                    <QrCode className="h-8 w-8 animate-pulse" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-800">
-                    Camera & Optical Scanner Active
-                  </p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Align customer&apos;s digital pass QR inside frame
-                  </p>
-                </div>
+                <QrCameraScanner onResult={(text) => handleResolveScan(text)} disabled={loading} />
 
-                <div>
-                  <label className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 block mb-1">
-                    Manual QR Token / Scanner Input
-                  </label>
-                  <Input
-                    placeholder="e.g. LP1.mem_... or test token"
-                    value={qrInput}
-                    onChange={(e) => setQrInput(e.target.value)}
-                    className="font-mono text-xs rounded-xl bg-slate-50 border-slate-200"
-                  />
-                </div>
-
-                {/* Quick Simulation Buttons for 1-Click Testing */}
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 block mb-2">
-                    ⚡ Instant 1-Click Test Scans
-                  </span>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => handleResolveScan("LP1.mem_barber1")}
-                      className="p-2 bg-white hover:bg-indigo-50 hover:border-indigo-300 border border-slate-200 rounded-xl text-left cursor-pointer transition-colors shadow-2xs"
-                    >
-                      <p className="font-bold text-slate-900 text-xs">Scan James Barber</p>
-                      <p className="text-[10px] text-slate-400">#BM-001 • Points</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleResolveScan("LP1.mem_coffee1")}
-                      className="p-2 bg-white hover:bg-amber-50 hover:border-amber-300 border border-slate-200 rounded-xl text-left cursor-pointer transition-colors shadow-2xs"
-                    >
-                      <p className="font-bold text-slate-900 text-xs">Scan Sarah Coffee</p>
-                      <p className="text-[10px] text-slate-400">#CM-002 • Stamps</p>
-                    </button>
-                  </div>
-                </div>
-
-                <Button
-                  variant="default"
-                  size="lg"
-                  className="w-full font-black text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-11 cursor-pointer shadow-md"
-                  onClick={() => handleResolveScan()}
-                  disabled={loading || !qrInput.trim()}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (customerIdInput.trim()) openMember({ memberNumber: customerIdInput });
+                  }}
+                  className="pt-4 border-t border-zinc-100"
                 >
-                  {loading ? "Resolving Token..." : "Resolve Scanned QR Code →"}
-                </Button>
+                  <label htmlFor="customer-id" className="block font-semibold text-zinc-900">
+                    No QR code? Type their customer ID
+                  </label>
+                  <p className="text-sm text-zinc-500">It&rsquo;s shown under the QR code on the customer&rsquo;s card.</p>
+                  <div className="mt-2 flex gap-2">
+                    <Input
+                      id="customer-id"
+                      placeholder="e.g. YEQVHBSY"
+                      value={customerIdInput}
+                      onChange={(e) => setCustomerIdInput(e.target.value.toUpperCase())}
+                      autoCapitalize="characters"
+                      autoComplete="off"
+                      className="text-lg font-semibold tracking-wider rounded-xl bg-zinc-50 border-zinc-200"
+                    />
+                    <Button
+                      type="submit"
+                      disabled={loading || !customerIdInput.trim()}
+                      className="rounded-xl px-5 font-semibold cursor-pointer"
+                    >
+                      {loading ? "Looking up..." : "Look up"}
+                    </Button>
+                  </div>
+                </form>
+
+                <details className="rounded-2xl bg-zinc-50 border border-zinc-200 px-4 py-3 text-sm">
+                  <summary className="cursor-pointer font-medium text-zinc-600">Testing tools</summary>
+                  <div className="mt-3 space-y-3">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Paste a QR token, e.g. LP1.mem_..."
+                        value={qrInput}
+                        onChange={(e) => setQrInput(e.target.value)}
+                        className="font-mono text-xs rounded-xl bg-white border-zinc-200"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => handleResolveScan()}
+                        disabled={loading || !qrInput.trim()}
+                        className="rounded-xl text-sm cursor-pointer"
+                      >
+                        Open
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleResolveScan("LP1.mem_barber1")}
+                        className="p-2.5 bg-white hover:border-evergreen border border-zinc-200 rounded-xl text-left cursor-pointer"
+                      >
+                        <p className="font-semibold text-zinc-900">James (barber)</p>
+                        <p className="text-xs text-zinc-500">Points customer</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleResolveScan("LP1.mem_coffee1")}
+                        className="p-2.5 bg-white hover:border-evergreen border border-zinc-200 rounded-xl text-left cursor-pointer"
+                      >
+                        <p className="font-semibold text-zinc-900">Sarah (coffee)</p>
+                        <p className="text-xs text-zinc-500">Stamps customer</p>
+                      </button>
+                    </div>
+                  </div>
+                </details>
               </div>
             )}
 
@@ -1128,10 +1297,10 @@ export default function StaffPage() {
               <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div>
-                    <h3 className="text-sm font-black text-slate-900">Enrolled Customers Directory</h3>
+                    <h3 className="text-sm font-bold text-slate-900">Enrolled Customers Directory</h3>
                     <p className="text-[11px] text-slate-500">Live list of customers registered at your store</p>
                   </div>
-                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
                     {searchResults.length} Customers
                   </span>
                 </div>
@@ -1158,32 +1327,32 @@ export default function StaffPage() {
                     {searchResults.map((member) => (
                       <div
                         key={member.membershipId}
-                        onClick={() => setActiveMember(member)}
+                        onClick={() => openMember({ membershipId: member.membershipId })}
                         className="p-3.5 rounded-2xl border border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/30 flex items-center justify-between cursor-pointer transition-all shadow-2xs"
                       >
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-sm text-slate-900">{member.name || member.displayName}</span>
-                            <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
+                            <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
                               #{member.memberNumber}
                             </span>
                           </div>
                           {member.email && (
-                            <div className="text-xs text-slate-500 font-mono">
-                              ✉ {member.email}
+                            <div className="text-sm text-slate-500">
+                              {member.email}
                             </div>
                           )}
                           {member.joinedAt && (
-                            <div className="text-[10px] text-slate-400">
+                            <div className="text-xs text-slate-400">
                               Enrolled: {new Date(member.joinedAt).toLocaleDateString()}
                             </div>
                           )}
                         </div>
                         <div className="text-right">
-                          <div className="font-black text-sm text-indigo-700">
+                          <div className="font-bold text-sm text-indigo-700">
                             {member.balance} pts
                           </div>
-                          <span className="inline-block mt-0.5 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                          <span className="inline-block mt-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
                             Select Member →
                           </span>
                         </div>
@@ -1202,12 +1371,12 @@ export default function StaffPage() {
             {activeTab === "code" && (
               <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 className="text-sm font-black text-slate-900">Validate 8-Char Claim Voucher</h3>
-                  <span className="text-[10px] font-bold text-slate-400">One-Time Token</span>
+                  <h3 className="text-sm font-bold text-slate-900">Validate 8-Char Claim Voucher</h3>
+                  <span className="text-xs font-bold text-slate-400">One-Time Token</span>
                 </div>
 
                 <div>
-                  <label className="text-xs font-extrabold uppercase tracking-wider text-slate-600 block mb-1">
+                  <label className="text-xs font-extrabold text-slate-600 block mb-1">
                     Redemption Code (from Customer Screen)
                   </label>
                   <Input
@@ -1216,7 +1385,7 @@ export default function StaffPage() {
                     placeholder="e.g. 7K9X2B4P"
                     value={redeemCodeInput}
                     onChange={(e) => setRedeemCodeInput(e.target.value.toUpperCase())}
-                    className="text-center font-mono tracking-widest text-2xl font-black uppercase h-14 rounded-2xl bg-slate-50 border-slate-200 text-slate-900"
+                    className="text-center font-mono tracking-widest text-2xl font-bold uppercase h-14 rounded-2xl bg-slate-50 border-slate-200 text-slate-900"
                   />
                 </div>
 
@@ -1232,11 +1401,11 @@ export default function StaffPage() {
                 {/* Validation Preview Card */}
                 {redeemValidation && (
                   <div className="rounded-2xl border-2 border-emerald-400 bg-emerald-50/70 p-4 animate-in fade-in shadow-xs">
-                    <div className="flex items-center space-x-2 text-emerald-800 font-black mb-2 text-xs">
+                    <div className="flex items-center space-x-2 text-emerald-800 font-bold mb-2 text-xs">
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       <span>VALID REWARD VOUCHER</span>
                     </div>
-                    <div className="text-sm font-black text-slate-900">
+                    <div className="text-sm font-bold text-slate-900">
                       Reward: {redeemValidation.reward.title}
                     </div>
                     <div className="text-xs text-slate-600 mt-1">
@@ -1247,7 +1416,7 @@ export default function StaffPage() {
                     <Button
                       variant="default"
                       size="lg"
-                      className="w-full mt-4 font-black text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-md rounded-xl cursor-pointer"
+                      className="w-full mt-4 font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-md rounded-xl cursor-pointer"
                       onClick={handleConfirmRedemption}
                       disabled={loading}
                     >
@@ -1262,7 +1431,7 @@ export default function StaffPage() {
             {activeTab === "history" && (
               <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 className="text-sm font-black text-slate-900">Recent Terminal Activity</h3>
+                  <h3 className="text-sm font-bold text-slate-900">Recent Terminal Activity</h3>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1297,13 +1466,13 @@ export default function StaffPage() {
                           </div>
                           <div className="text-right">
                             <span
-                              className={`font-black text-sm tabular-nums ${
+                              className={`font-bold text-sm tabular-nums ${
                                 tx.pointsDelta > 0 ? "text-emerald-600" : "text-rose-600"
                               }`}
                             >
                               {tx.pointsDelta > 0 ? `+${tx.pointsDelta}` : tx.pointsDelta} pts
                             </span>
-                            <div className="text-[9px] uppercase font-extrabold text-slate-400 tracking-wider">
+                            <div className="text-[11px] capitalize font-extrabold text-slate-400">
                               {tx.type}
                             </div>
                           </div>
@@ -1320,7 +1489,7 @@ export default function StaffPage() {
               <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 space-y-6">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-3 gap-3">
                   <div>
-                    <h3 className="text-base font-black text-slate-900">Products & Counter Offer QR Codes</h3>
+                    <h3 className="text-base font-bold text-slate-900">Products & Counter Offer QR Codes</h3>
                     <p className="text-xs text-slate-400">Generate dynamic promotional QR codes for customers at the counter</p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1353,7 +1522,7 @@ export default function StaffPage() {
                 {/* Today's Storewide Discount Control */}
                 <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-2xl space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                       Today&apos;s Storewide Promo Discount
                     </span>
@@ -1389,7 +1558,7 @@ export default function StaffPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <QrCode className="w-4 h-4 text-purple-600" />
-                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                      <h4 className="text-xs font-extrabold text-slate-700">
                         Counter Promotional QR Codes
                       </h4>
                     </div>
@@ -1432,7 +1601,7 @@ export default function StaffPage() {
                           >
                             <div className="flex items-start justify-between gap-2 mb-2">
                               <span
-                                className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                                className={`text-[11px] font-extrabold capitalize px-2 py-0.5 rounded-full border ${
                                   isActive
                                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                     : isDeactivated
@@ -1442,7 +1611,7 @@ export default function StaffPage() {
                               >
                                 {isActive ? `Active • ${daysLeft}d left` : isDeactivated ? "Deactivated" : "Expired"}
                               </span>
-                              <span className="text-[10px] font-mono text-slate-400 font-bold">{qr.code}</span>
+                              <span className="text-xs font-mono text-slate-400 font-bold">{qr.code}</span>
                             </div>
 
                             <div className="flex items-center gap-3 mb-3">
@@ -1460,7 +1629,7 @@ export default function StaffPage() {
                                   {qr.offerType === "stamps_bonus" && `+1 Stamp`}
                                   {qr.offerType === "discount_promo" && `${qr.discountPercent}% OFF`}
                                 </p>
-                                <span className="text-[10px] text-slate-400 font-mono">
+                                <span className="text-xs text-slate-400 font-mono">
                                   {qr.totalScans} scans • {qr.totalClaims} claims
                                 </span>
                               </div>
@@ -1496,7 +1665,7 @@ export default function StaffPage() {
                 {/* Product Catalog List */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                    <span className="text-xs font-extrabold text-slate-700">
                       Product Catalog &amp; Menu
                     </span>
                     <span className="text-[11px] text-slate-400 font-mono">{productsList.length} items</span>
@@ -1518,7 +1687,7 @@ export default function StaffPage() {
                           <div>
                             <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
                               <span>{prod.name}</span>
-                              <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md font-semibold">
+                              <span className="text-xs bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md font-semibold">
                                 {prod.category}
                               </span>
                             </div>
@@ -1529,11 +1698,11 @@ export default function StaffPage() {
 
                           <div className="flex items-center gap-3">
                             <div className="text-right">
-                              <div className="font-black text-sm text-slate-900 tabular-nums">
+                              <div className="font-bold text-sm text-slate-900 tabular-nums">
                                 £{finalPrice}
                               </div>
                               {prod.discountPercent > 0 && (
-                                <div className="text-[10px] text-slate-400 line-through">
+                                <div className="text-xs text-slate-400 line-through">
                                   £{originalPrice} ({prod.discountPercent}% off)
                                 </div>
                               )}
@@ -1563,7 +1732,7 @@ export default function StaffPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <History className="w-3.5 h-3.5 text-purple-600" />
-                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                      <h4 className="text-xs font-extrabold text-slate-700">
                         Customer Scan Audit Log
                       </h4>
                     </div>
@@ -1601,12 +1770,12 @@ export default function StaffPage() {
                             <div className="flex items-start justify-between gap-2">
                               <div>
                                 <span className="font-bold text-slate-900 block">{r.memberName}</span>
-                                <span className="text-[10px] text-slate-400 font-mono">
+                                <span className="text-xs text-slate-400 font-mono">
                                   #{r.memberNumber} • {new Date(r.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                 </span>
                               </div>
                               <div className="text-right">
-                                <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold text-[10px] border border-purple-200 inline-block">
+                                <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold text-xs border border-purple-200 inline-block">
                                   {r.requiredVisits > 1 ? `Visit ${r.visitNumber}/${r.requiredVisits}` : "1-Time Claim"}
                                 </span>
                               </div>
@@ -1617,17 +1786,17 @@ export default function StaffPage() {
                                 {r.campaignTitle}
                               </span>
                               {isPending && (
-                                <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse">
+                                <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse">
                                   ⏳ Needs Counter Approval
                                 </span>
                               )}
                               {isApproved && (
-                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                                   ✓ Handed Over
                                 </span>
                               )}
                               {isDiscarded && (
-                                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                                <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
                                   Discarded
                                 </span>
                               )}
@@ -1678,7 +1847,7 @@ export default function StaffPage() {
               <X className="h-5 w-5" />
             </button>
 
-            <h3 className="text-lg font-black text-slate-900 mb-1">Add Store Product</h3>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Add Store Product</h3>
             <p className="text-xs text-slate-500 mb-4">Add a new item to store catalog with points and price.</p>
 
             <div className="space-y-3">
@@ -1756,7 +1925,7 @@ export default function StaffPage() {
               <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
                 <QrCode className="w-4 h-4" />
               </div>
-              <h3 className="text-base font-black text-slate-900">Generate Counter Offer QR</h3>
+              <h3 className="text-base font-bold text-slate-900">Generate Counter Offer QR</h3>
             </div>
             <p className="text-xs text-slate-500 mb-4">
               Create a promotional QR code for customers to scan at the counter or table.
@@ -1895,11 +2064,11 @@ export default function StaffPage() {
               <X className="h-6 w-6" />
             </button>
 
-            <span className="text-[10px] font-extrabold uppercase px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+            <span className="text-xs font-extrabold capitalize px-3 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
               Point Phone Camera to Scan
             </span>
 
-            <h3 className="text-xl font-black text-slate-950 mt-3 mb-1">
+            <h3 className="text-xl font-bold text-slate-950 mt-3 mb-1">
               {fullscreenQr.title}
             </h3>
             <p className="text-xs text-purple-700 font-bold mb-4">

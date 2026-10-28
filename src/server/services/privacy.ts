@@ -10,8 +10,9 @@ import {
   feedbackMessages,
   auditEvents,
 } from "../db/schema";
-import { invalidateUserSessions } from "../auth";
+import { invalidateUserSessions, purgeExpiredSessions } from "../auth";
 import { logAuditEvent } from "./audit";
+import { logoRefSql, resolveLogoUrl } from "./business-logo";
 import { eq, desc, lt } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -43,7 +44,7 @@ export async function getCustomerPrivacyData(userId: string) {
       tenantName: tenants.name,
       tenantSlug: tenants.slug,
       brandPrimaryHex: tenants.brandPrimaryHex,
-      logoUrl: tenants.logoUrl,
+      logoRef: logoRefSql,
       balance: membershipBalances.balance,
       lifetimeEarned: membershipBalances.lifetimeEarned,
       lifetimeRedeemed: membershipBalances.lifetimeRedeemed,
@@ -69,7 +70,10 @@ export async function getCustomerPrivacyData(userId: string) {
 
   return {
     user,
-    memberships: membershipRows,
+    memberships: membershipRows.map(({ logoRef, ...m }) => ({
+      ...m,
+      logoUrl: resolveLogoUrl(m.tenantId, logoRef),
+    })),
     consents,
   };
 }
@@ -261,9 +265,13 @@ export async function runRetentionCleanup() {
     .where(lt(auditEvents.createdAt, twentyFourMonthsAgo))
     .returning({ id: auditEvents.id });
 
+  // 4. Expired sign-in sessions (idle timeout passed, or staff/admin absolute limit reached)
+  const deletedSessionsCount = await purgeExpiredSessions();
+
   return {
     deletedClicksCount: deletedClicks.length,
     deletedFeedbackCount: deletedFeedback.length,
     deletedAuditCount: deletedAudit.length,
+    deletedSessionsCount,
   };
 }

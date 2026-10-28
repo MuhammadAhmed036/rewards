@@ -6,11 +6,11 @@ import { z } from "zod";
 const linksUpdateSchema = z.array(
   z.object({
     type: z.enum(["google_review", "instagram", "facebook", "website", "other"]),
-    label: z.string().min(1).max(128),
-    url: z.string().min(1),
+    label: z.string().trim().min(1, "Every button needs a label").max(128),
+    url: z.string().max(2048),
     enabled: z.boolean(),
     sortOrder: z.number().int(),
-    locationId: z.string().optional(),
+    locationId: z.string().uuid().nullable().optional(),
   })
 );
 
@@ -43,7 +43,12 @@ export async function PUT(request: NextRequest) {
       {
         error: {
           code: "LINKS_UPDATE_FAILED",
-          message: err instanceof Error ? err.message : "Failed to update links",
+          message:
+            err instanceof z.ZodError
+              ? err.errors[0]?.message || "Some link details are missing"
+              : err instanceof Error
+              ? err.message
+              : "Failed to update links",
         },
       },
       { status: 400 }

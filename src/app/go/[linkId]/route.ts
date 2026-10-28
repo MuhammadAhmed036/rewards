@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordLinkClick } from "@/server/services/links";
 import { checkGoRedirectRateLimit, getClientIp, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
-import { cookies } from "next/headers";
 import { db } from "@/server/db";
-import { sessions, memberships } from "@/server/db/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { memberships } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
+import { getSessionContext } from "@/server/auth";
+import { readSessionCookie } from "@/server/auth/session-response";
 
 export async function GET(
   request: NextRequest,
@@ -18,25 +19,16 @@ export async function GET(
     await checkGoRedirectRateLimit(clientIp);
 
     // Check if customer session cookie exists
-    const cookieStore = await cookies();
-    const token = cookieStore.get("loyalty_session")?.value;
     let membershipId: string | undefined = undefined;
 
-    if (token) {
-      const now = new Date();
-      const sessionRows = await db
-        .select({
-          userId: sessions.userId,
-        })
-        .from(sessions)
-        .where(and(eq(sessions.token, token), gt(sessions.expiresAt, now)))
-        .limit(1);
+    {
+      const sessionCtx = await getSessionContext(readSessionCookie(request));
 
-      if (sessionRows.length > 0) {
+      if (sessionCtx) {
         const memberRows = await db
           .select({ id: memberships.id })
           .from(memberships)
-          .where(eq(memberships.userId, sessionRows[0].userId))
+          .where(eq(memberships.userId, sessionCtx.userId))
           .limit(1);
         if (memberRows.length > 0) {
           membershipId = memberRows[0].id;

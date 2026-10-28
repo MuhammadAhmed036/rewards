@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { hashPassword, createSession } from "@/server/auth";
+import { setSessionCookie } from "@/server/auth/session-response";
 import { registerOwnerAndTenant } from "@/server/services/tenant";
+import { validateLogoDataUrl } from "@/server/services/business-logo";
 import { queueEmail, processOutbox } from "@/server/services/email";
 import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/url";
@@ -19,6 +21,7 @@ const signupSchema = z.object({
   requestedStaffCount: z.number().int().min(1).max(100).optional(),
   requestedManagerCount: z.number().int().min(0).max(50).optional(),
   programmeType: z.enum(["points", "stamps"]).default("points"),
+  logoDataUrl: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -55,6 +58,8 @@ export async function POST(request: NextRequest) {
 
       const totalRequestedStaff = (validated.requestedStaffCount || 5) + (validated.requestedManagerCount || 2);
 
+      const logoUrl = validated.logoDataUrl ? validateLogoDataUrl(validated.logoDataUrl) : null;
+
       const result = await registerOwnerAndTenant({
         email: normalizedEmail,
         password: validated.password,
@@ -65,6 +70,7 @@ export async function POST(request: NextRequest) {
         industry: validated.category || "Coffee Shop & Cafe",
         status: "pending", // Requires SuperAdmin approval before owner can log in
         maxStaff: totalRequestedStaff,
+        logoUrl,
       });
 
       const baseUrl = getBaseUrl(request);
@@ -121,7 +127,7 @@ export async function POST(request: NextRequest) {
         .returning();
 
       // Create session
-      const { token, expiresAt } = await createSession(newUser.id, false);
+      const session = await createSession(newUser.id, "customer");
 
       const response = NextResponse.json(
         {
@@ -133,15 +139,7 @@ export async function POST(request: NextRequest) {
         { status: 201 }
       );
 
-      response.cookies.set({
-        name: "loyalty_session",
-        value: token,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        expires: expiresAt,
-      });
+      setSessionCookie(response, session);
 
       return response;
     }

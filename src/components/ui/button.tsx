@@ -15,12 +15,12 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         className={twMerge(
           clsx(
-            "inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 select-none",
+            "inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-evergreen focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 select-none",
             "min-h-[48px] rounded-xl text-base px-5 py-3", // Touch friendly 48px height per Section 14.1 & 14.3
             {
-              "bg-slate-900 text-white hover:bg-slate-800 active:scale-[0.98]":
+              "bg-evergreen text-white hover:bg-indigo-700 active:scale-[0.98]":
                 variant === "default",
-              "bg-[var(--brand,#0f172a)] text-[var(--brand-foreground,#ffffff)] hover:opacity-90 active:scale-[0.98]":
+              "bg-[var(--brand,#495e57)] text-[var(--brand-foreground,#ffffff)] hover:opacity-90 active:scale-[0.98]":
                 variant === "brand",
               "border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 shadow-2xs":
                 variant === "outline",

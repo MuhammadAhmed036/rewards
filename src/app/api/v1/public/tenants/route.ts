@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { tenants } from "@/server/db/schema";
 import { desc } from "drizzle-orm";
+import { logoRefSql, resolveLogoUrl } from "@/server/services/business-logo";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
         status: tenants.status,
         industry: tenants.industry,
         brandPrimaryHex: tenants.brandPrimaryHex,
-        logoUrl: tenants.logoUrl,
+        logoRef: logoRefSql,
         plan: tenants.plan,
         createdAt: tenants.createdAt,
       })
@@ -21,7 +22,9 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(tenants.createdAt))
       .limit(50);
 
-    return NextResponse.json({ data: list });
+    return NextResponse.json({
+      data: list.map(({ logoRef, ...t }) => ({ ...t, logoUrl: resolveLogoUrl(t.id, logoRef) })),
+    });
   } catch (err) {
     return NextResponse.json(
       {

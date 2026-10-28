@@ -14,6 +14,13 @@ import { generateQrDataUrl } from "../qr";
 import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/url";
 import { eq, and, desc, sql, lt } from "drizzle-orm";
+import {
+  addStamp,
+  claimStampCard,
+  effectiveRequiredVisits,
+  getMemberStampCards,
+  type StampCard,
+} from "./stamp-cards";
 import crypto from "crypto";
 
 export interface CreateCampaignQrInput {
@@ -235,6 +242,11 @@ export async function scanAndClaimCampaignQr(
     throw new Error("Member not found for this store.");
   }
 
+  // Multi-visit offers ("Buy 3 get 1 free") are stamp cards: repeatable, and claimed by the member once full.
+  if (effectiveRequiredVisits(qr) > 1) {
+    return collectStampFromScan(tenantId, qr, member.id);
+  }
+
   // 3. Check if member already claimed and had this offer approved
   const [alreadyApproved] = await db
     .select()
@@ -413,6 +425,102 @@ export async function scanAndClaimCampaignQr(
       qr.productRewardName || "Reward"
     } request is waiting at the counter. Staff / Owner will approve and hand it over to you!`,
   };
+}
+
+interface StampScanResult {
+  success: true;
+  campaignTitle: string;
+  productRewardName: string | null;
+  currentVisit: number;
+  requiredVisits: number;
+  visitsRemaining: number;
+  card: StampCard;
+  message: string;
+  isIntermediateVisit: boolean;
+  isPendingClaim?: boolean;
+  isReady?: boolean;
+  isAlreadyScannedToday?: boolean;
+  isAlreadyClaimed?: boolean;
+}
+
+async function collectStampFromScan(
+  tenantId: string,
+  qr: typeof promoQrCodes.$inferSelect,
+  membershipId: string
+): Promise<StampScanResult> {
+  const result = await addStamp({ tenantId, membershipId, offerId: qr.id, source: "customer" });
+  const { card } = result;
+  const remaining = card.requiredStamps - card.stamps;
+  const reward = qr.productRewardName || "reward";
+  const base = {
+    success: true as const,
+    campaignTitle: qr.title,
+    productRewardName: qr.productRewardName,
+    currentVisit: card.stamps,
+    requiredVisits: card.requiredStamps,
+    visitsRemaining: remaining,
+    card,
+  };
+
+  if (card.state === "pending") {
+    return {
+      ...base,
+      isIntermediateVisit: false,
+      isPendingClaim: true,
+      message: `Your free ${reward} is waiting at the counter. Show your card to a member of staff.`,
+    };
+  }
+  if (card.state === "ready") {
+    return {
+      ...base,
+      isIntermediateVisit: false,
+      isPendingClaim: false,
+      isReady: true,
+      message: result.added
+        ? `Card complete! Tap "Claim reward" to get your free ${reward}.`
+        : `Your card is full. Tap "Claim reward" to get your free ${reward}.`,
+    };
+  }
+  if (result.reason === "cooldown") {
+    return {
+      ...base,
+      isIntermediateVisit: true,
+      isAlreadyScannedToday: true,
+      message: `Visit ${card.stamps} of ${card.requiredStamps} is already stamped for today. You can collect your next stamp on your next visit.`,
+    };
+  }
+  return {
+    ...base,
+    isIntermediateVisit: true,
+    isPendingClaim: false,
+    message: `Visit ${card.stamps} of ${card.requiredStamps} stamped. ${remaining} more for a free ${reward}.`,
+  };
+}
+
+/**
+ * Staff hand over a stamp-card reward at the till. Works whether or not the
+ * member has tapped "Claim reward" yet, as long as the card is full.
+ */
+export async function staffGiveStampReward(
+  ctx: RequestContext,
+  params: { membershipId: string; offerId: string }
+) {
+  assertCan(ctx, "ledger.redeem");
+  if (!ctx.tenantId) throw new Error("tenantId required");
+
+  const cards = await getMemberStampCards(ctx.tenantId, params.membershipId, { includeUnstarted: true });
+  let card = cards.find((c) => c.offerId === params.offerId);
+  if (!card) throw new Error("Stamp card offer not found");
+
+  if (card.state === "collecting") {
+    const remaining = card.requiredStamps - card.stamps;
+    throw new Error(`CARD_NOT_FULL: The customer needs ${remaining} more stamp${remaining === 1 ? "" : "s"}.`);
+  }
+  if (card.state === "ready") {
+    card = await claimStampCard({ tenantId: ctx.tenantId, ...params });
+  }
+
+  return approvePromoClaim(ctx, card.pendingScanId!);
 }
 
 /**

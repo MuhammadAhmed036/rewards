@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { businessLinks, linkClickEvents } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
-import { eq, and, sql, asc, gte, lte } from "drizzle-orm";
+import { eq, and, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { logAuditEvent } from "./audit";
 
 export type LinkType = "google_review" | "instagram" | "facebook" | "website" | "other";
@@ -16,6 +16,20 @@ const ALLOWED_GOOGLE_DOMAINS = [
   "g.co",
 ];
 
+/**
+ * Example URLs older businesses were created with. They are never shown to customers,
+ * and can't be published — owners must replace them with their own links.
+ */
+export const PLACEHOLDER_LINK_URLS = new Set([
+  "https://g.page/review/example",
+  "https://instagram.com/example",
+  "https://facebook.com/example",
+]);
+
+export function isPlaceholderLinkUrl(url: string | null | undefined) {
+  return !url || PLACEHOLDER_LINK_URLS.has(url.trim().replace(/\/+$/, ""));
+}
+
 const ALLOWED_INSTAGRAM_DOMAINS = ["instagram.com", "www.instagram.com"];
 const ALLOWED_FACEBOOK_DOMAINS = ["facebook.com", "www.facebook.com", "fb.com", "fb.me"];
 
@@ -28,6 +42,9 @@ export function validateLinkUrl(type: LinkType, urlString: string): { valid: boo
   }
 
   const trimmed = urlString.trim();
+  if (isPlaceholderLinkUrl(trimmed)) {
+    return { valid: false, error: "Replace the example link with your own link" };
+  }
   if (trimmed.length > 2048) {
     return { valid: false, error: "URL exceeds maximum length" };
   }
@@ -103,7 +120,8 @@ export async function getVisibleLinks(tenantId: string, _locationId?: string) {
     )
     .orderBy(asc(businessLinks.sortOrder));
 
-  return await query;
+  // Never send customers to an unfinished example link
+  return (await query).filter((l) => !isPlaceholderLinkUrl(l.url));
 }
 
 export async function getAllTenantLinks(tenantId: string) {
@@ -120,42 +138,63 @@ export interface UpdateLinkInput {
   url: string;
   enabled: boolean;
   sortOrder: number;
-  locationId?: string;
+  locationId?: string | null;
 }
 
 export async function updateBusinessLinks(ctx: RequestContext, links: UpdateLinkInput[]) {
   assertCan(ctx, "links.manage");
   if (!ctx.tenantId) throw new Error("tenantId required");
 
+  const types = new Set<string>();
   for (const l of links) {
+    if (types.has(l.type)) throw new Error(`Only one ${l.type.replace("_", " ")} button is allowed`);
+    types.add(l.type);
     if (l.enabled) {
       const val = validateLinkUrl(l.type, l.url);
       if (!val.valid) {
-        throw new Error(`Invalid URL for ${l.label}: ${val.error}`);
+        throw new Error(`${l.label}: ${val.error}`);
       }
     }
   }
 
   return await db.transaction(async (tx) => {
-    // Delete existing and replace with validated set
-    await tx.delete(businessLinks).where(eq(businessLinks.tenantId, ctx.tenantId!));
+    // Update buttons in place (matched by type) so link ids, and their click history, survive edits.
+    const existing = await tx
+      .select()
+      .from(businessLinks)
+      .where(eq(businessLinks.tenantId, ctx.tenantId!));
+    const now = new Date();
+    const keptIds = new Set<string>();
+
+    for (const l of links) {
+      const values = {
+        label: l.label.trim(),
+        url: l.url.trim(),
+        enabled: l.enabled,
+        sortOrder: l.sortOrder,
+        locationId: l.locationId || null,
+        updatedBy: ctx.userId,
+        updatedAt: now,
+      };
+      const match = existing.find((e) => e.type === l.type);
+      if (match) {
+        keptIds.add(match.id);
+        await tx.update(businessLinks).set(values).where(eq(businessLinks.id, match.id));
+      } else {
+        await tx.insert(businessLinks).values({ tenantId: ctx.tenantId!, type: l.type, ...values });
+      }
+    }
+
+    const removed = existing.filter((e) => !keptIds.has(e.id)).map((e) => e.id);
+    if (removed.length > 0) {
+      await tx.delete(businessLinks).where(inArray(businessLinks.id, removed));
+    }
 
     const inserted = await tx
-      .insert(businessLinks)
-      .values(
-        links.map((l) => ({
-          tenantId: ctx.tenantId!,
-          type: l.type,
-          label: l.label,
-          url: l.url,
-          enabled: l.enabled,
-          sortOrder: l.sortOrder,
-          locationId: l.locationId || null,
-          updatedBy: ctx.userId,
-          updatedAt: new Date(),
-        }))
-      )
-      .returning();
+      .select()
+      .from(businessLinks)
+      .where(eq(businessLinks.tenantId, ctx.tenantId!))
+      .orderBy(asc(businessLinks.sortOrder));
 
     await logAuditEvent(
       ctx,

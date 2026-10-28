@@ -25,6 +25,8 @@ export interface RegisterOwnerParams {
   plan?: "free" | "pro";
   locationName?: string;
   brandPrimaryHex?: string;
+  /** Pre-validated logo data URL (see business-logo.ts) */
+  logoUrl?: string | null;
   status?: "active" | "pending" | "suspended";
   maxStaff?: number;
   maxLocations?: number;
@@ -83,6 +85,7 @@ export async function registerOwnerAndTenant(params: RegisterOwnerParams) {
         timezone: "Europe/London",
         locale: "en-GB",
         brandPrimaryHex: params.brandPrimaryHex || "#1e293b",
+        logoUrl: params.logoUrl || null,
         plan: params.plan || "free",
         features: {},
         limits: {
@@ -184,30 +187,30 @@ export async function registerOwnerAndTenant(params: RegisterOwnerParams) {
       .set({ currentRuleVersionId: ruleVer.id })
       .where(eq(programmes.id, newProgramme.id));
 
-    // 5. Create default business links (Review, Instagram, Facebook) per Section 1.1 / 11.1
+    // 5. Create the review/social buttons switched off; the owner adds their own links before they go live
     await tx.insert(businessLinks).values([
       {
         tenantId: newTenant.id,
         type: "google_review",
         label: "Leave a Google review",
-        url: "https://g.page/review/example",
-        enabled: true,
+        url: "",
+        enabled: false,
         sortOrder: 1,
       },
       {
         tenantId: newTenant.id,
         type: "instagram",
         label: "Follow on Instagram",
-        url: "https://instagram.com/example",
-        enabled: true,
+        url: "",
+        enabled: false,
         sortOrder: 2,
       },
       {
         tenantId: newTenant.id,
         type: "facebook",
         label: "Like us on Facebook",
-        url: "https://facebook.com/example",
-        enabled: true,
+        url: "",
+        enabled: false,
         sortOrder: 3,
       },
     ]);
@@ -229,7 +232,7 @@ export async function registerOwnerAndTenant(params: RegisterOwnerParams) {
       tx
     );
 
-    const session = await createSession(userId, true, undefined, undefined, tx);
+    const session = await createSession(userId, "staff", undefined, undefined, tx);
 
     return {
       user: { id: userId, email: normalizedEmail, name: params.name },

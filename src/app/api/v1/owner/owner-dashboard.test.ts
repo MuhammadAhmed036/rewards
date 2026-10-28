@@ -4,7 +4,7 @@ import { joinProgramme } from "@/server/services/member";
 import { earn, requestRedemption, confirmRedemption } from "@/server/services/ledger";
 import { createReward } from "@/server/services/rewards";
 import { recordLinkClick } from "@/server/services/links";
-import { createSession } from "@/server/auth";
+import { createSession, sessionLookupKey } from "@/server/auth";
 import { db } from "@/server/db";
 import { sessions, auditEvents } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -22,7 +22,7 @@ import { POST as teamAddRoute, PATCH as teamUpdateRoute } from "./team/route";
 import { GET as reportsExportRoute } from "./reports/export/route";
 import { GET as auditRoute } from "./audit/route";
 import { GET as qrRoute } from "./qr/route";
-import { GET as linksGetRoute } from "./links/route";
+import { GET as linksGetRoute, PUT as linksPutRoute } from "./links/route";
 
 describe("Owner Dashboard API & Reports (M7)", () => {
   it("provides comprehensive overview metrics, member adjustments, reversals, team management, and audited reports", async () => {
@@ -104,10 +104,24 @@ describe("Owner Dashboard API & Reports (M7)", () => {
         headers: { Authorization: `Bearer ${ownerToken}`, "x-tenant-id": tenantId },
       })
     );
-    const linksData = (await linksRes.json()).data;
-    if (linksData.length > 0) {
-      await recordLinkClick(linksData[0].id, { membershipId: member1.membership.id });
-    }
+    const fetchedLinks = (await linksRes.json()).data;
+
+    // Save exactly what the dashboard sends back (GET rows include locationId: null etc.)
+    const publishRes = await linksPutRoute(
+      new NextRequest("http://localhost:3000/api/v1/owner/links", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${ownerToken}`, "x-tenant-id": tenantId, "Content-Type": "application/json" },
+        body: JSON.stringify(
+          fetchedLinks.map((l: { type: string }) =>
+            l.type === "google_review" ? { ...l, url: "https://g.page/r/owner-test/review", enabled: true } : l
+          )
+        ),
+      })
+    );
+    expect(publishRes.status).toBe(200);
+    const linksData = (await publishRes.json()).data.filter((l: { enabled: boolean }) => l.enabled);
+    expect(linksData[0].url).toBe("https://g.page/r/owner-test/review");
+    await recordLinkClick(linksData[0].id, { membershipId: member1.membership.id });
 
     // 1. Overview API
     const overviewReq = new NextRequest("http://localhost:3000/api/v1/owner/overview", {
@@ -260,7 +274,7 @@ describe("Owner Dashboard API & Reports (M7)", () => {
     const [foundSessionBefore] = await db
       .select()
       .from(sessions)
-      .where(eq(sessions.token, staffSession.token));
+      .where(eq(sessions.token, (await sessionLookupKey(staffSession.token))!));
     expect(foundSessionBefore).toBeDefined();
 
     // Revoke the staff member
@@ -283,7 +297,7 @@ describe("Owner Dashboard API & Reports (M7)", () => {
     const [foundSessionAfter] = await db
       .select()
       .from(sessions)
-      .where(eq(sessions.token, staffSession.token));
+      .where(eq(sessions.token, (await sessionLookupKey(staffSession.token))!));
     expect(foundSessionAfter).toBeUndefined();
 
     // 5. Audited CSV Reports Export

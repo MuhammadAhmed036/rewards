@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { users, staffMembers } from "@/server/db/schema";
-import { createSession } from "@/server/auth";
+import { createSession, sessionKindForUser } from "@/server/auth";
+import { setSessionCookie } from "@/server/auth/session-response";
 import { joinProgramme } from "@/server/services/member";
+import { isBusinessAccount } from "@/server/auth/portal-access";
 import { registerOwnerAndTenant } from "@/server/services/tenant";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
@@ -98,8 +100,9 @@ export async function GET(request: NextRequest) {
       userId = newUser.id;
     }
 
-    // 4. If returnTo is a business hub (/b/[slug]), automatically join customer to programme
-    if (returnTo.startsWith("/b/")) {
+    // 4. If returnTo is a business hub (/b/[slug]), join the customer to that shop's programme.
+    // Owner, staff and admin accounts are never turned into customer cards.
+    if (returnTo.startsWith("/b/") && !(await isBusinessAccount(userId))) {
       const parts = returnTo.split("/");
       const slug = parts[2]?.split("?")[0];
       if (slug) {
@@ -139,22 +142,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const isStaff = staffRow.length > 0 || existingUser?.isPlatformAdmin || false;
-
-    // 6. Create session
-    const { token, expiresAt } = await createSession(userId, isStaff);
+    // 6. Create session (length depends on whether this user is an admin, staff or a customer)
+    const session = await createSession(userId, await sessionKindForUser(userId));
 
     // 7. Set session cookie and redirect
     const response = NextResponse.redirect(new URL(returnTo, appUrl));
-    response.cookies.set({
-      name: "loyalty_session",
-      value: token,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: expiresAt,
-    });
+    setSessionCookie(response, session);
 
     return response;
   } catch (err: unknown) {

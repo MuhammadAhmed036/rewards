@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionContext } from "@/server/auth";
+import { readSessionCookie } from "@/server/auth/session-response";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("loyalty_session")?.value;
+    const token = readSessionCookie(request);
     if (!token) {
       return NextResponse.json({ authenticated: false, user: null });
     }

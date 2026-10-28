@@ -17,6 +17,7 @@ import {
   QrCode,
 } from "lucide-react";
 import Link from "next/link";
+import { BusinessLogo } from "@/components/brand/BusinessLogo";
 
 interface Membership {
   id: string;
@@ -28,6 +29,7 @@ interface Membership {
   tenantName: string;
   tenantSlug: string;
   brandPrimaryHex: string | null;
+  logoUrl?: string | null;
   balance: number;
   lifetimeEarned: number;
   lifetimeRedeemed: number;
@@ -122,14 +124,14 @@ export default function CustomerMePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-paper flex items-center justify-center p-4">
         <RefreshCw className="w-6 h-6 text-zinc-900 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-zinc-900 py-6 sm:py-10 px-4 sm:px-6 selection:bg-zinc-900 selection:text-white overflow-x-hidden w-full max-w-full">
+    <div className="min-h-screen bg-paper text-zinc-900 py-6 sm:py-10 px-4 sm:px-6 overflow-x-hidden w-full max-w-full">
       <div className="max-w-3xl mx-auto space-y-6 sm:space-y-8">
         {/* Navigation Breadcrumb */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
@@ -191,12 +193,11 @@ export default function CustomerMePage() {
                   className="p-5 bg-white border border-zinc-200/90 rounded-2xl shadow-xs space-y-4 hover:border-zinc-300 transition-colors"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-3">
-                    <div>
-                      <h3 className="font-bold text-base text-zinc-950">
-                        {m.tenantName}
-                      </h3>
-                      <div className="font-mono text-xs text-zinc-600 font-semibold">
-                        Member #{m.memberNumber}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <BusinessLogo name={m.tenantName} logoUrl={m.logoUrl} brandColor={m.brandPrimaryHex} size="sm" />
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-base text-zinc-950 truncate">{m.tenantName}</h3>
+                        <div className="text-xs text-zinc-600 font-semibold">Customer ID {m.memberNumber}</div>
                       </div>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end space-x-3">
@@ -320,7 +321,7 @@ export default function CustomerMePage() {
                 </p>
 
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700 block mb-1">
+                  <label className="text-xs font-semibold text-zinc-700 block mb-1">
                     Type <strong className="text-rose-700">DELETE</strong> to confirm:
                   </label>
                   <input

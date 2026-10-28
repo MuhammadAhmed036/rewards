@@ -3,7 +3,8 @@ import { getBaseUrl } from "@/lib/url";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { joinProgramme } from "@/server/services/member";
-import { createSession } from "@/server/auth";
+import { createSession, sessionKindForUser } from "@/server/auth";
+import { setSessionCookie } from "@/server/auth/session-response";
 import { eq } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
@@ -51,34 +52,18 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        const { token, expiresAt } = await createSession(user.id, false);
+        const session = await createSession(user.id, await sessionKindForUser(user.id));
         const response = NextResponse.redirect(new URL(returnTo, appUrl));
-        response.cookies.set({
-          name: "loyalty_session",
-          value: token,
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          path: "/",
-          expires: expiresAt,
-        });
+        setSessionCookie(response, session);
         return response;
       } else {
         // Business owner demo login fallback
         const demoOwnerEmail = "barber-owner@platform.local";
         const [ownerUser] = await db.select().from(users).where(eq(users.email, demoOwnerEmail)).limit(1);
         if (ownerUser) {
-          const { token, expiresAt } = await createSession(ownerUser.id, true);
+          const session = await createSession(ownerUser.id, await sessionKindForUser(ownerUser.id));
           const response = NextResponse.redirect(new URL("/dashboard", appUrl));
-          response.cookies.set({
-            name: "loyalty_session",
-            value: token,
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            path: "/",
-            expires: expiresAt,
-          });
+          setSessionCookie(response, session);
           return response;
         }
       }

@@ -10,7 +10,9 @@ import {
   discardPromoClaim,
   getCampaignQrReports,
   getCampaignQrPublicInfo,
+  staffGiveStampReward,
 } from "./campaign-qr";
+import { claimStampCard, getMemberStampCards, staffAddStamp } from "./stamp-cards";
 import { RequestContext } from "../security/permissions";
 
 describe("Promotional Campaign QR Engine", () => {
@@ -95,68 +97,119 @@ describe("Promotional Campaign QR Engine", () => {
       validityDays: 30,
     });
 
-    // 1. Visit 1 scan: Intermediate visit (1 of 3)
-    const scan1 = await scanAndClaimCampaignQr(
-      registered.tenant.id,
-      promo.code,
-      customer.membership.id
-    );
+    const staffCtx: RequestContext = { ...ownerCtx, requestId: "req-promo-staff" };
+    const cardFor = async () =>
+      (await getMemberStampCards(registered.tenant.id, customer.membership.id)).find(
+        (c) => c.offerId === promo.id
+      )!;
+
+    // 1. First self-scan: stamp 1 of 3, and the card now shows in the customer portal
+    const scan1 = await scanAndClaimCampaignQr(registered.tenant.id, promo.code, customer.membership.id);
     expect(scan1.success).toBe(true);
     expect(scan1.isIntermediateVisit).toBe(true);
     expect(scan1.currentVisit).toBe(1);
     expect(scan1.requiredVisits).toBe(3);
     expect(scan1.visitsRemaining).toBe(2);
     expect(scan1.message).toContain("Visit 1 of 3");
+    expect((await cardFor()).state).toBe("collecting");
 
-    // 2. Visit 2 scan: Intermediate visit (2 of 3)
-    const scan2 = await scanAndClaimCampaignQr(
-      registered.tenant.id,
-      promo.code,
-      customer.membership.id
-    );
-    expect(scan2.success).toBe(true);
-    expect(scan2.isIntermediateVisit).toBe(true);
-    expect(scan2.currentVisit).toBe(2);
-    expect(scan2.requiredVisits).toBe(3);
-    expect(scan2.visitsRemaining).toBe(1);
-    expect(scan2.message).toContain("Visit 2 of 3");
+    // 2. Scanning again on the same visit is rate-limited: still 1 of 3
+    const scan2 = await scanAndClaimCampaignQr(registered.tenant.id, promo.code, customer.membership.id);
+    expect(scan2.currentVisit).toBe(1);
+    expect((scan2 as { isAlreadyScannedToday?: boolean }).isAlreadyScannedToday).toBe(true);
 
-    // 3. Visit 3 scan: Milestone reached (3 of 3), status becomes pending_claim
-    const scan3 = await scanAndClaimCampaignQr(
-      registered.tenant.id,
-      promo.code,
-      customer.membership.id
-    );
-    expect(scan3.success).toBe(true);
-    expect(scan3.isIntermediateVisit).toBe(false);
-    expect(scan3.isPendingClaim).toBe(true);
-    expect(scan3.currentVisit).toBe(3);
-    expect(scan3.message).toContain("Goal Reached (3/3)");
+    // 3. Claiming before the card is full is refused
+    await expect(
+      claimStampCard({ tenantId: registered.tenant.id, membershipId: customer.membership.id, offerId: promo.id })
+    ).rejects.toThrow(/CARD_NOT_FULL/);
 
-    // 4. Staff/Owner sees pending claim in audit reports
+    // 4. Staff add stamps for verified purchases (no cooldown) until the card is full
+    await staffAddStamp(staffCtx, { membershipId: customer.membership.id, offerId: promo.id });
+    const third = await staffAddStamp(staffCtx, { membershipId: customer.membership.id, offerId: promo.id });
+    expect(third.added).toBe(true);
+    expect(third.card.stamps).toBe(3);
+    expect(third.card.state).toBe("ready");
+
+    // 5. A full card takes no more stamps
+    const extra = await staffAddStamp(staffCtx, { membershipId: customer.membership.id, offerId: promo.id });
+    expect(extra.added).toBe(false);
+    expect(extra.reason).toBe("full");
+
+    // 6. Customer claims the reward from their portal; staff see it waiting
+    const claimed = await claimStampCard({
+      tenantId: registered.tenant.id,
+      membershipId: customer.membership.id,
+      offerId: promo.id,
+    });
+    expect(claimed.state).toBe("pending");
+
     const reports = await getCampaignQrReports(ownerCtx);
-    const pendingScan = reports.find(
-      (r) => r.campaignQrId === promo.id && r.status === "pending_claim"
-    );
+    const pendingScan = reports.find((r) => r.campaignQrId === promo.id && r.status === "pending_claim");
     expect(pendingScan).toBeDefined();
     expect(pendingScan?.memberName).toBe("Alice Coffee Lover");
     expect(pendingScan?.visitNumber).toBe(3);
 
-    // 5. Staff/Owner clicks "Approve & Give Perk" at counter
+    // 7. Staff hand the reward over
     const approveResult = await approvePromoClaim(ownerCtx, pendingScan!.id);
     expect(approveResult.success).toBe(true);
     expect(approveResult.approvedByName).toBe("Punch Owner");
 
-    // 6. Verify audit report shows approved
     const updatedReports = await getCampaignQrReports(ownerCtx);
-    const approvedScan = updatedReports.find((r) => r.id === pendingScan!.id);
-    expect(approvedScan?.status).toBe("approved");
-    expect(approvedScan?.approvedByName).toBe("Punch Owner");
+    expect(updatedReports.find((r) => r.id === pendingScan!.id)?.status).toBe("approved");
 
-    // 7. Duplicate prevention: Alice attempts to claim again -> Rejected!
-    await expect(
-      scanAndClaimCampaignQr(registered.tenant.id, promo.code, customer.membership.id)
-    ).rejects.toThrow(/already claimed this promotional offer/i);
+    // 8. The card starts again from zero and remembers the reward
+    const fresh = await cardFor();
+    expect(fresh.stamps).toBe(0);
+    expect(fresh.state).toBe("collecting");
+    expect(fresh.rewardsClaimed).toBe(1);
+
+    // 9. Stamp cards are repeatable: a second card fills and staff can hand it over directly
+    for (let i = 0; i < 3; i++) {
+      await staffAddStamp(staffCtx, { membershipId: customer.membership.id, offerId: promo.id });
+    }
+    await staffGiveStampReward(staffCtx, { membershipId: customer.membership.id, offerId: promo.id });
+    const afterSecond = await cardFor();
+    expect(afterSecond.stamps).toBe(0);
+    expect(afterSecond.rewardsClaimed).toBe(2);
+  });
+
+  it("shows staff the active stamp offers a member hasn't started", async () => {
+    const slug = `stamp-staff-${Date.now()}`;
+    const registered = await registerOwnerAndTenant({
+      email: `owner-${Date.now()}@stampstaff.com`,
+      password: "Password123!",
+      name: "Stamp Owner",
+      businessName: "Stamp Cafe",
+      slug,
+      programmeType: "stamps",
+    });
+    const ownerCtx: RequestContext = {
+      userId: registered.user.id,
+      tenantId: registered.tenant.id,
+      role: "owner",
+      requestId: "req-stamp-staff",
+    };
+    const customer = await joinProgramme({
+      tenantSlug: slug,
+      email: `walkin-${Date.now()}@stampstaff.com`,
+      name: "Walk In",
+    });
+    const promo = await createCampaignQr(ownerCtx, {
+      title: "Buy 5 smoothies",
+      offerType: "free_product",
+      productRewardName: "Smoothie",
+      requiredVisits: 5,
+    });
+
+    const customerView = await getMemberStampCards(registered.tenant.id, customer.membership.id);
+    expect(customerView.some((c) => c.offerId === promo.id)).toBe(false);
+
+    const staffView = await getMemberStampCards(registered.tenant.id, customer.membership.id, {
+      includeUnstarted: true,
+    });
+    const card = staffView.find((c) => c.offerId === promo.id);
+    expect(card?.stamps).toBe(0);
+    expect(card?.requiredStamps).toBe(5);
   });
 
   it("handles discard of pending claims", async () => {

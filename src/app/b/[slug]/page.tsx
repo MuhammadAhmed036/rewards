@@ -31,6 +31,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { InstagramIcon, FacebookIcon } from "@/components/ui/icons";
+import { BusinessLogo } from "@/components/brand/BusinessLogo";
+import { StampCard, type StampCardData } from "@/components/loyalty/StampCard";
 
 interface HubPayload {
   tenant: {
@@ -38,7 +40,7 @@ interface HubPayload {
     slug: string;
     name: string;
     brandPrimaryHex: string;
-    logoUrl?: string;
+    logoUrl?: string | null;
   };
   programme: {
     name: string;
@@ -52,6 +54,7 @@ interface HubPayload {
     lifetimeEarned: number;
     qrToken: string;
     qrDataUrl: string;
+    stampCards?: StampCardData[];
     recentHistory: Array<{
       id: string;
       type: string;
@@ -161,17 +164,22 @@ export default function BusinessHubPage(props: {
     currentVisit?: number;
     requiredVisits?: number;
     visitsRemaining?: number;
+    isReady?: boolean;
+    card?: StampCardData;
   } | null>(null);
+  const [claimingOfferId, setClaimingOfferId] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
 
-  const fetchHubData = useCallback(async () => {
+  const fetchHubData = useCallback(async (opts: { silent?: boolean } = {}) => {
     try {
-      const res = await fetch(`/api/v1/customer/hub-data?slug=${encodeURIComponent(slug)}`);
+      const res = await fetch(`/api/v1/customer/hub-data?slug=${encodeURIComponent(slug)}`, {
+        cache: "no-store",
+      });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Failed to load business");
       setHubData(json.data);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error loading business");
+      if (!opts.silent) setErrorMsg(err instanceof Error ? err.message : "Error loading business");
     } finally {
       setLoading(false);
     }
@@ -180,6 +188,56 @@ export default function BusinessHubPage(props: {
   useEffect(() => {
     fetchHubData();
   }, [fetchHubData]);
+
+  // Keep stamp cards and balance live while the customer has the page open
+  // (staff add stamps and hand over rewards from the till).
+  const signedIn = Boolean(hubData?.member);
+
+  // A signed-in customer only ever sees the customer view
+  useEffect(() => {
+    if (signedIn) setActivePortalRole("customer");
+  }, [signedIn]);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") fetchHubData({ silent: true });
+    };
+    const interval = setInterval(refresh, 10000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [signedIn, fetchHubData]);
+
+  // Customer claims a full stamp card
+  const handleClaimStampCard = useCallback(
+    async (offerId: string) => {
+      const memId = hubData?.member?.membershipId;
+      if (!memId) return;
+      setClaimingOfferId(offerId);
+      setErrorMsg(null);
+      try {
+        const res = await fetch("/api/v1/customer/stamp-cards/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ membershipId: memId, offerId }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error?.message || "Couldn't claim this reward");
+        if (claimResult?.card?.offerId === offerId) {
+          setClaimResult({ ...claimResult, card: json.data, isReady: false, isPendingClaim: true });
+        }
+        await fetchHubData({ silent: true });
+      } catch (err) {
+        setErrorMsg(err instanceof Error ? err.message : "Couldn't claim this reward");
+      } finally {
+        setClaimingOfferId(null);
+      }
+    },
+    [hubData?.member?.membershipId, claimResult, fetchHubData]
+  );
 
   // Poll redemption status every 3s if pending code is active
   useEffect(() => {
@@ -354,7 +412,7 @@ export default function BusinessHubPage(props: {
           json.error?.message?.toLowerCase().includes("already exists")
         ) {
           setCustomerLoginEmail(joinEmail.trim());
-          throw new Error("⚠️ An account with this email already exists. Please switch to the Sign In tab below to sign in.");
+          throw new Error(json.error?.message || "An account with this email already exists. Sign in instead.");
         }
         throw new Error(json.error?.message || "Failed to join");
       }
@@ -390,10 +448,19 @@ export default function BusinessHubPage(props: {
         body: JSON.stringify({
           email: customerLoginEmail.trim(),
           password: customerLoginPassword,
+          portal: "customer",
+          tenantSlug: slug,
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error?.message || "Invalid customer credentials");
+      if (!res.ok) {
+        if (json.error?.code === "NOT_A_MEMBER") {
+          // Registered elsewhere but not here: take them to "New here" with their email filled in
+          setJoinEmail(customerLoginEmail.trim());
+          setCustomerAuthMode("join");
+        }
+        throw new Error(json.error?.message || "Invalid customer credentials");
+      }
       const updatedHubRes = await fetch(`/api/v1/customer/hub-data?slug=${encodeURIComponent(slug)}`);
       const updatedHubJson = await updatedHubRes.json();
       if (updatedHubRes.ok && updatedHubJson.data) {
@@ -425,6 +492,8 @@ export default function BusinessHubPage(props: {
         body: JSON.stringify({
           email: staffEmail.trim(),
           password: staffPassword,
+          portal: "staff",
+          tenantSlug: slug,
         }),
       });
       const json = await res.json();
@@ -454,6 +523,8 @@ export default function BusinessHubPage(props: {
         body: JSON.stringify({
           email: ownerEmail.trim(),
           password: ownerPassword,
+          portal: "owner",
+          tenantSlug: slug,
         }),
       });
       const json = await res.json();
@@ -566,7 +637,7 @@ export default function BusinessHubPage(props: {
 
   if (!hubData) return null;
 
-  const brandColor = hubData.tenant.brandPrimaryHex || "#0f172a";
+  const brandColor = hubData.tenant.brandPrimaryHex || "#495e57";
   const member = hubData.member;
   const isStamps = hubData.programme.type === "stamps";
 
@@ -581,7 +652,7 @@ export default function BusinessHubPage(props: {
 
   return (
     <div
-      className="min-h-screen bg-[#f8fafc] text-slate-900 pb-20 selection:bg-zinc-900 selection:text-white flex flex-col justify-between overflow-x-hidden w-full max-w-full"
+      className="min-h-screen bg-paper text-slate-900 pb-20 flex flex-col justify-between overflow-x-hidden w-full max-w-full"
       style={{ "--brand": brandColor } as React.CSSProperties}
     >
       {/* Brand Header - Full Enterprise Widescreen Bar */}
@@ -590,46 +661,44 @@ export default function BusinessHubPage(props: {
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             {/* Store Brand Info */}
             <div className="flex items-center space-x-3.5">
-              <span
-                className="flex h-12 w-12 items-center justify-center rounded-2xl text-white font-black text-xl shadow-md shrink-0"
-                style={{ backgroundColor: brandColor || "#4f46e5" }}
-              >
-                {hubData.tenant.name.slice(0, 1)}
-              </span>
+              <BusinessLogo
+                name={hubData.tenant.name}
+                logoUrl={hubData.tenant.logoUrl}
+                brandColor={brandColor}
+                size="md"
+              />
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="font-black text-lg text-slate-900 leading-tight tracking-tight">
+                  <h1 className="font-bold text-xl text-evergreen-deep leading-tight">
                     {hubData.tenant.name}
                   </h1>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 uppercase">
-                    Official Store
-                  </span>
                 </div>
                 <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                  {hubData.programme.name} • {isStamps ? "Stamps Programme" : "Points Programme"}
+                  {isStamps ? "Collect stamps" : "Collect points"} with {hubData.programme.name}
                 </span>
               </div>
             </div>
 
             {/* Header Right Actions / Role Switcher */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
-              {/* Role Navigation Switcher (Customer / Staff / Owner) */}
-              <div className="flex bg-slate-100 p-1 border border-slate-200 rounded-xl text-xs font-semibold w-full sm:w-auto overflow-x-auto">
+              {/* Role switcher: only for visitors who are not signed in to their card */}
+              {!member && (
+              <div className="flex bg-white p-1 border border-slate-200 rounded-full text-sm font-semibold w-full sm:w-auto overflow-x-auto">
                 <button
                   type="button"
                   onClick={() => {
                     setActivePortalRole("customer");
                     setErrorMsg(null);
                   }}
-                  className={`flex-1 sm:flex-initial py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  className={`flex-1 sm:flex-initial py-2 px-3.5 rounded-full transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
                     activePortalRole === "customer"
-                      ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                      ? "bg-evergreen text-white"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   <User className="w-3.5 h-3.5" />
-                  Customer Pass
+                  I&rsquo;m a customer
                 </button>
                 <button
                   type="button"
@@ -637,14 +706,14 @@ export default function BusinessHubPage(props: {
                     setActivePortalRole("staff");
                     setErrorMsg(null);
                   }}
-                  className={`flex-1 sm:flex-initial py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  className={`flex-1 sm:flex-initial py-2 px-3.5 rounded-full transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
                     activePortalRole === "staff"
-                      ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                      ? "bg-evergreen text-white"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   <Smartphone className="w-3.5 h-3.5" />
-                  Staff Scanner
+                  I work here
                 </button>
                 <button
                   type="button"
@@ -652,16 +721,17 @@ export default function BusinessHubPage(props: {
                     setActivePortalRole("owner");
                     setErrorMsg(null);
                   }}
-                  className={`flex-1 sm:flex-initial py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  className={`flex-1 sm:flex-initial py-2 px-3.5 rounded-full transition-colors flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
                     activePortalRole === "owner"
-                      ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                      ? "bg-evergreen text-white"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   <Store className="w-3.5 h-3.5" />
-                  Owner Portal
+                  I own this shop
                 </button>
               </div>
+              )}
 
               {/* Logged in customer quick controls */}
               {member && activePortalRole === "customer" && (
@@ -670,10 +740,10 @@ export default function BusinessHubPage(props: {
                     variant="default"
                     size="sm"
                     onClick={() => setShowQrModal(true)}
-                    className="bg-zinc-950 hover:bg-zinc-800 text-white font-semibold rounded-xl text-xs shadow-xs cursor-pointer transition-colors"
+                    className="bg-evergreen hover:bg-evergreen-deep text-white font-semibold rounded-full text-sm cursor-pointer transition-colors"
                   >
                     <QrCode className="h-4 w-4 mr-1.5 stroke-[1.8]" />
-                    Show QR
+                    Show my card
                   </Button>
                   <button
                     type="button"
@@ -729,29 +799,29 @@ export default function BusinessHubPage(props: {
               {scannedOfferInfo && !member && (
                 <div className="p-5 rounded-3xl bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 text-white shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in">
                   <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black text-2xl shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-bold text-2xl shrink-0">
                       🎁
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-white/20 text-white tracking-wider">
+                        <span className="text-xs font-extrabold capitalize px-2 py-0.5 rounded-full bg-white/20 text-white">
                           Promotional Offer Scanned
                         </span>
                         {scannedOfferInfo.isExpired ? (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white">
                             Expired
                           </span>
                         ) : scannedOfferInfo.isDeactivated ? (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white">
                             Deactivated
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400 text-slate-900">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-400 text-slate-900">
                             Available Now
                           </span>
                         )}
                       </div>
-                      <h3 className="text-base font-black text-white mt-1">{scannedOfferInfo.title}</h3>
+                      <h3 className="text-base font-bold text-white mt-1">{scannedOfferInfo.title}</h3>
                       <p className="text-xs text-white/90 mt-0.5">
                         {scannedOfferInfo.isExpired || scannedOfferInfo.isDeactivated
                           ? "This promotional QR code is no longer active."
@@ -775,11 +845,11 @@ export default function BusinessHubPage(props: {
                     <div className="w-14 h-14 rounded-2xl bg-purple-50 text-purple-700 flex items-center justify-center mx-auto mb-3 text-3xl shadow-inner">
                       🎁
                     </div>
-                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                    <span className="text-xs font-extrabold capitalize px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
                       Promotional Offer Detected
                     </span>
 
-                    <h3 className="text-lg font-black text-slate-950 mt-2 mb-1">
+                    <h3 className="text-lg font-bold text-slate-950 mt-2 mb-1">
                       {scannedOfferInfo?.title || "Special Store Offer"}
                     </h3>
                     <p className="text-xs text-slate-500 mb-4">
@@ -824,16 +894,37 @@ export default function BusinessHubPage(props: {
               {claimStatus === "success" && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in">
                   <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl relative border border-emerald-300">
-                    {/* Intermediate visit state */}
-                    {claimResult?.isIntermediateVisit ? (
+                    {claimResult?.card ? (
+                      <>
+                        <h3 className="font-display text-xl font-bold text-evergreen-deep mb-1">
+                          {claimResult.card.state === "pending"
+                            ? "Reward waiting at the counter"
+                            : claimResult.card.state === "ready"
+                            ? "Your card is full!"
+                            : "Stamp added"}
+                        </h3>
+                        <p className="text-sm text-zinc-600 mb-5 leading-relaxed">{claimResult.message}</p>
+                        <div className="-mx-2 mb-5 text-left">
+                          <StampCard
+                            card={claimResult.card}
+                            businessName={hubData.tenant.name}
+                            logoUrl={hubData.tenant.logoUrl}
+                            brandColor={brandColor}
+                            justEarned={claimResult.isIntermediateVisit || claimResult.card.state === "ready"}
+                            onClaim={() => handleClaimStampCard(claimResult.card!.offerId)}
+                            claiming={claimingOfferId === claimResult.card.offerId}
+                          />
+                        </div>
+                      </>
+                    ) : claimResult?.isIntermediateVisit ? (
                       <>
                         <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-3 shadow-inner">
                           <Sparkles className="w-8 h-8" />
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
                           Visit {claimResult.currentVisit} of {claimResult.requiredVisits} Recorded
                         </span>
-                        <h3 className="text-lg font-black text-slate-950 mt-2 mb-1">
+                        <h3 className="text-lg font-bold text-slate-950 mt-2 mb-1">
                           Stamp Recorded! ☕
                         </h3>
                         <p className="text-xs text-slate-600 mb-4 leading-relaxed">
@@ -842,7 +933,7 @@ export default function BusinessHubPage(props: {
 
                         {/* Punch card visual progression dots */}
                         <div className="bg-amber-50/70 p-3.5 rounded-2xl border border-amber-200 mb-4">
-                          <p className="text-[10px] font-bold text-amber-900 uppercase tracking-wider mb-2">
+                          <p className="text-xs font-bold text-amber-900 mb-2">
                             Progress to Free Perk ({claimResult.currentVisit}/{claimResult.requiredVisits})
                           </p>
                           <div className="flex items-center justify-center gap-2">
@@ -851,7 +942,7 @@ export default function BusinessHubPage(props: {
                               return (
                                 <div
                                   key={idx}
-                                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs transition-all ${
+                                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs transition-all ${
                                     isCompleted
                                       ? "bg-amber-500 text-white shadow-md scale-105"
                                       : "bg-white text-slate-400 border-2 border-dashed border-amber-300"
@@ -873,10 +964,10 @@ export default function BusinessHubPage(props: {
                         <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3 shadow-inner animate-bounce">
                           <Gift className="w-8 h-8" />
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
                           🎉 Reward Unlocked!
                         </span>
-                        <h3 className="text-lg font-black text-slate-950 mt-2 mb-1">
+                        <h3 className="text-lg font-bold text-slate-950 mt-2 mb-1">
                           Show Counter Staff!
                         </h3>
                         <p className="text-xs text-slate-600 mb-3 leading-relaxed">
@@ -894,14 +985,14 @@ export default function BusinessHubPage(props: {
                         <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 shadow-inner">
                           <CheckCircle2 className="w-8 h-8" />
                         </div>
-                        <h3 className="text-lg font-black text-slate-950 mb-1">Offer Claimed!</h3>
+                        <h3 className="text-lg font-bold text-slate-950 mb-1">Offer Claimed!</h3>
                         <p className="text-xs text-slate-600 mb-4 leading-relaxed">
                           {claimResult?.message || "Your offer has been credited to your pass."}
                         </p>
                         {claimResult?.newBalance !== undefined && (
                           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 mb-4 text-xs">
-                            <span className="text-slate-400 block text-[10px] uppercase font-bold">Updated Balance</span>
-                            <span className="text-xl font-black text-slate-900">{claimResult.newBalance} pts</span>
+                            <span className="text-slate-400 block text-xs capitalize font-bold">Updated Balance</span>
+                            <span className="text-xl font-bold text-slate-900">{claimResult.newBalance} pts</span>
                           </div>
                         )}
                       </>
@@ -915,7 +1006,7 @@ export default function BusinessHubPage(props: {
                       }}
                       className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl py-2.5 text-xs shadow-md cursor-pointer"
                     >
-                      View Digital Pass →
+                      {claimResult?.card ? "See my cards" : "View Digital Pass"}
                     </Button>
                   </div>
                 </div>
@@ -929,7 +1020,7 @@ export default function BusinessHubPage(props: {
                       <AlertCircle className="w-8 h-8" />
                     </div>
 
-                    <h3 className="text-lg font-black text-slate-950 mb-1">Offer Unavailable</h3>
+                    <h3 className="text-lg font-bold text-slate-950 mb-1">Offer Unavailable</h3>
                     <p className="text-xs text-slate-600 mb-4 leading-relaxed">
                       {claimError || "This promotional QR code has expired or was deactivated by the business manager."}
                     </p>
@@ -950,7 +1041,34 @@ export default function BusinessHubPage(props: {
               )}
 
               {member ? (
-                /* LOGGED IN CUSTOMER ENTERPRISE 2-COLUMN VIEW */
+                <>
+                {member.stampCards && member.stampCards.length > 0 && (
+                  <section aria-labelledby="stamp-cards-heading" className="mb-8">
+                    <div className="flex items-end justify-between gap-3 mb-4">
+                      <div>
+                        <h2 id="stamp-cards-heading" className="font-display text-2xl font-bold text-evergreen-deep">
+                          Your stamp cards
+                        </h2>
+                        <p className="text-sm text-zinc-600">
+                          Get a stamp each time you buy. Fill a card to claim your reward.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8">
+                      {member.stampCards.map((card) => (
+                        <StampCard
+                          key={card.offerId}
+                          card={card}
+                          businessName={hubData.tenant.name}
+                          logoUrl={hubData.tenant.logoUrl}
+                          brandColor={brandColor}
+                          onClaim={() => handleClaimStampCard(card.offerId)}
+                          claiming={claimingOfferId === card.offerId}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                   {/* Left Column: Digital Pass & Quick Links (5 cols) */}
                   <div className="lg:col-span-5 space-y-6">
@@ -959,17 +1077,26 @@ export default function BusinessHubPage(props: {
                       <div
                         className="p-7 text-white relative overflow-hidden"
                         style={{
-                          background: `linear-gradient(135deg, ${brandColor || "#1e1b4b"} 0%, #0f172a 100%)`,
+                          background: `linear-gradient(135deg, ${brandColor || "#495e57"} 0%, #26302d 100%)`,
                         }}
                       >
                         <div className="absolute -top-10 -right-10 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
+                        <div className="flex items-center gap-3 mb-5 relative z-10">
+                          <BusinessLogo
+                            name={hubData.tenant.name}
+                            logoUrl={hubData.tenant.logoUrl}
+                            brandColor={brandColor}
+                            size="sm"
+                          />
+                          <span className="font-display font-bold text-lg truncate">{hubData.tenant.name}</span>
+                        </div>
                         <div className="flex justify-between items-start relative z-10">
                           <div>
-                            <span className="text-[10px] uppercase tracking-wider text-slate-300 font-extrabold block">
+                            <span className="text-xs text-slate-300 font-extrabold block">
                               {isStamps ? "Verified Stamp Card" : "Loyalty Points Balance"}
                             </span>
-                            <div className="text-4xl font-black mt-1.5 tracking-tight text-white tabular-nums">
+                            <div className="text-4xl font-bold mt-1.5 tracking-tight text-white tabular-nums">
                               {member.balance}{" "}
                               <span className="text-xl font-bold font-sans text-slate-300">
                                 {isStamps ? "stamps" : "pts"}
@@ -980,7 +1107,7 @@ export default function BusinessHubPage(props: {
                             <span className="text-xs text-slate-300 font-mono block">
                               #{member.memberNumber}
                             </span>
-                            <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-md text-white text-[10px] font-bold border border-white/20">
+                            <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-md text-white text-xs font-bold border border-white/20">
                               Verified Pass
                             </span>
                           </div>
@@ -1054,11 +1181,11 @@ export default function BusinessHubPage(props: {
                     {hubData.links.length > 0 && (
                       <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 space-y-3">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                          <h3 className="text-sm font-black text-slate-900 flex items-center">
+                          <h3 className="text-sm font-bold text-slate-900 flex items-center">
                             <Star className="h-4 w-4 mr-1.5 text-amber-500 fill-amber-500" />
                             Official Reviews &amp; Social Links
                           </h3>
-                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                             Anti-Gating Compliant
                           </span>
                         </div>
@@ -1103,11 +1230,11 @@ export default function BusinessHubPage(props: {
                     {/* Direct Private Message to Manager */}
                     <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 space-y-3">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <h3 className="text-sm font-black text-slate-900 flex items-center">
+                        <h3 className="text-sm font-bold text-slate-900 flex items-center">
                           <MessageSquare className="h-4 w-4 mr-1.5 text-indigo-600" />
                           Direct Message to Business
                         </h3>
-                        <span className="text-[10px] font-bold text-slate-400">Private &amp; Confidential</span>
+                        <span className="text-xs font-bold text-slate-400">Private &amp; Confidential</span>
                       </div>
 
                       {feedbackSubmitted ? (
@@ -1156,7 +1283,7 @@ export default function BusinessHubPage(props: {
                     <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 sm:p-7 space-y-4">
                       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                         <div>
-                          <h3 className="text-base font-black text-slate-900 flex items-center">
+                          <h3 className="text-base font-bold text-slate-900 flex items-center">
                             <Gift className="h-5 w-5 mr-2 text-indigo-600" />
                             Available Programme Rewards
                           </h3>
@@ -1192,7 +1319,7 @@ export default function BusinessHubPage(props: {
                               </div>
 
                               <div className="mt-4 pt-3 border-t border-slate-200/70 flex items-center justify-between">
-                                <span className="text-xs font-black text-indigo-700">
+                                <span className="text-xs font-bold text-indigo-700">
                                   {reward.costPoints} {isStamps ? "stamps" : "points"}
                                 </span>
 
@@ -1200,7 +1327,7 @@ export default function BusinessHubPage(props: {
                                   <Button
                                     variant="default"
                                     size="sm"
-                                    className="font-black text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs cursor-pointer"
+                                    className="font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs cursor-pointer"
                                     onClick={() =>
                                       handleStartRedeem(reward.id, reward.title, reward.costPoints)
                                     }
@@ -1208,7 +1335,7 @@ export default function BusinessHubPage(props: {
                                     Claim Reward →
                                   </Button>
                                 ) : (
-                                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
+                                  <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
                                     Need {reward.pointsShortfall} more
                                   </span>
                                 )}
@@ -1223,11 +1350,11 @@ export default function BusinessHubPage(props: {
                     {member.recentHistory && member.recentHistory.length > 0 && (
                       <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 sm:p-7 space-y-4">
                         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                          <h3 className="text-sm font-black text-slate-900 flex items-center">
+                          <h3 className="text-sm font-bold text-slate-900 flex items-center">
                             <History className="h-4 w-4 mr-1.5 text-slate-500" />
                             Member Transaction History
                           </h3>
-                          <span className="text-[10px] font-bold text-slate-400">Audited Ledger</span>
+                          <span className="text-xs font-bold text-slate-400">Audited Ledger</span>
                         </div>
 
                         <div className="space-y-2">
@@ -1251,7 +1378,7 @@ export default function BusinessHubPage(props: {
                                 </span>
                               </div>
                               <span
-                                className={`font-black text-base tabular-nums ${
+                                className={`font-bold text-base tabular-nums ${
                                   item.pointsDelta > 0 ? "text-emerald-600" : "text-rose-600"
                                 }`}
                               >
@@ -1264,6 +1391,7 @@ export default function BusinessHubPage(props: {
                     )}
                   </div>
                 </div>
+                </>
               ) : (
                 /* PUBLIC CUSTOMER JOIN / SIGN IN ENTERPRISE 2-COLUMN VIEW */
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -1275,7 +1403,7 @@ export default function BusinessHubPage(props: {
                       </div>
 
                       <h2 className="text-2xl sm:text-3xl font-bold text-zinc-950 tracking-tight leading-tight">
-                        Join {hubData.tenant.name} &amp; Collect Rewards
+                        Join {hubData.tenant.name} and get rewarded
                       </h2>
 
                       <p className="mt-3 text-xs sm:text-sm text-zinc-600 leading-relaxed">
@@ -1285,11 +1413,11 @@ export default function BusinessHubPage(props: {
                       <div className="mt-6 pt-5 border-t border-zinc-100 flex flex-wrap items-center gap-4 text-xs text-zinc-600">
                         <div className="flex items-center gap-1.5 font-medium text-zinc-900">
                           <CheckCircle2 className="w-4 h-4 text-zinc-900 stroke-[1.8]" />
-                          <span>Instant Digital Pass</span>
+                          <span>Your card is ready instantly</span>
                         </div>
                         <div className="flex items-center gap-1.5 font-medium text-zinc-900">
                           <CheckCircle2 className="w-4 h-4 text-zinc-900 stroke-[1.8]" />
-                          <span>No App Download Needed</span>
+                          <span>No app to download</span>
                         </div>
                       </div>
                     </div>
@@ -1297,8 +1425,8 @@ export default function BusinessHubPage(props: {
                     {/* Featured Rewards Preview */}
                     {hubData.rewards.length > 0 && (
                       <div className="bg-white rounded-2xl border border-zinc-200/90 shadow-xs p-5 sm:p-6 space-y-3">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 block">
-                          Featured Rewards to Unlock
+                        <span className="text-xs font-semibold text-zinc-400 block">
+                          Rewards you can get
                         </span>
                         <div className="space-y-2">
                           {hubData.rewards.slice(0, 4).map((r) => (
@@ -1323,11 +1451,11 @@ export default function BusinessHubPage(props: {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
                         <div>
                           <h3 className="text-lg sm:text-xl font-bold text-zinc-950">
-                            {customerAuthMode === "join" ? "Get Your Digital Pass" : "Customer Sign In"}
+                            {customerAuthMode === "join" ? "Get your loyalty card" : "Sign in to your card"}
                           </h3>
                           <p className="text-xs text-zinc-500 mt-0.5">
                             {customerAuthMode === "join"
-                              ? "Enter details below to launch your digital pass"
+                              ? "It takes about 30 seconds"
                               : "Enter your email & password to view balance and rewards"}
                           </p>
                         </div>
@@ -1343,7 +1471,7 @@ export default function BusinessHubPage(props: {
                                 : "text-zinc-600 hover:text-zinc-900"
                             }`}
                           >
-                            Join (New)
+                            New here
                           </button>
                           <button
                             type="button"
@@ -1387,13 +1515,13 @@ export default function BusinessHubPage(props: {
                             />
                           </svg>
                           <span>
-                            {customerAuthMode === "join" ? "Quick Join with Google" : "Sign in with Google"}
+                            {customerAuthMode === "join" ? "Join with Google" : "Sign in with Google"}
                           </span>
                         </a>
 
                         <div className="flex items-center my-4">
                           <div className="flex-1 border-t border-zinc-200" />
-                          <span className="px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 font-mono">
+                          <span className="px-3 text-xs font-semibold text-zinc-400">
                             or with email
                           </span>
                           <div className="flex-1 border-t border-zinc-200" />
@@ -1477,7 +1605,7 @@ export default function BusinessHubPage(props: {
                             className="w-full font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
                             disabled={joining || !joinEmail}
                           >
-                            {joining ? "Generating Digital Pass..." : "Join & Get My Pass →"}
+                            {joining ? "Creating your card..." : "Get my card"}
                           </Button>
                         </form>
                       ) : (
@@ -1702,10 +1830,10 @@ export default function BusinessHubPage(props: {
       {/* Footer */}
       <footer className="border-t border-slate-200/80 bg-white py-4 px-4 sm:px-6 lg:px-8 mt-12">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
-          <span>&copy; {new Date().getFullYear()} {hubData.tenant.name} • LoyaltyEngine Infrastructure</span>
+          <span>&copy; {new Date().getFullYear()} {hubData.tenant.name}. Loyalty card by LoyaltyPlatform</span>
           <div className="flex items-center space-x-4">
-            <a href="/" className="hover:text-slate-800">Platform Portal</a>
-            <a href={`/b/${slug}`} className="hover:text-slate-800">Storefront Pass</a>
+            <a href="/" className="hover:text-slate-800">LoyaltyPlatform</a>
+            <a href={`/b/${slug}`} className="hover:text-slate-800">This shop&rsquo;s page</a>
           </div>
         </div>
       </footer>
@@ -1721,8 +1849,16 @@ export default function BusinessHubPage(props: {
               <X className="h-5 w-5" />
             </button>
 
-            <h3 className="text-xl font-black mb-0.5 text-slate-900">{member.displayName}</h3>
-            <p className="text-xs text-indigo-600 font-mono font-bold mb-4">#{member.memberNumber}</p>
+            <div className="flex items-center justify-center gap-2.5 mb-1">
+              <BusinessLogo
+                name={hubData.tenant.name}
+                logoUrl={hubData.tenant.logoUrl}
+                brandColor={brandColor}
+                size="sm"
+              />
+              <span className="font-semibold text-zinc-700">{hubData.tenant.name}</span>
+            </div>
+            <h3 className="text-xl font-bold mb-4 text-slate-900">{member.displayName}</h3>
 
             <div className="p-4 bg-white rounded-2xl border-2 border-slate-900 mx-auto inline-block shadow-sm">
               <img
@@ -1732,17 +1868,19 @@ export default function BusinessHubPage(props: {
               />
             </div>
 
-            <div className="mt-4 flex items-center justify-center text-xs text-slate-500 space-x-1.5">
-              <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span>Verified Member QR • Brighten screen at scanner</span>
-            </div>
+            <p className="mt-4 text-sm text-zinc-600">
+              No scanner? Staff can type your customer ID:
+            </p>
+            <p className="font-display text-2xl font-bold tracking-[0.12em] text-evergreen-deep">
+              {member.memberNumber}
+            </p>
 
             <Button
               variant="default"
               className="w-full mt-5 font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl cursor-pointer"
               onClick={() => setShowQrModal(false)}
             >
-              Done / Close
+              Done
             </Button>
           </div>
         </div>
@@ -1763,7 +1901,7 @@ export default function BusinessHubPage(props: {
               <Gift className="h-6 w-6" />
             </div>
 
-            <h3 className="text-xl font-black text-slate-900">{activeRedemption.rewardTitle}</h3>
+            <h3 className="text-xl font-bold text-slate-900">{activeRedemption.rewardTitle}</h3>
             <p className="text-xs text-slate-500 mb-2">Present this voucher code to staff at counter</p>
 
             {/* Voucher QR Code */}
@@ -1776,7 +1914,7 @@ export default function BusinessHubPage(props: {
               </div>
             )}
 
-            <div className="my-2.5 py-2.5 px-4 bg-slate-100 rounded-2xl font-mono text-2xl font-black tracking-widest text-slate-900 border border-slate-200">
+            <div className="my-2.5 py-2.5 px-4 bg-slate-100 rounded-2xl font-mono text-2xl font-bold tracking-widest text-slate-900 border border-slate-200">
               {activeRedemption.code}
             </div>
 
@@ -1815,7 +1953,7 @@ export default function BusinessHubPage(props: {
             <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 mx-auto flex items-center justify-center mb-3">
               <CheckCircle2 className="h-9 w-9 text-emerald-600" />
             </div>
-            <h3 className="text-2xl font-black text-slate-900">Enjoy Your Reward!</h3>
+            <h3 className="text-2xl font-bold text-slate-900">Enjoy Your Reward!</h3>
             <p className="text-slate-600 text-xs mt-1 mb-6 font-medium">
               Your voucher has been verified and confirmed in the ledger.
             </p>

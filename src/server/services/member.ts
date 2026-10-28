@@ -14,6 +14,7 @@ import {
   generateQrDataUrl,
 } from "../qr";
 import { getRewards } from "./rewards";
+import { getMemberStampCards } from "./stamp-cards";
 import { RequestContext, assertCan } from "../security/permissions";
 import { logAuditEvent } from "./audit";
 import { hashPassword } from "../auth";
@@ -181,6 +182,67 @@ export async function joinProgramme(input: JoinProgrammeInput) {
  * Resolves a Member QR scanned by staff.
  * Validates cryptographic signature, version, tenant matching, and active status.
  */
+const staffMemberSelect = {
+  id: memberships.id,
+  tenantId: memberships.tenantId,
+  memberNumber: memberships.memberNumber,
+  qrVersion: memberships.qrVersion,
+  status: memberships.status,
+  joinedAt: memberships.joinedAt,
+  userName: users.name,
+};
+
+type StaffMemberRow = {
+  id: string;
+  tenantId: string;
+  memberNumber: string;
+  qrVersion: number;
+  status: string;
+  joinedAt: Date;
+  userName: string | null;
+};
+
+/** Balance, rewards and stamp cards for the member a staff user has just identified. */
+async function buildStaffMemberSummary(ctx: RequestContext, membership: StaffMemberRow) {
+  // Section 9: A member from tenant A identified at tenant B must return "Not a member of this business"
+  if (membership.tenantId !== ctx.tenantId) {
+    throw new Error("Not a member of this business");
+  }
+  if (membership.status !== "active") {
+    throw new Error(`Membership is ${membership.status}`);
+  }
+
+  const [balanceRow] = await db
+    .select()
+    .from(membershipBalances)
+    .where(eq(membershipBalances.membershipId, membership.id))
+    .limit(1);
+
+  const currentBalance = balanceRow?.balance || 0;
+  const availableRewards = await getRewards(ctx.tenantId, { memberBalance: currentBalance });
+  const stampCards = await getMemberStampCards(ctx.tenantId, membership.id, { includeUnstarted: true });
+
+  // Obfuscate customer identity per Section 9 & 14.3: First Name + Last Initial
+  let displayName = "Member";
+  if (membership.userName) {
+    const parts = membership.userName.trim().split(" ");
+    displayName = parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
+  }
+
+  return {
+    membershipId: membership.id,
+    memberNumber: membership.memberNumber,
+    displayName,
+    balance: currentBalance,
+    lifetimeEarned: balanceRow?.lifetimeEarned || 0,
+    lifetimeRedeemed: balanceRow?.lifetimeRedeemed || 0,
+    status: membership.status,
+    joinedAt: membership.joinedAt,
+    availableRewards,
+    stampCards,
+  };
+}
+
 export async function resolveMemberQrForStaff(
   ctx: RequestContext,
   token: string,
@@ -194,22 +256,8 @@ export async function resolveMemberQrForStaff(
     throw new Error(verifyResult.error || "Invalid Member QR code");
   }
 
-  // Find membership
   const [membership] = await db
-    .select({
-      id: memberships.id,
-      tenantId: memberships.tenantId,
-      userId: memberships.userId,
-      memberNumber: memberships.memberNumber,
-      publicId: memberships.publicId,
-      qrVersion: memberships.qrVersion,
-      status: memberships.status,
-      joinedAt: memberships.joinedAt,
-      user: {
-        name: users.name,
-        email: users.email,
-      },
-    })
+    .select(staffMemberSelect)
     .from(memberships)
     .innerJoin(users, eq(memberships.userId, users.id))
     .where(eq(memberships.publicId, verifyResult.membershipPublicId))
@@ -218,8 +266,6 @@ export async function resolveMemberQrForStaff(
   if (!membership) {
     throw new Error("Membership not found");
   }
-
-  // Section 9: A Member QR from tenant A scanned at tenant B must return "Not a member of this business"
   if (membership.tenantId !== ctx.tenantId) {
     throw new Error("Not a member of this business");
   }
@@ -229,45 +275,53 @@ export async function resolveMemberQrForStaff(
     throw new Error("QR code has expired or was revoked. Please refresh your membership card.");
   }
 
-  if (membership.status !== "active") {
-    throw new Error(`Membership is ${membership.status}`);
+  return buildStaffMemberSummary(ctx, membership);
+}
+
+/**
+ * Walk-in lookup when the customer can't show a QR code: staff type the
+ * customer ID printed under it. Scoped to the staff member's own business.
+ */
+export async function resolveMemberByNumberForStaff(
+  ctx: RequestContext,
+  memberNumber: string,
+  locationId?: string
+) {
+  assertCan(ctx, "member.read", { locationId });
+  if (!ctx.tenantId) throw new Error("Staff must be scoped to a tenant");
+
+  const normalized = memberNumber.trim().replace(/^#/, "").toUpperCase();
+  if (!/^[0-9A-Z-]{4,32}$/.test(normalized)) {
+    throw new Error("Customer ID should be the letters and numbers shown under the customer's QR code");
   }
 
-  // Get balance
-  const [balanceRow] = await db
-    .select()
-    .from(membershipBalances)
-    .where(eq(membershipBalances.membershipId, membership.id))
+  const [membership] = await db
+    .select(staffMemberSelect)
+    .from(memberships)
+    .innerJoin(users, eq(memberships.userId, users.id))
+    .where(and(eq(memberships.tenantId, ctx.tenantId), eq(memberships.memberNumber, normalized)))
     .limit(1);
 
-  const currentBalance = balanceRow?.balance || 0;
-
-  // Available rewards with eligibility
-  const availableRewards = await getRewards(ctx.tenantId, {
-    memberBalance: currentBalance,
-  });
-
-  // Obfuscate customer identity per Section 9 & 14.3: First Name + Last Initial
-  let displayName = "Member";
-  if (membership.user.name) {
-    const parts = membership.user.name.trim().split(" ");
-    if (parts.length > 1) {
-      displayName = `${parts[0]} ${parts[parts.length - 1][0]}.`;
-    } else {
-      displayName = parts[0];
-    }
+  if (!membership) {
+    throw new Error(`No customer with ID ${normalized} at this business`);
   }
+  return buildStaffMemberSummary(ctx, membership);
+}
 
-  return {
-    membershipId: membership.id,
-    memberNumber: membership.memberNumber,
-    displayName,
-    balance: currentBalance,
-    lifetimeEarned: balanceRow?.lifetimeEarned || 0,
-    status: membership.status,
-    joinedAt: membership.joinedAt,
-    availableRewards,
-  };
+/** Opens a member picked from staff search results. */
+export async function getMemberForStaff(ctx: RequestContext, membershipId: string, locationId?: string) {
+  assertCan(ctx, "member.read", { locationId });
+  if (!ctx.tenantId) throw new Error("Staff must be scoped to a tenant");
+
+  const [membership] = await db
+    .select(staffMemberSelect)
+    .from(memberships)
+    .innerJoin(users, eq(memberships.userId, users.id))
+    .where(and(eq(memberships.id, membershipId), eq(memberships.tenantId, ctx.tenantId)))
+    .limit(1);
+
+  if (!membership) throw new Error("Customer not found");
+  return buildStaffMemberSummary(ctx, membership);
 }
 
 export async function revokeMemberQr(ctx: RequestContext, membershipId: string) {

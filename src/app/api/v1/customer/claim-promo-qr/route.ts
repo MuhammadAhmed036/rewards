@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scanAndClaimCampaignQr, getCampaignQrPublicInfo } from "@/server/services/campaign-qr";
+import { requireOwnMembership } from "@/server/auth/customer-membership";
 import { z } from "zod";
 
 export async function GET(request: NextRequest) {
@@ -41,6 +42,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validated = claimSchema.parse(body);
+
+    const owned = await requireOwnMembership(request, validated.membershipId, validated.tenantId);
+    if ("response" in owned) return owned.response;
 
     const result = await scanAndClaimCampaignQr(
       validated.tenantId,

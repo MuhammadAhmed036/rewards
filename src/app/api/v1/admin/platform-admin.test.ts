@@ -3,7 +3,7 @@ import { registerOwnerAndTenant } from "@/server/services/tenant";
 import { joinProgramme } from "@/server/services/member";
 import { earn, requestRedemption } from "@/server/services/ledger";
 import { createReward } from "@/server/services/rewards";
-import { createSession } from "@/server/auth";
+import { createSession, sessionLookupKey } from "@/server/auth";
 import { db } from "@/server/db";
 import { users, sessions, ledgerEntries, memberships } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -139,7 +139,7 @@ describe("Platform Admin Console & Tenant Suspension (M8)", () => {
     const [staffSessionAfter] = await db
       .select()
       .from(sessions)
-      .where(eq(sessions.token, ownerToken));
+      .where(eq(sessions.token, (await sessionLookupKey(ownerToken))!));
     expect(staffSessionAfter).toBeUndefined();
 
     // 8. Verify suspended tenant CANNOT earn points

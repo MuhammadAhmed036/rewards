@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionContext } from "./index";
+import { readSessionCookie } from "./session-response";
 import { RequestContext, UserRole } from "../security/permissions";
 import crypto from "crypto";
 
@@ -19,7 +20,7 @@ export async function guardApiRequest(
   const bearerToken = authHeader?.startsWith("Bearer ")
     ? authHeader.slice(7)
     : null;
-  const cookieToken = request.cookies.get("loyalty_session")?.value || null;
+  const cookieToken = readSessionCookie(request);
   const token = bearerToken || cookieToken;
 
   const tenantSlugOrId =

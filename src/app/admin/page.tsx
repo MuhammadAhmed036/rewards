@@ -119,7 +119,7 @@ export default function PlatformAdminPage() {
   const [addOwnerEmail, setAddOwnerEmail] = useState("");
   const [addPassword, setAddPassword] = useState("Password123!");
   const [addLocationName, setAddLocationName] = useState("Main Branch");
-  const [addBrandColor, setAddBrandColor] = useState("#4f46e5");
+  const [addBrandColor, setAddBrandColor] = useState("#495e57");
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState("");
   const [createdTenantData, setCreatedTenantData] = useState<{
@@ -194,7 +194,7 @@ export default function PlatformAdminPage() {
     setAddOwnerEmail("");
     setAddPassword("Password123!");
     setAddLocationName("Main Branch");
-    setAddBrandColor("#4f46e5");
+    setAddBrandColor("#495e57");
     setAddError("");
     setCreatedTenantData(null);
     setCopiedLink(false);
@@ -327,7 +327,7 @@ export default function PlatformAdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-zinc-900 flex flex-col font-sans selection:bg-zinc-900 selection:text-white overflow-x-hidden w-full max-w-full">
+    <div className="min-h-screen bg-paper text-zinc-900 flex flex-col font-sans overflow-x-hidden w-full max-w-full">
       {/* Top Header */}
       <header className="border-b border-zinc-200/80 bg-white/95 backdrop-blur sticky top-0 z-30 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-0 sm:h-16 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -339,7 +339,7 @@ export default function PlatformAdminPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-sm sm:text-base font-bold text-zinc-950 leading-tight">Platform Admin Console</h1>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-600 border border-zinc-200">
+                  <span className="text-xs font-semibold px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-600 border border-zinc-200">
                     Cluster
                   </span>
                 </div>
@@ -434,10 +434,10 @@ export default function PlatformAdminPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-extrabold uppercase tracking-wider text-[10px]">Total Businesses</span>
+                  <span className="font-extrabold text-xs">Total Businesses</span>
                   <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-bold">{tenants.filter((t) => t.status === "active").length} Active</span>
                 </div>
-                <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
+                <div className="text-3xl font-bold text-slate-950 mt-1.5 tabular-nums">
                   {tenants.length}
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">Multi-tenant database isolates</p>
@@ -445,10 +445,10 @@ export default function PlatformAdminPage() {
 
               <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-extrabold uppercase tracking-wider text-[10px]">Active Locations</span>
+                  <span className="font-extrabold text-xs">Active Locations</span>
                   <span className="text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded font-bold">UK Network</span>
                 </div>
-                <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
+                <div className="text-3xl font-bold text-slate-950 mt-1.5 tabular-nums">
                   {tenants.reduce((acc, t) => acc + (t.stats?.locationCount || 0), 0)}
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">Cashier terminal branches</p>
@@ -456,10 +456,10 @@ export default function PlatformAdminPage() {
 
               <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-extrabold uppercase tracking-wider text-[10px]">Platform Members</span>
+                  <span className="font-extrabold text-xs">Platform Members</span>
                   <span className="text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded font-bold">Cross-Tenant</span>
                 </div>
-                <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
+                <div className="text-3xl font-bold text-slate-950 mt-1.5 tabular-nums">
                   {tenants.reduce((acc, t) => acc + (t.stats?.memberCount || 0), 0).toLocaleString()}
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">Enrolled customer passes</p>
@@ -467,10 +467,10 @@ export default function PlatformAdminPage() {
 
               <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-extrabold uppercase tracking-wider text-[10px]">Ledger Points Liability</span>
+                  <span className="font-extrabold text-xs">Ledger Points Liability</span>
                   <span className="text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-bold">Audited</span>
                 </div>
-                <div className="text-3xl font-black text-amber-700 mt-1.5 tabular-nums">
+                <div className="text-3xl font-bold text-amber-700 mt-1.5 tabular-nums">
                   {tenants.reduce((acc, t) => acc + (t.stats?.outstandingPoints || 0), 0).toLocaleString()} <span className="text-sm font-semibold text-slate-400">pts</span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">Total points outstanding</p>
@@ -521,7 +521,7 @@ export default function PlatformAdminPage() {
             <Card className="bg-white border-slate-200 overflow-hidden shadow-xs rounded-3xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-slate-900">
-                  <thead className="bg-slate-50 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                  <thead className="bg-slate-50 text-xs font-extrabold text-slate-500 border-b border-slate-200">
                     <tr>
                       <th className="px-6 py-3.5">Business</th>
                       <th className="px-6 py-3.5">Slug</th>
@@ -665,7 +665,7 @@ export default function PlatformAdminPage() {
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
               <div>
-                <h2 className="text-xl font-black text-slate-950 tracking-tight">Enrolled Customer Directory</h2>
+                <h2 className="text-xl font-bold text-slate-950 tracking-tight">Enrolled Customer Directory</h2>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Real-time visibility into all customers registered across the loyalty platform
                 </p>
@@ -706,7 +706,7 @@ export default function PlatformAdminPage() {
             <Card className="bg-white border-slate-200 overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500">
                     <tr>
                       <th className="p-4">Customer</th>
                       <th className="p-4">Email</th>
@@ -736,25 +736,25 @@ export default function PlatformAdminPage() {
                           <td className="p-4">
                             <span className="font-bold text-slate-900 block text-xs">{c.name || "Customer Member"}</span>
                           </td>
-                          <td className="p-4 font-mono text-[11px] text-slate-600">
+                          <td className="p-4 text-sm text-slate-600">
                             {c.email}
                           </td>
                           <td className="p-4">
                             <span className="font-bold text-slate-800 block text-xs">{c.tenantName}</span>
-                            <span className="text-[10px] font-mono text-slate-400">/b/{c.tenantSlug}</span>
+                            <span className="text-xs font-mono text-slate-400">/b/{c.tenantSlug}</span>
                           </td>
                           <td className="p-4 font-mono font-bold text-indigo-600">
                             #{c.memberNumber}
                           </td>
                           <td className="p-4">
-                            <span className="font-black text-sm text-slate-900">{c.balance ?? 0}</span>{" "}
-                            <span className="text-[10px] text-slate-400 uppercase">pts</span>
+                            <span className="font-bold text-sm text-slate-900">{c.balance ?? 0}</span>{" "}
+                            <span className="text-xs text-slate-400">pts</span>
                           </td>
                           <td className="p-4 text-slate-500 text-[11px]">
                             {new Date(c.joinedAt).toLocaleDateString()}
                           </td>
                           <td className="p-4">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border ${
                               c.status === "active"
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                 : "bg-rose-50 text-rose-700 border-rose-200"
@@ -787,7 +787,7 @@ export default function PlatformAdminPage() {
                 {/* Database Card */}
                 <Card className="bg-white border-slate-200 p-6 space-y-4 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <span className="text-xs font-semibold text-slate-500">
                       Database Health
                     </span>
                     <Server className="w-5 h-5 text-indigo-600" />
@@ -809,7 +809,7 @@ export default function PlatformAdminPage() {
                 {/* Email Outbox Card */}
                 <Card className="bg-white border-slate-200 p-6 space-y-4 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <span className="text-xs font-semibold text-slate-500">
                       Email Outbox Queue
                     </span>
                     <Mail className="w-5 h-5 text-indigo-600" />
@@ -827,7 +827,7 @@ export default function PlatformAdminPage() {
                 {/* Tenants Breakdown */}
                 <Card className="bg-white border-slate-200 p-6 space-y-4 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <span className="text-xs font-semibold text-slate-500">
                       Platform Tenants
                     </span>
                     <Building2 className="w-5 h-5 text-indigo-600" />
@@ -859,7 +859,7 @@ export default function PlatformAdminPage() {
             <Card className="bg-white border-slate-200 overflow-hidden shadow-xs rounded-3xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-slate-700">
-                  <thead className="bg-slate-50 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                  <thead className="bg-slate-50 text-xs font-extrabold text-slate-500 border-b border-slate-200">
                     <tr>
                       <th className="px-6 py-3">Timestamp (UTC)</th>
                       <th className="px-6 py-3">Action</th>
@@ -1205,7 +1205,7 @@ export default function PlatformAdminPage() {
                 {/* Handover Cards */}
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-left space-y-3 text-xs">
                   <div>
-                    <label className="text-[11px] font-bold uppercase text-slate-500 block">Customer Webpage URL</label>
+                    <label className="text-[11px] font-bold capitalize text-slate-500 block">Customer Webpage URL</label>
                     <div className="flex items-center justify-between gap-2 mt-1 p-2 rounded-lg bg-slate-900 border border-slate-800">
                       <span className="font-mono text-indigo-300 truncate">
                         {typeof window !== "undefined" ? window.location.origin : ""}/b/{createdTenantData.slug}
@@ -1239,11 +1239,11 @@ export default function PlatformAdminPage() {
 
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
                     <div>
-                      <label className="text-[11px] font-bold uppercase text-slate-500 block">Owner Login Email</label>
+                      <label className="text-[11px] font-bold capitalize text-slate-500 block">Owner Login Email</label>
                       <p className="font-mono text-slate-200 mt-0.5">{createdTenantData.ownerEmail}</p>
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold uppercase text-slate-500 block">Owner Password</label>
+                      <label className="text-[11px] font-bold capitalize text-slate-500 block">Owner Password</label>
                       <p className="font-mono text-slate-200 mt-0.5">{createdTenantData.ownerPassword}</p>
                     </div>
                   </div>

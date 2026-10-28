@@ -3,6 +3,8 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { BusinessLogo } from "@/components/brand/BusinessLogo";
+import { LogoUploader } from "@/components/brand/LogoUploader";
 import {
   Lock,
   Mail,
@@ -57,6 +59,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
   // Sign Up inputs (Business Owner only)
   const [signupName, setSignupName] = useState("");
   const [signupBusinessName, setSignupBusinessName] = useState("");
+  const [signupLogo, setSignupLogo] = useState<string | null>(null);
   const [signupCategory, setSignupCategory] = useState("Coffee Shop & Cafe");
   const [signupStaffCount, setSignupStaffCount] = useState(5);
   const [signupManagerCount, setSignupManagerCount] = useState(2);
@@ -124,7 +127,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
       const res = await fetch("/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: e, password: p }),
+        body: JSON.stringify({ email: e, password: p, portal: "admin" }),
       });
 
       const json = await res.json();
@@ -180,6 +183,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
           requestedStaffCount: Number(signupStaffCount),
           requestedManagerCount: Number(signupManagerCount),
           programmeType: signupProgrammeType,
+          logoDataUrl: signupLogo || undefined,
         }),
       });
 
@@ -245,17 +249,17 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                   <Building2 className="w-4 h-4 stroke-[1.8]" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-zinc-950 leading-tight">
-                    Registered Businesses &amp; Storefronts
+                  <h2 className="text-xl font-bold text-evergreen-deep leading-tight">
+                    Find your shop
                   </h2>
-                  <p className="text-[11px] text-zinc-500 font-medium">
-                    Store owners, staff &amp; customers access via their dedicated link:
+                  <p className="text-sm text-zinc-600">
+                    Customers, staff and owners all sign in on their shop&rsquo;s page.
                   </p>
                 </div>
               </div>
 
-              <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 border border-zinc-200/60 font-mono">
-                {registeredTenants.length} Stores
+              <span className="text-sm text-zinc-500 shrink-0">
+                {registeredTenants.length} shops
               </span>
             </div>
 
@@ -264,10 +268,10 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
               <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5 stroke-[1.8]" />
               <input
                 type="text"
-                placeholder="Search registered stores by name or industry..."
+                placeholder="Search by shop name or type of business"
                 value={storeSearchQuery}
                 onChange={(e) => setStoreSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
+                className="w-full pl-9 pr-3 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white transition-all font-medium text-zinc-900"
               />
             </div>
 
@@ -285,7 +289,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
             ) : (
               <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
                 {filteredStores.map((store) => {
-                  const brandColor = store.brandPrimaryHex || "#18181b";
+                  const brandColor = store.brandPrimaryHex || "#495e57";
                   const storeUrl = `/b/${store.slug}`;
                   const isPending = store.status === "pending";
 
@@ -295,19 +299,14 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       className="p-3 rounded-xl border border-zinc-200/80 bg-zinc-50/50 hover:bg-white hover:border-zinc-300 hover:shadow-xs transition-all flex items-center justify-between gap-3 group"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <span
-                          className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-2xs shrink-0"
-                          style={{ backgroundColor: brandColor }}
-                        >
-                          {store.name.slice(0, 1)}
-                        </span>
+                        <BusinessLogo name={store.name} logoUrl={store.logoUrl} brandColor={brandColor} size="sm" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <h3 className="font-bold text-xs text-zinc-950 truncate">
                               {store.name}
                             </h3>
                             <span
-                              className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.2 rounded shrink-0 border ${
+                              className={`text-[11px] font-semibold px-1.5 py-0.2 rounded shrink-0 border ${
                                 isPending
                                   ? "bg-amber-50 text-amber-800 border-amber-200"
                                   : "bg-emerald-50 text-emerald-800 border-emerald-200"
@@ -316,7 +315,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                               {isPending ? "Pending" : "Active"}
                             </span>
                           </div>
-                          <p className="text-[10px] text-zinc-400 font-mono truncate">
+                          <p className="text-xs text-zinc-400 truncate">
                             /b/{store.slug}
                           </p>
                         </div>
@@ -326,7 +325,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                         href={storeUrl}
                         className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-zinc-800 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-lg shadow-2xs transition-colors shrink-0 group-hover:border-zinc-300"
                       >
-                        <span>Visit Store</span>
+                        <span>Open</span>
                         <ArrowRight className="w-3 h-3 text-zinc-500 group-hover:translate-x-0.5 transition-transform stroke-[1.8]" />
                       </Link>
                     </div>
@@ -338,12 +337,8 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
 
           {/* Bottom Security Pill */}
           <div className="mt-4 pt-3 border-t border-zinc-100 flex items-center justify-between text-[11px] text-zinc-500">
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-zinc-900 stroke-[1.8]" />
-              Strict Multi-Tenant RLS &amp; Ledger Audit
-            </span>
-            <span className="text-zinc-400 font-mono text-[10px]">
-              PostgreSQL 16
+            <span className="text-sm">
+              Can&rsquo;t see your shop? Ask the owner for their link.
             </span>
           </div>
         </div>
@@ -354,21 +349,21 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
         <div className="lg:col-span-6 bg-white rounded-2xl border border-zinc-200/90 shadow-sm p-5 sm:p-6 flex flex-col justify-between">
           <div>
             {/* Mode Switcher Tabs */}
-            <div className="flex bg-zinc-100 p-1 rounded-xl border border-zinc-200 mb-4">
+            <div className="flex bg-zinc-100 p-1 rounded-full mb-5">
               <button
                 type="button"
                 onClick={() => {
                   setMode("signin");
                   setError(null);
                 }}
-                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 text-sm font-semibold rounded-full transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
                   mode === "signin"
-                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    ? "bg-evergreen text-white"
                     : "text-zinc-600 hover:text-zinc-900"
                 }`}
               >
                 <KeyRound className="w-3.5 h-3.5 stroke-[1.8]" />
-                <span>Super Admin Login</span>
+                <span>Platform admin</span>
               </button>
               <button
                 type="button"
@@ -376,14 +371,14 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                   setMode("signup");
                   setError(null);
                 }}
-                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 text-sm font-semibold rounded-full transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
                   mode === "signup"
-                    ? "bg-white text-zinc-950 shadow-2xs font-bold"
+                    ? "bg-evergreen text-white"
                     : "text-zinc-600 hover:text-zinc-900"
                 }`}
               >
                 <UserPlus className="w-3.5 h-3.5 stroke-[1.8]" />
-                <span>Register Business</span>
+                <span>Register a business</span>
               </button>
             </div>
 
@@ -402,7 +397,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                   <CheckCircle2 className="w-6 h-6 stroke-[1.8]" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-800 bg-emerald-200/60 px-2 py-0.5 rounded-full">
+                  <span className="text-xs font-semibold text-emerald-800 bg-emerald-200/60 px-2 py-0.5 rounded-full">
                     Storefront Created
                   </span>
                   <h3 className="font-bold text-base text-zinc-950 mt-1.5">
@@ -415,7 +410,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
 
                 {/* Direct Store URL Box */}
                 <div className="bg-white p-3 rounded-xl border border-emerald-300 text-left space-y-1 shadow-2xs">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 block">
+                  <span className="text-xs font-semibold text-zinc-500 block">
                     Your Dedicated Store Website Link:
                   </span>
                   <div className="flex items-center gap-1.5">
@@ -440,7 +435,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                 <div className="pt-1 space-y-2">
                   <Link
                     href={`/b/${createdStoreData.slug}`}
-                    className="w-full py-2.5 px-4 bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl font-medium text-xs flex items-center justify-center gap-2 transition-colors shadow-xs"
+                    className="w-full py-2.5 px-4 bg-evergreen hover:bg-evergreen-deep text-white rounded-full font-semibold text-sm flex items-center justify-center gap-2 transition-colors shadow-xs"
                   >
                     <span>Open Your Store Website Page</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -454,7 +449,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                     }}
                     className="text-xs text-zinc-500 hover:text-zinc-900 font-medium underline cursor-pointer"
                   >
-                    Return to Super Admin Login
+                    Back to sign in
                   </button>
                 </div>
               </div>
@@ -462,11 +457,11 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
               /* VIEW B: PLATFORM SUPER ADMIN CONSOLE LOGIN */
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-base font-bold text-zinc-950">
-                    Platform Super Admin Console
+                  <h3 className="text-xl font-bold text-evergreen-deep">
+                    Platform admin sign-in
                   </h3>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    Restricted platform access to audit multi-tenant ledgers, configure rate limits, and inspect health.
+                  <p className="text-sm text-zinc-600 mt-1">
+                    For the LoyaltyPlatform team only. Shop owners, staff and customers: pick your shop on the left.
                   </p>
                 </div>
 
@@ -479,8 +474,8 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                   <div className="flex items-center gap-2.5">
                     <ShieldCheck className="w-4 h-4 text-zinc-900 shrink-0 stroke-[1.8]" />
                     <div>
-                      <p className="font-semibold text-xs text-zinc-900">1-Click Platform Super Admin Demo</p>
-                      <p className="text-[10px] text-zinc-500 font-mono">admin@platform.local</p>
+                      <p className="font-semibold text-sm text-zinc-900">Demo admin account</p>
+                      <p className="text-xs text-zinc-500 font-mono">admin@platform.local</p>
                     </div>
                   </div>
                   <span className="text-[11px] font-semibold text-zinc-800 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
@@ -508,7 +503,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                         onChange={(e) => setAdminEmail(e.target.value)}
                         placeholder="admin@platform.local"
                         required
-                        className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
+                        className="w-full pl-9 pr-3 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white transition-all font-medium text-zinc-900"
                       />
                     </div>
                   </div>
@@ -525,7 +520,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                         onChange={(e) => setAdminPassword(e.target.value)}
                         placeholder="••••••••"
                         required
-                        className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
+                        className="w-full pl-9 pr-3 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white transition-all font-medium text-zinc-900"
                       />
                     </div>
                   </div>
@@ -533,26 +528,22 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-2.5 px-4 bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl font-medium text-xs flex items-center justify-center gap-2 shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
+                    className="w-full py-2.5 px-4 bg-evergreen hover:bg-evergreen-deep text-white rounded-full font-semibold text-sm flex items-center justify-center gap-2 shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
                   >
-                    {loading ? "Signing in..." : "Sign In to Super Admin Console →"}
+                    {loading ? "Signing in..." : "Sign in"}
                   </button>
                 </form>
 
-                {/* Explicit Guidance for Store Owners */}
-                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 text-[11px] text-zinc-600 leading-relaxed">
-                  <strong className="text-zinc-900 font-semibold">Store Owner Notice:</strong> Owners and staff log in directly on their store website (e.g. <span className="font-mono text-zinc-900 font-semibold">/b/your-store</span>), not on the platform console. Select your store on the left to open its portal.
-                </div>
               </div>
             ) : (
               /* VIEW C: BUSINESS OWNER SIGN UP ONLY */
               <div className="space-y-3.5">
                 <div>
-                  <h3 className="text-base font-bold text-zinc-950">
-                    Register Business &amp; Launch Store
+                  <h3 className="text-xl font-bold text-evergreen-deep">
+                    Register your business
                   </h3>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    Your dedicated store loyalty website will be created immediately upon registration.
+                  <p className="text-sm text-zinc-600 mt-1">
+                    We&rsquo;ll create your shop&rsquo;s loyalty page straight away.
                   </p>
                 </div>
 
@@ -568,7 +559,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                         value={signupName}
                         onChange={(e) => setSignupName(e.target.value)}
                         required
-                        className="w-full px-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
+                        className="w-full px-3 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white transition-all font-medium text-zinc-900"
                       />
                     </div>
 
@@ -582,9 +573,19 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                         value={signupBusinessName}
                         onChange={(e) => setSignupBusinessName(e.target.value)}
                         required
-                        className="w-full px-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
+                        className="w-full px-3 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white transition-all font-medium text-zinc-900"
                       />
                     </div>
+                  </div>
+
+                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                    <p className="text-[11px] font-semibold text-zinc-700 mb-2">Business logo (optional)</p>
+                    <LogoUploader
+                      businessName={signupBusinessName || "Your business"}
+                      value={signupLogo}
+                      onChange={setSignupLogo}
+                      compact
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -595,7 +596,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       <select
                         value={signupCategory}
                         onChange={(e) => setSignupCategory(e.target.value)}
-                        className="w-full px-2.5 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
+                        className="w-full px-2.5 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white transition-all font-medium text-zinc-900"
                       >
                         <option value="Coffee Shop & Cafe">Coffee Shop &amp; Cafe</option>
                         <option value="Restaurant & Dining">Restaurant &amp; Dining</option>
@@ -615,7 +616,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       <select
                         value={signupProgrammeType}
                         onChange={(e) => setSignupProgrammeType(e.target.value as "points" | "stamps")}
-                        className="w-full px-2.5 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
+                        className="w-full px-2.5 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white transition-all font-medium text-zinc-900"
                       >
                         <option value="points">Points Mode (£1 = 1 Point)</option>
                         <option value="stamps">Stamps Mode (1 Visit = 1 Stamp)</option>
@@ -631,7 +632,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       <select
                         value={signupStaffCount}
                         onChange={(e) => setSignupStaffCount(Number(e.target.value))}
-                        className="w-full px-2.5 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
+                        className="w-full px-2.5 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white transition-all font-medium text-zinc-900"
                       >
                         <option value={2}>2 Staff</option>
                         <option value={5}>5 Staff</option>
@@ -647,7 +648,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       <select
                         value={signupManagerCount}
                         onChange={(e) => setSignupManagerCount(Number(e.target.value))}
-                        className="w-full px-2.5 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
+                        className="w-full px-2.5 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white transition-all font-medium text-zinc-900"
                       >
                         <option value={1}>1 Manager</option>
                         <option value={2}>2 Managers</option>
@@ -666,7 +667,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
                       required
-                      className="w-full px-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
+                      className="w-full px-3 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white transition-all font-medium text-zinc-900"
                     />
                   </div>
 
@@ -681,11 +682,11 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       onChange={(e) => setSignupPassword(e.target.value)}
                       required
                       minLength={8}
-                      className="w-full px-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-zinc-900 focus:bg-white transition-all font-medium text-zinc-900"
+                      className="w-full px-3 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white transition-all font-medium text-zinc-900"
                     />
                   </div>
 
-                  <div className="p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-700 text-[10px] leading-relaxed flex items-center gap-2">
+                  <div className="p-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-700 text-xs leading-relaxed flex items-center gap-2">
                     <ShieldCheck className="w-3.5 h-3.5 text-zinc-800 shrink-0 stroke-[1.8]" />
                     <span>Your store website link will be generated automatically upon submission.</span>
                   </div>
@@ -693,7 +694,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-2.5 px-4 bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl font-medium text-xs flex items-center justify-center gap-2 shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
+                    className="w-full py-2.5 px-4 bg-evergreen hover:bg-evergreen-deep text-white rounded-full font-semibold text-sm flex items-center justify-center gap-2 shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     {loading ? "Registering Business..." : "Register Business & Launch Storefront →"}
                   </button>

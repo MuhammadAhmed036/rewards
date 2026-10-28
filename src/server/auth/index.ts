@@ -1,13 +1,21 @@
 import crypto from "crypto";
+// Loads and validates .env (AUTH_SECRET is required to encrypt session cookies)
+import "@/lib/env";
 import { db, DbExecutor } from "../db";
 import { users, sessions, staffMembers, staffLocationScopes, verifications, tenants } from "../db/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, lt, or, inArray, sql } from "drizzle-orm";
+import {
+  SESSION_COOKIE_NAME,
+  SESSION_POLICY,
+  SessionKind,
+  decryptSessionCookie,
+  encryptSessionCookie,
+  generateSessionToken,
+  hashSessionToken,
+  initialCookieExpiry,
+} from "@/lib/session-cookie";
 import { RequestContext, UserRole } from "../security/permissions";
 import { cookies } from "next/headers";
-
-const SESSION_COOKIE_NAME = "loyalty_session";
-const STAFF_SESSION_TTL_HOURS = 12;
-const CUSTOMER_SESSION_TTL_DAYS = 30;
 
 // ==========================================
 // Password Hashing (Crypto Scrypt)
@@ -36,66 +44,159 @@ export function verifyPassword(password: string, hash: string): Promise<boolean>
 // ==========================================
 // Session Management
 // ==========================================
+// The cookie value is an encrypted payload (see src/lib/session-cookie.ts);
+// the sessions table stores only SHA-256 of the token inside it.
+
+export type { SessionKind };
+
+/** Session kind for a user: platform admins and active staff get short sessions, everyone else is a customer. */
+export async function sessionKindForUser(userId: string, executor: DbExecutor = db): Promise<SessionKind> {
+  const [user] = await executor
+    .select({ isPlatformAdmin: users.isPlatformAdmin })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (user?.isPlatformAdmin) return "admin";
+
+  const [staff] = await executor
+    .select({ id: staffMembers.id })
+    .from(staffMembers)
+    .where(and(eq(staffMembers.userId, userId), eq(staffMembers.status, "active")))
+    .limit(1);
+  return staff ? "staff" : "customer";
+}
+
+/**
+ * Starts a session. `token` is the encrypted cookie value to send to the browser and
+ * `expiresAt` is when that cookie expires.
+ */
 export async function createSession(
   userId: string,
-  isStaff: boolean = false,
+  kind: SessionKind = "customer",
   userAgent?: string,
   ipAddress?: string,
   executor: DbExecutor = db
-): Promise<{ token: string; expiresAt: Date }> {
-  const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date();
-  if (isStaff) {
-    expiresAt.setHours(expiresAt.getHours() + STAFF_SESSION_TTL_HOURS);
-  } else {
-    expiresAt.setDate(expiresAt.getDate() + CUSTOMER_SESSION_TTL_DAYS);
-  }
+): Promise<{ token: string; expiresAt: Date; kind: SessionKind }> {
+  const now = Date.now();
+  const rawToken = generateSessionToken();
+  const policy = SESSION_POLICY[kind];
+  const cookieExpiry = initialCookieExpiry(kind, now);
 
   await executor.insert(sessions).values({
     userId,
-    token,
-    expiresAt,
-    userAgent: userAgent || null,
+    token: await hashSessionToken(rawToken),
+    expiresAt: new Date(now + policy.idleMs),
+    userAgent: userAgent ? userAgent.slice(0, 512) : null,
     ipAddress: ipAddress || null,
   });
 
-  return { token, expiresAt };
+  const token = await encryptSessionCookie({ t: rawToken, k: kind, iat: now, exp: cookieExpiry });
+  return { token, expiresAt: new Date(cookieExpiry), kind };
+}
+
+/** Database key for a cookie value, or null if the cookie is invalid. */
+export async function sessionLookupKey(cookieValue: string | null | undefined): Promise<string | null> {
+  const payload = await decryptSessionCookie(cookieValue);
+  return payload ? hashSessionToken(payload.t) : null;
 }
 
 export async function invalidateUserSessions(userId: string): Promise<void> {
   await db.delete(sessions).where(eq(sessions.userId, userId));
 }
 
-export async function deleteSession(token: string): Promise<void> {
-  await db.delete(sessions).where(eq(sessions.token, token));
+export async function deleteSession(cookieValue: string): Promise<void> {
+  const key = await sessionLookupKey(cookieValue);
+  if (key) await db.delete(sessions).where(eq(sessions.token, key));
+}
+
+/** Removes sessions past their idle expiry, plus staff/admin sessions past their absolute limit. */
+export async function purgeExpiredSessions(executor: DbExecutor = db): Promise<number> {
+  const now = Date.now();
+  const staffCutoff = new Date(now - (SESSION_POLICY.staff.absoluteMs ?? 0));
+  const elevatedUsers = sql`(SELECT user_id FROM staff_members WHERE status = 'active' UNION SELECT id FROM users WHERE is_platform_admin)`;
+  const deleted = await executor
+    .delete(sessions)
+    .where(
+      or(
+        lt(sessions.expiresAt, new Date(now)),
+        // Staff/admin sessions older than the longest absolute limit can never be valid again.
+        and(lt(sessions.createdAt, staffCutoff), inArray(sessions.userId, elevatedUsers))
+      )
+    )
+    .returning({ id: sessions.id });
+  return deleted.length;
 }
 
 // ==========================================
 // Context Resolution
 // ==========================================
 export async function getSessionContext(
-  token: string | null,
+  cookieValue: string | null,
   tenantSlugOrId?: string,
   requestId: string = crypto.randomUUID()
 ): Promise<RequestContext | null> {
-  if (!token) return null;
+  const payload = await decryptSessionCookie(cookieValue);
+  if (!payload) return null;
+  const tokenHash = await hashSessionToken(payload.t);
 
   const now = new Date();
   const sessionRows = await db
     .select({
       sessionId: sessions.id,
       userId: sessions.userId,
+      expiresAt: sessions.expiresAt,
+      createdAt: sessions.createdAt,
       user: users,
     })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
-    .where(and(eq(sessions.token, token), gt(sessions.expiresAt, now)))
+    .where(and(eq(sessions.token, tokenHash), gt(sessions.expiresAt, now)))
     .limit(1);
 
   if (sessionRows.length === 0) return null;
 
   const session = sessionRows[0];
   const user = session.user;
+
+  // The staff lookup also decides which session policy applies to this user right now.
+  const staffRows = user.isPlatformAdmin
+    ? []
+    : await db
+        .select({
+          staff: staffMembers,
+          tenantSlug: tenants.slug,
+        })
+        .from(staffMembers)
+        .innerJoin(tenants, eq(staffMembers.tenantId, tenants.id))
+        .where(
+          and(
+            eq(staffMembers.userId, user.id),
+            eq(staffMembers.status, "active")
+          )
+        );
+
+  const kind: SessionKind = user.isPlatformAdmin ? "admin" : staffRows.length > 0 ? "staff" : "customer";
+  const policy = SESSION_POLICY[kind];
+
+  // Absolute limit: staff and admin sessions end a fixed time after sign-in, however active.
+  if (policy.absoluteMs !== null && now.getTime() - session.createdAt.getTime() > policy.absoluteMs) {
+    await db.delete(sessions).where(eq(sessions.id, session.sessionId));
+    return null;
+  }
+
+  // Idle timeout: push expiry forward while the session is in use (throttled to limit writes).
+  const remaining = session.expiresAt.getTime() - now.getTime();
+  if (remaining > policy.idleMs) {
+    // A customer session now used by someone who became staff: shrink it to the stricter policy.
+    await db
+      .update(sessions)
+      .set({ expiresAt: new Date(now.getTime() + policy.idleMs) })
+      .where(eq(sessions.id, session.sessionId));
+  } else if (policy.idleMs - remaining > policy.refreshMs) {
+    let next = now.getTime() + policy.idleMs;
+    if (policy.absoluteMs !== null) next = Math.min(next, session.createdAt.getTime() + policy.absoluteMs);
+    await db.update(sessions).set({ expiresAt: new Date(next) }).where(eq(sessions.id, session.sessionId));
+  }
 
   // 1. Platform Admin check
   if (user.isPlatformAdmin) {
@@ -109,20 +210,6 @@ export async function getSessionContext(
   }
 
   // 2. Tenant Staff check
-  const staffRows = await db
-    .select({
-      staff: staffMembers,
-      tenantSlug: tenants.slug,
-    })
-    .from(staffMembers)
-    .innerJoin(tenants, eq(staffMembers.tenantId, tenants.id))
-    .where(
-      and(
-        eq(staffMembers.userId, user.id),
-        eq(staffMembers.status, "active")
-      )
-    );
-
   let matchingStaff = null;
   if (tenantSlugOrId) {
     matchingStaff = staffRows.find(

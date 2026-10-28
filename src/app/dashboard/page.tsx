@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { LinksAndPageEditor, LinkConfig } from "@/components/dashboard/LinksAndPageEditor";
+import { BusinessLogo } from "@/components/brand/BusinessLogo";
+import { LogoUploader } from "@/components/brand/LogoUploader";
 import {
   LayoutDashboard,
   Users,
@@ -22,21 +23,11 @@ import {
   Plus,
   RefreshCw,
   Sparkles,
-  ExternalLink,
   LogOut,
-  Building2,
-  ShieldCheck,
-  Activity,
-  Layers,
-  ArrowUpRight,
-  TrendingUp,
   CreditCard,
   History,
-  Lock,
   Clock,
-  ChevronRight,
   Check,
-  AlertTriangle,
   Gift,
   Tag,
   Copy,
@@ -145,6 +136,14 @@ interface RewardRow {
   version: number;
 }
 
+interface BusinessInfo {
+  id: string;
+  slug: string;
+  name: string;
+  brandPrimaryHex: string | null;
+  logoUrl: string | null;
+}
+
 export default function OwnerDashboardPage() {
   const [activeTab, setActiveTab] = useState<
     "overview" | "members" | "ledger" | "rewards" | "products" | "links" | "qr" | "team" | "reports"
@@ -160,6 +159,9 @@ export default function OwnerDashboardPage() {
   const [qrData, setQrData] = useState<{ joinUrl: string; qrPng: string } | null>(null);
 
   const [loading, setLoading] = useState(false);
+  const [business, setBusiness] = useState<BusinessInfo | null>(null);
+  const [savingLogo, setSavingLogo] = useState(false);
+  const [logoMessage, setLogoMessage] = useState<string | null>(null);
   const [memberSearch, setMemberSearch] = useState("");
   const [ledgerSearch, setLedgerSearch] = useState("");
 
@@ -186,6 +188,9 @@ export default function OwnerDashboardPage() {
   const [adjustPoints, setAdjustPoints] = useState("");
   const [adjustReason, setAdjustReason] = useState<"goodwill" | "correction" | "fraud_removal" | "other">("goodwill");
   const [adjustNote, setAdjustNote] = useState("");
+  const [adjustDirection, setAdjustDirection] = useState<"add" | "remove">("add");
+  const [adjustError, setAdjustError] = useState<string | null>(null);
+  const [memberNotice, setMemberNotice] = useState<string | null>(null);
 
   // Reversal modal state
   const [reversingTx, setReversingTx] = useState<LedgerRow | null>(null);
@@ -226,6 +231,38 @@ export default function OwnerDashboardPage() {
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const loadBusiness = async () => {
+    try {
+      const res = await fetch("/api/v1/business");
+      if (res.ok) {
+        const json = await res.json();
+        setBusiness(json.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleSaveLogo = async (logoDataUrl: string | null) => {
+    setSavingLogo(true);
+    setLogoMessage(null);
+    try {
+      const res = await fetch("/api/v1/business", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logoDataUrl }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message?.replace(/^LOGO_\w+: /, "") || "Couldn't save the logo");
+      setBusiness(json.data);
+      setLogoMessage(logoDataUrl ? "Logo saved. It now shows for your staff and customers." : "Logo removed.");
+    } catch (err) {
+      setLogoMessage(err instanceof Error ? err.message : "Couldn't save the logo");
+    } finally {
+      setSavingLogo(false);
     }
   };
 
@@ -385,6 +422,9 @@ export default function OwnerDashboardPage() {
     loadOverview();
     loadMembers();
     loadRewards();
+    loadTeam();
+    loadLinks();
+    loadBusiness();
   }, []);
 
   const loadCampaignQrs = async () => {
@@ -525,30 +565,52 @@ export default function OwnerDashboardPage() {
     }
   };
 
+  const openAdjust = (member: MemberRow) => {
+    setAdjustingMember(member);
+    setAdjustDirection("add");
+    setAdjustPoints("");
+    setAdjustReason("goodwill");
+    setAdjustNote("");
+    setAdjustError(null);
+  };
+
   // Submit Point Adjustment
   const handleConfirmAdjust = async () => {
-    if (!adjustingMember || !adjustPoints || !adjustNote) return;
+    if (!adjustingMember) return;
+    const amount = parseInt(adjustPoints, 10);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setAdjustError("Enter how many points, as a whole number above 0.");
+      return;
+    }
+    if (!adjustNote.trim()) {
+      setAdjustError("Add a short note so you remember why later.");
+      return;
+    }
+    const pointsDelta = adjustDirection === "add" ? amount : -amount;
     setLoading(true);
+    setAdjustError(null);
     try {
-      const res = await fetch(`/api/v1/owner/members/${adjustingMember.id}/adjust`, {
+      const res = await fetch(`/api/v1/owner/members/${adjustingMember.id}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pointsDelta: parseInt(adjustPoints, 10),
-          reasonCode: adjustReason,
-          note: adjustNote,
-        }),
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({ pointsDelta, reasonCode: adjustReason, note: adjustNote.trim() }),
       });
-      if (res.ok) {
-        setAdjustingMember(null);
-        setAdjustPoints("");
-        setAdjustNote("");
-        loadMembers();
-        loadOverview();
-      } else {
-        const json = await res.json();
-        alert(json.error?.message || "Adjustment failed");
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setAdjustError(json?.error?.message || "The points couldn't be changed. Try again.");
+        return;
       }
+      const who = adjustingMember.name || `#${adjustingMember.memberNumber}`;
+      setMemberNotice(
+        `${pointsDelta > 0 ? "Added" : "Removed"} ${Math.abs(pointsDelta)} points ${pointsDelta > 0 ? "to" : "from"} ${who}. New balance: ${json.data.newBalance} points.`
+      );
+      setAdjustingMember(null);
+      setAdjustPoints("");
+      setAdjustNote("");
+      loadMembers();
+      loadOverview();
+    } catch {
+      setAdjustError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -726,344 +788,367 @@ export default function OwnerDashboardPage() {
     );
   });
 
+  const navGroups: Array<{
+    title?: string;
+    items: Array<{ id: typeof activeTab; label: string; icon: typeof LayoutDashboard }>;
+  }> = [
+    { items: [{ id: "overview", label: "Home", icon: LayoutDashboard }] },
+    {
+      title: "Your loyalty card",
+      items: [
+        { id: "rewards", label: "Rewards", icon: Gift },
+        { id: "products", label: "Products & offers", icon: Tag },
+        { id: "qr", label: "QR posters", icon: QrCode },
+        { id: "links", label: "Reviews & links", icon: Share2 },
+      ],
+    },
+    {
+      title: "People",
+      items: [
+        { id: "members", label: "Customers", icon: Users },
+        { id: "team", label: "Staff", icon: UserCheck },
+      ],
+    },
+    {
+      title: "Records",
+      items: [
+        { id: "ledger", label: "Points history", icon: History },
+        { id: "reports", label: "Downloads", icon: FileDown },
+      ],
+    },
+  ];
+  const allNavItems = navGroups.flatMap((g) => g.items);
+
+  const activeRewards = rewardsList.filter((r) => r.status === "active").length;
+  const setupSteps: Array<{ done: boolean; title: string; detail: string; action: string; tab: typeof activeTab }> = [
+    {
+      done: Boolean(business?.logoUrl),
+      title: "Add your logo",
+      detail: "It appears on your customers' cards and the staff scanner.",
+      action: "Add logo",
+      tab: "overview",
+    },
+    {
+      done: activeRewards > 0,
+      title: "Add your first reward",
+      detail: "Something customers work towards, like a free coffee at 8 stamps.",
+      action: "Add a reward",
+      tab: "rewards",
+    },
+    {
+      done: links.length > 0,
+      title: "Add your Google review link",
+      detail: "Customers see it on their card after each visit.",
+      action: "Add links",
+      tab: "links",
+    },
+    {
+      done: team.some((t) => t.role !== "owner" && t.status !== "revoked"),
+      title: "Give your staff a login",
+      detail: "So they can scan cards and add points at the till.",
+      action: "Add staff",
+      tab: "team",
+    },
+    {
+      done: (metrics?.totalMembers || 0) > 0,
+      title: "Print your QR poster",
+      detail: "Put it by the till. Customers scan it to get their card.",
+      action: "Get poster",
+      tab: "qr",
+    },
+  ];
+  const stepsDone = setupSteps.filter((s) => s.done).length;
+
   return (
-    <div className="min-h-screen bg-[#fafafa] text-zinc-900 flex flex-col font-sans selection:bg-zinc-900 selection:text-white overflow-x-hidden w-full max-w-full">
-      {/* Top Enterprise Bar */}
-      <header className="h-16 border-b border-zinc-200/80 bg-white/95 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between sticky top-0 z-40 shadow-2xs">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-zinc-950 text-white flex items-center justify-center font-bold text-sm shadow-xs ring-1 ring-zinc-900/10">
-            <QrCode className="w-4 h-4 stroke-[1.8]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-sm text-zinc-950 tracking-tight">Enterprise ERP</span>
-              <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                Active Production
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-500 font-medium hidden sm:block">
-              PostgreSQL Double-Entry • UK Minor Pence Engine
+    <div className="min-h-screen bg-paper text-zinc-900 flex flex-col overflow-x-hidden w-full max-w-full">
+      {/* Top bar */}
+      <header className="h-16 border-b border-zinc-200 bg-white px-4 sm:px-6 flex items-center justify-between gap-3 sticky top-0 z-40">
+        <div className="flex items-center gap-3 min-w-0">
+          <BusinessLogo
+            name={business?.name || "Your business"}
+            logoUrl={business?.logoUrl}
+            brandColor={business?.brandPrimaryHex}
+            size="md"
+          />
+          <div className="min-w-0">
+            <p className="font-display font-bold text-evergreen-deep leading-tight truncate">
+              {business?.name || "Your business"}
             </p>
+            <p className="text-xs text-zinc-500">Owner dashboard</p>
           </div>
         </div>
 
-        {/* Global Action Tools */}
         <div className="flex items-center gap-2">
           <Link
             href="/staff"
-            className="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-800 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 px-3 py-1.5 rounded-lg transition-all shadow-2xs"
+            className="inline-flex items-center gap-2 text-sm font-semibold bg-evergreen text-white hover:bg-evergreen-deep px-4 py-2 rounded-full transition-colors"
           >
-            <Smartphone className="w-3.5 h-3.5 text-zinc-700 stroke-[1.8]" />
-            <span>Open Staff Scanner</span>
+            <Smartphone className="w-4 h-4" />
+            <span className="hidden sm:inline">Open scanner</span>
+            <span className="sm:hidden">Scan</span>
           </Link>
-
-          <button
-            onClick={() => handleTabChange("reports")}
-            className="hidden lg:inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-800 hover:text-zinc-950 bg-white hover:bg-zinc-50 border border-zinc-200 px-3 py-1.5 rounded-lg transition-all shadow-2xs cursor-pointer"
-          >
-            <FileDown className="w-3.5 h-3.5 text-zinc-700 stroke-[1.8]" />
-            <span>Export Audit Pack</span>
-          </button>
-
           <button
             onClick={async () => {
               await fetch("/api/v1/auth/logout", { method: "POST" });
               window.location.href = "/login";
             }}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 px-3 py-2 rounded-full transition-colors cursor-pointer"
           >
-            <LogOut className="w-3.5 h-3.5 stroke-[1.8]" />
-            <span className="hidden sm:inline">Sign Out</span>
+            <LogOut className="w-4 h-4" />
+            <span className="hidden sm:inline">Sign out</span>
           </button>
         </div>
       </header>
 
-      {/* Mobile Horizontal Navigation Bar */}
-      <div className="md:hidden border-b border-zinc-200/80 bg-white px-3 py-2 overflow-x-auto flex space-x-1.5 sticky top-16 z-30 shadow-2xs">
-        {[
-          { id: "overview", label: "Overview", icon: LayoutDashboard },
-          { id: "rewards", label: "Rewards", icon: Gift },
-          { id: "products", label: "Products", icon: Sparkles },
-          { id: "members", label: "Members", icon: Users },
-          { id: "ledger", label: "Ledger", icon: Receipt },
-          { id: "links", label: "Reviews", icon: Share2 },
-          { id: "qr", label: "QR Signage", icon: QrCode },
-          { id: "team", label: "Team", icon: UserCheck },
-          { id: "reports", label: "Exports", icon: FileDown },
-        ].map((item) => {
+      {/* Mobile navigation */}
+      <nav className="md:hidden border-b border-zinc-200 bg-white px-3 py-2 overflow-x-auto flex gap-1.5 sticky top-16 z-30">
+        {allNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
-              onClick={() => handleTabChange(item.id as typeof activeTab)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors shrink-0 cursor-pointer ${
-                isActive
-                  ? "bg-zinc-950 text-white shadow-2xs"
-                  : "bg-zinc-50 text-zinc-600 hover:text-zinc-900 border border-zinc-200/60"
+              onClick={() => handleTabChange(item.id)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+                isActive ? "bg-evergreen text-white" : "text-zinc-600 hover:bg-zinc-100"
               }`}
             >
-              <Icon className="w-3.5 h-3.5 stroke-[1.8]" />
-              <span>{item.label}</span>
+              <Icon className="w-4 h-4" />
+              {item.label}
             </button>
           );
         })}
-      </div>
+      </nav>
 
       <div className="flex flex-1 flex-col md:flex-row">
-        {/* Left ERP Sidebar (Desktop Only) */}
-        <aside className="hidden md:flex md:w-64 border-r border-zinc-200/80 bg-white p-4 shrink-0 flex-col justify-between">
-          <div>
-            <div className="px-3 py-2 mb-2">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-400 block">
-                Command Console
-              </span>
-            </div>
-
-            <nav className="space-y-1">
-              {[
-                { id: "overview", label: "Executive Overview", icon: LayoutDashboard },
-                { id: "rewards", label: "Rewards & Perks", icon: Gift },
-                { id: "products", label: "Products & Discounts", icon: Sparkles },
-                { id: "members", label: "Customer Members", icon: Users },
-                { id: "ledger", label: "Immutable Ledger", icon: Receipt },
-                { id: "links", label: "Links & Review Hub", icon: Share2 },
-                { id: "qr", label: "Printable QR Signage", icon: QrCode },
-                { id: "team", label: "Team & Staff RBAC", icon: UserCheck },
-                { id: "reports", label: "Audited CSV Exports", icon: FileDown },
-              ].map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleTabChange(item.id as typeof activeTab)}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                      isActive
-                        ? "bg-zinc-950 text-white shadow-2xs"
-                        : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Icon className={`w-4 h-4 ${isActive ? "text-zinc-300" : "text-zinc-400"}`} />
-                      <span>{item.label}</span>
-                    </div>
-                    {isActive && <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* Quick System Telemetry in Sidebar */}
-          <div className="pt-4 border-t border-slate-100 px-2 space-y-3">
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] space-y-1.5">
-              <div className="flex items-center justify-between text-slate-600">
-                <span>Ledger Integrity</span>
-                <span className="text-emerald-600 font-bold">100% Valid</span>
+        {/* Sidebar */}
+        <aside className="hidden md:flex md:w-60 border-r border-zinc-200 bg-white px-3 py-5 shrink-0 flex-col gap-6">
+          {navGroups.map((group, gi) => (
+            <div key={gi}>
+              {group.title && <p className="px-3 mb-1.5 text-xs font-semibold text-zinc-400">{group.title}</p>}
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleTabChange(item.id)}
+                      aria-current={isActive ? "page" : undefined}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
+                        isActive ? "bg-mist text-evergreen-deep font-semibold" : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
+                      }`}
+                    >
+                      <Icon className={`w-[18px] h-[18px] ${isActive ? "text-evergreen" : "text-zinc-400"}`} />
+                      {item.label}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                <div className="w-full h-full bg-emerald-500 rounded-full"></div>
-              </div>
-              <p className="text-[10px] text-slate-400">Append-only triggers active</p>
             </div>
-
-            <div className="text-[11px] text-slate-500 flex items-center justify-between px-1">
-              <span>Environment</span>
-              <span className="font-mono text-indigo-600 font-bold">UK-PROD-01</span>
-            </div>
-          </div>
+          ))}
         </aside>
 
-        {/* Main Command Center Body */}
-        <main className="flex-1 p-6 md:p-8 max-w-7xl overflow-y-auto bg-slate-50">
+        {/* Main */}
+        <main className="flex-1 min-w-0 px-4 py-6 sm:px-8 sm:py-8 max-w-6xl">
           {/* ======================================================== */}
-          {/* TAB 1: EXECUTIVE OVERVIEW                                */}
+          {/* HOME                                                     */}
           {/* ======================================================== */}
           {activeTab === "overview" && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div className="space-y-8">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-950 tracking-tight">Executive Programme Overview</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Live operational metrics reconciled with your immutable double-entry ledger.
+                  <h2 className="font-display text-3xl font-bold text-evergreen-deep">Welcome back</h2>
+                  <p className="text-zinc-600 mt-1">Here&rsquo;s how your loyalty card is doing.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    loadOverview();
+                    loadMembers();
+                  }}
+                  className="self-start sm:self-auto inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-evergreen-deep px-3 py-2 rounded-full hover:bg-white border border-transparent hover:border-zinc-200 transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh
+                </button>
+              </div>
+
+              {/* Numbers */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                {[
+                  { label: "Customers", value: metrics?.totalMembers ?? 0, note: "signed up to your card" },
+                  { label: "Came back", value: metrics?.activeMembers30d ?? 0, note: "visited in the last 30 days" },
+                  { label: "Rewards claimed", value: metrics?.redemptionsCount ?? 0, note: "handed out so far" },
+                ].map((stat) => (
+                  <div key={stat.label} className="rounded-2xl bg-white border border-zinc-200 p-4 sm:p-5">
+                    <p className="text-sm text-zinc-600">{stat.label}</p>
+                    <p className="font-display text-3xl sm:text-4xl font-bold text-evergreen-deep mt-1 tabular-nums">
+                      {stat.value.toLocaleString("en-GB")}
+                    </p>
+                    <p className="text-xs text-zinc-500 mt-1">{stat.note}</p>
+                  </div>
+                ))}
+                <div className="rounded-2xl bg-marigold p-4 sm:p-5 text-evergreen-deep">
+                  <p className="text-sm font-medium">Points waiting to be spent</p>
+                  <p className="font-display text-3xl sm:text-4xl font-bold mt-1 tabular-nums">
+                    {(metrics?.outstandingPoints ?? 0).toLocaleString("en-GB")}
                   </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={loadOverview} className="bg-white border-slate-300 text-xs font-bold text-slate-700 shadow-2xs">
-                    <RefreshCw className="h-3.5 w-3.5 mr-1.5 text-indigo-600" />
-                    Re-Sync Ledger
-                  </Button>
+                  <p className="text-xs mt-1 opacity-80">held by your customers</p>
                 </div>
               </div>
 
-              {/* 4 Executive KPI Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-extrabold uppercase tracking-wider text-[10px]">Total Members</span>
-                    <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-                      <TrendingUp className="w-3 h-3" /> +18.4%
-                    </span>
-                  </div>
-                  <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
-                    {metrics?.totalMembers || 0}
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
-                    <span>Enrolled Customers</span>
-                    <span className="text-emerald-600 font-semibold">Active RLS</span>
-                  </div>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-extrabold uppercase tracking-wider text-[10px]">30-Day Active</span>
-                    <span className="text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
-                      <TrendingUp className="w-3 h-3" /> +24.1%
-                    </span>
-                  </div>
-                  <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
-                    {metrics?.activeMembers30d || 0}
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
-                    <span>Recent Shoppers</span>
-                    <span className="text-indigo-600 font-semibold">High Retention</span>
-                  </div>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-extrabold uppercase tracking-wider text-[10px]">Points Liability</span>
-                    <span className="text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded font-bold">Unredeemed</span>
-                  </div>
-                  <div className="text-3xl font-black text-purple-700 mt-1.5 tabular-nums">
-                    {metrics?.outstandingPoints || 0} <span className="text-sm font-semibold text-slate-400">pts</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
-                    <span>Estimated Cost</span>
-                    <span className="text-slate-700 font-mono font-bold">£{((metrics?.outstandingPoints || 0) * 0.05).toFixed(2)}</span>
-                  </div>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-slate-300 transition-all">
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-extrabold uppercase tracking-wider text-[10px]">Review Clicks</span>
-                    <span className="text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded font-bold">4.9 ★ Rating</span>
-                  </div>
-                  <div className="text-3xl font-black text-amber-700 mt-1.5 tabular-nums">
-                    {metrics?.linkClicksTotal || 0}
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
-                    <span>Google Reviews Hub</span>
-                    <span className="text-amber-600 font-semibold">Anti-Gating</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Enterprise Readiness & Governance Checklist */}
-              <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4" />
-                    </div>
+              {/* Setup checklist */}
+              {stepsDone < setupSteps.length && (
+                <section className="rounded-3xl bg-white border border-zinc-200 p-5 sm:p-7">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-bold text-slate-900">Enterprise Governance & Compliance Audit</h3>
-                      <p className="text-xs text-slate-500">All statutory UK retail loyalty checks are verified and enforced in software.</p>
+                      <h3 className="font-display text-xl font-bold text-evergreen-deep">Get your card ready</h3>
+                      <p className="text-sm text-zinc-600 mt-0.5">
+                        {stepsDone} of {setupSteps.length} done. Finish these and you&rsquo;re ready for customers.
+                      </p>
+                    </div>
+                    <div className="w-full sm:w-48 h-2 rounded-full bg-zinc-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-evergreen transition-all"
+                        style={{ width: `${(stepsDone / setupSteps.length) * 100}%` }}
+                      />
                     </div>
                   </div>
-                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
-                    3/3 Passed
-                  </span>
+                  <ol className="mt-6 divide-y divide-zinc-100">
+                    {setupSteps.map((step, i) => (
+                      <li key={step.title} className="py-4 flex items-center gap-4">
+                        <span
+                          className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-display font-bold ${
+                            step.done ? "bg-evergreen text-white" : "border-2 border-zinc-200 text-zinc-500"
+                          }`}
+                        >
+                          {step.done ? <Check className="w-4 h-4" strokeWidth={3} /> : i + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-semibold ${step.done ? "text-zinc-400 line-through" : "text-zinc-900"}`}>
+                            {step.title}
+                          </p>
+                          {!step.done && <p className="text-sm text-zinc-600">{step.detail}</p>}
+                        </div>
+                        {!step.done && (
+                          <button
+                            onClick={() =>
+                              step.tab === "overview"
+                                ? document.getElementById("business-logo")?.scrollIntoView({ behavior: "smooth", block: "center" })
+                                : handleTabChange(step.tab)
+                            }
+                            className="shrink-0 text-sm font-semibold text-evergreen hover:text-evergreen-deep border border-zinc-200 hover:border-evergreen rounded-full px-4 py-2 transition-colors cursor-pointer"
+                          >
+                            {step.action}
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              )}
+
+              {/* Common jobs */}
+              <section>
+                <h3 className="font-display text-xl font-bold text-evergreen-deep">Things you can do</h3>
+                <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {[
+                    { label: "Add points for a customer", hint: "Opens the scanner", icon: Smartphone, href: "/staff" },
+                    { label: "Create a reward", hint: `${activeRewards} live now`, icon: Gift, tab: "rewards" as const },
+                    { label: "Print your QR poster", hint: "For the till or window", icon: QrCode, tab: "qr" as const },
+                    { label: "Download your data", hint: "Spreadsheets for your records", icon: Download, tab: "reports" as const },
+                  ].map((job) => {
+                    const Icon = job.icon;
+                    const inner = (
+                      <>
+                        <span className="w-10 h-10 rounded-xl bg-mist text-evergreen flex items-center justify-center">
+                          <Icon className="w-5 h-5" />
+                        </span>
+                        <span className="mt-4 block font-semibold text-zinc-900">{job.label}</span>
+                        <span className="block text-sm text-zinc-500">{job.hint}</span>
+                      </>
+                    );
+                    const cls =
+                      "text-left rounded-2xl bg-white border border-zinc-200 p-4 sm:p-5 hover:border-evergreen transition-colors cursor-pointer";
+                    return job.href ? (
+                      <Link key={job.label} href={job.href} className={cls}>
+                        {inner}
+                      </Link>
+                    ) : (
+                      <button key={job.label} onClick={() => handleTabChange(job.tab!)} className={cls}>
+                        {inner}
+                      </button>
+                    );
+                  })}
                 </div>
+              </section>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-slate-900">Immutable Ledger Active</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">DB trigger prevents mutation or silent balance changes.</p>
-                    </div>
-                  </div>
+              {/* Business logo */}
+              <section id="business-logo" className="rounded-3xl bg-white border border-zinc-200 p-5 sm:p-7 scroll-mt-24">
+                <h3 className="font-display text-xl font-bold text-evergreen-deep">Your logo</h3>
+                <p className="text-sm text-zinc-600 mt-0.5 mb-5">
+                  Shown on your customers&rsquo; loyalty cards, on the staff scanner and here.
+                </p>
+                <LogoUploader
+                  businessName={business?.name || "Your business"}
+                  value={business?.logoUrl || null}
+                  brandColor={business?.brandPrimaryHex}
+                  onChange={handleSaveLogo}
+                  busy={savingLogo}
+                />
+                {logoMessage && <p className="mt-3 text-sm text-zinc-700">{logoMessage}</p>}
+              </section>
 
-                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-slate-900">Anti-Gating Compliance Verified</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Google Review link is never filtered by survey sentiment.</p>
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-bold text-slate-900">UK Minor Units Engine</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">Calculations run exclusively in pence to eliminate float drift.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Recent Registered Customers Widget on Overview */}
-              <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 flex items-center justify-center">
-                      <Users className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900">Recent Customer Registrations</h3>
-                      <p className="text-xs text-slate-500">Live feed of customers who recently created loyalty accounts at your store</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setActiveTab("members");
-                      loadMembers();
-                    }}
-                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
-                  >
-                    View All {members.length} Members →
-                  </Button>
+              {/* Newest customers */}
+              <section className="rounded-3xl bg-white border border-zinc-200 p-5 sm:p-7">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-display text-xl font-bold text-evergreen-deep">Newest customers</h3>
+                  {members.length > 0 && (
+                    <button
+                      onClick={() => handleTabChange("members")}
+                      className="text-sm font-semibold text-evergreen hover:text-evergreen-deep cursor-pointer"
+                    >
+                      See all {members.length}
+                    </button>
+                  )}
                 </div>
 
                 {members.length === 0 ? (
-                  <div className="p-6 text-center text-slate-400 text-xs">
-                    No customer members enrolled yet. Customers will appear here as soon as they sign up on your store portal.
+                  <div className="mt-6 rounded-2xl bg-paper p-6 text-center">
+                    <p className="font-semibold text-zinc-900">No customers yet</p>
+                    <p className="text-sm text-zinc-600 mt-1">
+                      Put your QR poster by the till. Customers appear here as soon as they scan it.
+                    </p>
+                    <button
+                      onClick={() => handleTabChange("qr")}
+                      className="mt-4 text-sm font-semibold bg-evergreen text-white rounded-full px-4 py-2 hover:bg-evergreen-deep cursor-pointer"
+                    >
+                      Get my QR poster
+                    </button>
                   </div>
                 ) : (
-                  <div className="divide-y divide-slate-100">
+                  <ul className="mt-4 divide-y divide-zinc-100">
                     {members.slice(0, 5).map((m) => (
-                      <div key={m.id} className="py-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs uppercase">
+                      <li key={m.id} className="py-3 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-full bg-mist text-evergreen-deep flex items-center justify-center font-bold text-sm uppercase shrink-0">
                             {(m.name || m.email || "C").slice(0, 2)}
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-xs text-slate-900">{m.name || "Customer Member"}</span>
-                              <span className="text-[10px] font-mono text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded font-bold">
-                                #{m.memberNumber}
-                              </span>
-                            </div>
-                            <span className="text-[11px] text-slate-500 font-mono block">✉ {m.email}</span>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-zinc-900 truncate">{m.name || "Customer"}</p>
+                            <p className="text-sm text-zinc-500 truncate">
+                              #{m.memberNumber}, joined {new Date(m.joinedAt).toLocaleDateString("en-GB")}
+                            </p>
                           </div>
                         </div>
-
-                        <div className="text-right">
-                          <span className="text-xs font-black text-slate-900">{m.balance} pts</span>
-                          <span className="text-[10px] text-slate-400 block">
-                            Enrolled: {new Date(m.joinedAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
+                        <span className="shrink-0 text-sm font-bold text-purple-800 bg-purple-50 border border-purple-200 rounded-full px-3 py-1 tabular-nums">
+                          {m.balance} pts
+                        </span>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 )}
-              </div>
+              </section>
             </div>
           )}
 
@@ -1074,10 +1159,8 @@ export default function OwnerDashboardPage() {
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-950 tracking-tight">Programme Rewards &amp; Perks</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Define point/stamp thresholds for customer rewards. Eligible members unlock vouchers to claim at counter.
-                  </p>
+                  <h2 className="font-display text-3xl font-bold text-evergreen-deep">Rewards</h2>
+                  <p className="text-zinc-600 mt-1">What customers can get with their points. Staff confirm each one at the till.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -1094,10 +1177,10 @@ export default function OwnerDashboardPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
                   <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-extrabold uppercase tracking-wider text-[10px]">Active Rewards</span>
+                    <span className="font-extrabold text-xs">Active Rewards</span>
                     <Gift className="w-4 h-4 text-indigo-600" />
                   </div>
-                  <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
+                  <div className="text-3xl font-bold text-slate-950 mt-1.5 tabular-nums">
                     {rewardsList.filter((r) => r.status === "active").length}
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1">Live in customer pass hub</p>
@@ -1105,10 +1188,10 @@ export default function OwnerDashboardPage() {
 
                 <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
                   <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-extrabold uppercase tracking-wider text-[10px]">Total Redemptions</span>
+                    <span className="font-extrabold text-xs">Total Redemptions</span>
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   </div>
-                  <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
+                  <div className="text-3xl font-bold text-slate-950 mt-1.5 tabular-nums">
                     {rewardsList.reduce((acc, r) => acc + (r.quantityRedeemed || 0), 0)}
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1">Confirmed by staff scanner</p>
@@ -1116,10 +1199,10 @@ export default function OwnerDashboardPage() {
 
                 <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
                   <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span className="font-extrabold uppercase tracking-wider text-[10px]">Lowest Unlock Cost</span>
+                    <span className="font-extrabold text-xs">Lowest Unlock Cost</span>
                     <Sparkles className="w-4 h-4 text-amber-500" />
                   </div>
-                  <div className="text-3xl font-black text-slate-950 mt-1.5 tabular-nums">
+                  <div className="text-3xl font-bold text-slate-950 mt-1.5 tabular-nums">
                     {rewardsList.length > 0
                       ? `${Math.min(...rewardsList.map((r) => r.costPoints))} pts`
                       : "—"}
@@ -1134,7 +1217,7 @@ export default function OwnerDashboardPage() {
                   <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 mx-auto flex items-center justify-center mb-3">
                     <Gift className="w-7 h-7" />
                   </div>
-                  <h3 className="text-base font-black text-slate-900">No Active Rewards Configured</h3>
+                  <h3 className="text-base font-bold text-slate-900">No Active Rewards Configured</h3>
                   <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-5">
                     Your customers currently see &ldquo;0 Rewards Active&rdquo;. Create your first reward (such as &ldquo;Free Coffee&rdquo; at 8 points, or a test reward at 1 point) so customers can unlock and claim rewards!
                   </p>
@@ -1161,11 +1244,11 @@ export default function OwnerDashboardPage() {
                       >
                         <div>
                           <div className="flex items-start justify-between gap-2">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                            <span className="text-xs font-extrabold capitalize px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                               {reward.type.replace("_", " ")}
                             </span>
                             <span
-                              className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                              className={`text-xs font-bold capitalize px-2 py-0.5 rounded-full ${
                                 reward.status === "active"
                                   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                   : "bg-amber-50 text-amber-700 border border-amber-200"
@@ -1187,7 +1270,7 @@ export default function OwnerDashboardPage() {
 
                           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                             <span className="text-slate-400 font-semibold">Cost:</span>
-                            <span className="font-black text-indigo-700 text-sm">
+                            <span className="font-bold text-indigo-700 text-sm">
                               {reward.costPoints} points / stamps
                             </span>
                           </div>
@@ -1235,10 +1318,8 @@ export default function OwnerDashboardPage() {
             <div className="space-y-8">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-950 tracking-tight">Products & Offer QR Codes</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Define catalog items, storewide discounts, and generate dynamic promotional QR codes for customers.
-                  </p>
+                  <h2 className="font-display text-3xl font-bold text-evergreen-deep">Products &amp; offers</h2>
+                  <p className="text-zinc-600 mt-1">Your menu or price list, today&rsquo;s discount, and special-offer QR codes.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -1269,11 +1350,11 @@ export default function OwnerDashboardPage() {
               {/* Today's Storewide Discount Banner */}
               <div className="p-5 rounded-3xl bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border border-indigo-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-md shadow-indigo-600/25">
+                  <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-600/25">
                     %
                   </div>
                   <div>
-                    <h3 className="font-black text-sm text-slate-900">Today's Promotional Store Discount</h3>
+                    <h3 className="font-bold text-sm text-slate-900">Today's Promotional Store Discount</h3>
                     <p className="text-xs text-slate-600 mt-0.5">
                       Apply a storewide discount across all products for today (e.g. Happy Hour or Daily Special).
                     </p>
@@ -1289,7 +1370,7 @@ export default function OwnerDashboardPage() {
                       max={100}
                       value={storewideDiscountInput}
                       onChange={(e) => setStorewideDiscountInput(e.target.value)}
-                      className="w-14 text-xs font-black text-indigo-700 focus:outline-none"
+                      className="w-14 text-xs font-bold text-indigo-700 focus:outline-none"
                     />
                     <span className="text-xs font-bold text-slate-700">%</span>
                   </div>
@@ -1308,13 +1389,13 @@ export default function OwnerDashboardPage() {
                 <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-indigo-600" />
-                    <h3 className="font-bold text-xs uppercase tracking-wider text-slate-700">Products & Menu Catalog</h3>
+                    <h3 className="font-bold text-xs text-slate-700">Products & Menu Catalog</h3>
                   </div>
                   <span className="text-xs text-slate-500 font-mono font-semibold">{productsList.length} items configured</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500">
                     <tr>
                       <th className="p-4">Item Name</th>
                       <th className="p-4">Category</th>
@@ -1401,7 +1482,7 @@ export default function OwnerDashboardPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <QrCode className="w-5 h-5 text-purple-600" />
-                      <h3 className="text-xl font-black text-slate-950 tracking-tight">Active Promotional & Offer QR Codes</h3>
+                      <h3 className="text-xl font-bold text-slate-950 tracking-tight">Active Promotional & Offer QR Codes</h3>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">
                       Unique QR codes configured with custom validity periods. Deactivate or expire them anytime on-demand.
@@ -1456,7 +1537,7 @@ export default function OwnerDashboardPage() {
                           <div>
                             <div className="flex items-start justify-between gap-3 mb-3">
                               <span
-                                className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
+                                className={`text-xs font-extrabold capitalize px-2.5 py-0.5 rounded-full border ${
                                   isActive
                                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                     : isDeactivated
@@ -1467,7 +1548,7 @@ export default function OwnerDashboardPage() {
                                 {isActive ? `Active • ${daysLeft}d left` : isDeactivated ? "Deactivated" : "Expired"}
                               </span>
 
-                              <span className="text-[10px] font-mono text-slate-400 font-semibold">{qr.code}</span>
+                              <span className="text-xs font-mono text-slate-400 font-semibold">{qr.code}</span>
                             </div>
 
                             <div className="flex items-center gap-3 mb-3">
@@ -1478,7 +1559,7 @@ export default function OwnerDashboardPage() {
                                 <img src={qr.qrDataUrl} alt={qr.title} className="w-full h-full object-contain" />
                               </div>
                               <div className="min-w-0">
-                                <h4 className="text-sm font-black text-slate-900 truncate">{qr.title}</h4>
+                                <h4 className="text-sm font-bold text-slate-900 truncate">{qr.title}</h4>
                                 <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                                   {qr.offerType === "free_product" && (
                                     <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
@@ -1506,11 +1587,11 @@ export default function OwnerDashboardPage() {
 
                             <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-600 mb-4">
                               <div>
-                                <span className="text-slate-400 block text-[10px] uppercase font-bold">Scans</span>
+                                <span className="text-slate-400 block text-xs capitalize font-bold">Scans</span>
                                 <span className="font-bold text-slate-900 text-xs">{qr.totalScans} scans</span>
                               </div>
                               <div>
-                                <span className="text-slate-400 block text-[10px] uppercase font-bold">Claims</span>
+                                <span className="text-slate-400 block text-xs capitalize font-bold">Claims</span>
                                 <span className="font-bold text-purple-700 text-xs">{qr.totalClaims} claimed</span>
                               </div>
                             </div>
@@ -1551,7 +1632,7 @@ export default function OwnerDashboardPage() {
                   <div className="flex items-center gap-2">
                     <History className="w-4 h-4 text-purple-600" />
                     <div>
-                      <h3 className="font-bold text-xs uppercase tracking-wider text-slate-700">Customer Promotional QR Scans Audit Log</h3>
+                      <h3 className="font-bold text-xs text-slate-700">Customer Promotional QR Scans Audit Log</h3>
                       <p className="text-[11px] text-slate-500">Real-time ledger recording of members who claimed promotional offers</p>
                     </div>
                   </div>
@@ -1568,7 +1649,7 @@ export default function OwnerDashboardPage() {
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50/50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
+                    <thead className="bg-slate-50/50 border-b border-slate-200 text-xs font-semibold text-slate-500">
                       <tr>
                         <th className="p-3.5">Timestamp</th>
                         <th className="p-3.5">Customer Member</th>
@@ -1604,7 +1685,7 @@ export default function OwnerDashboardPage() {
                               <td className="p-3.5 font-sans font-semibold text-slate-800">
                                 <div>{scan.campaignTitle}</div>
                                 {scan.productRewardName && (
-                                  <span className="text-[10px] text-purple-700 font-bold block">
+                                  <span className="text-xs text-purple-700 font-bold block">
                                     Reward: Free {scan.productRewardName}
                                   </span>
                                 )}
@@ -1618,30 +1699,30 @@ export default function OwnerDashboardPage() {
                               </td>
                               <td className="p-3.5">
                                 {isPending && (
-                                  <span className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-300 flex items-center gap-1 w-max animate-pulse">
+                                  <span className="text-xs font-bold capitalize px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-300 flex items-center gap-1 w-max animate-pulse">
                                     <Clock className="w-3 h-3" />
                                     Pending Approval
                                   </span>
                                 )}
                                 {isApproved && (
                                   <div className="font-sans">
-                                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 inline-block">
+                                    <span className="text-xs font-bold capitalize px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 inline-block">
                                       Claimed &amp; Approved
                                     </span>
                                     {scan.approvedByName && (
-                                      <span className="text-[10px] text-slate-400 block mt-0.5">
+                                      <span className="text-xs text-slate-400 block mt-0.5">
                                         By {scan.approvedByName}
                                       </span>
                                     )}
                                   </div>
                                 )}
                                 {isDiscarded && (
-                                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                                  <span className="text-xs font-bold capitalize px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
                                     Discarded / Reset
                                   </span>
                                 )}
                                 {isVisit && (
-                                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                                  <span className="text-xs font-bold capitalize px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                                     In Progress ({scan.requiredVisits - scan.visitNumber} left)
                                   </span>
                                 )}
@@ -1678,7 +1759,7 @@ export default function OwnerDashboardPage() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => handleDiscardScan(scan.id)}
-                                    className="text-[10px] text-slate-400 hover:text-rose-600 h-6 px-1.5"
+                                    className="text-xs text-slate-400 hover:text-rose-600 h-6 px-1.5"
                                   >
                                     Reset Progress
                                   </Button>
@@ -1702,8 +1783,8 @@ export default function OwnerDashboardPage() {
             <div className="space-y-5">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-950 tracking-tight">Customer Member Directory</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Manage customer profiles, lifetime points, and manual adjustments.</p>
+                  <h2 className="font-display text-3xl font-bold text-evergreen-deep">Customers</h2>
+                  <p className="text-zinc-600 mt-1">Everyone with your loyalty card. You can add or remove points by hand here.</p>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <div className="relative flex-1 sm:w-72">
@@ -1722,10 +1803,29 @@ export default function OwnerDashboardPage() {
                 </div>
               </div>
 
+              {memberNotice && (
+                <div
+                  role="status"
+                  className="flex items-start justify-between gap-3 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-900"
+                >
+                  <span className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+                    {memberNotice}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setMemberNotice(null)}
+                    className="text-emerald-800 font-medium hover:underline cursor-pointer shrink-0"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
               <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500">
                       <tr>
                         <th className="p-4">Member #</th>
                         <th className="p-4">Customer Details</th>
@@ -1751,17 +1851,17 @@ export default function OwnerDashboardPage() {
                             </td>
                             <td className="p-4">
                               <div className="font-bold text-slate-900 text-xs">{m.name || "Loyalty Member"}</div>
-                              <div className="text-[11px] text-slate-400 font-mono">{m.email}</div>
+                              <div className="text-xs text-slate-500">{m.email}</div>
                             </td>
                             <td className="p-4">
-                              <span className="font-black text-sm text-slate-900">{m.balance}</span>{" "}
-                              <span className="text-[10px] text-slate-400 uppercase">pts</span>
+                              <span className="font-bold text-sm text-slate-900">{m.balance}</span>{" "}
+                              <span className="text-xs text-slate-400">pts</span>
                             </td>
                             <td className="p-4 text-slate-500 font-mono">
                               {m.lifetimeEarned} pts
                             </td>
                             <td className="p-4">
-                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border ${
                                 m.status === "active"
                                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                   : "bg-rose-50 text-rose-700 border-rose-200"
@@ -1776,7 +1876,7 @@ export default function OwnerDashboardPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setAdjustingMember(m)}
+                                onClick={() => openAdjust(m)}
                                 className="bg-white border-slate-300 hover:bg-slate-50 text-xs font-semibold py-1 h-8"
                               >
                                 Adjust Points
@@ -1799,10 +1899,8 @@ export default function OwnerDashboardPage() {
             <div className="space-y-5">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-950 tracking-tight">Immutable Audit Ledger</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Append-only ledger enforced by PostgreSQL triggers. Every transaction is permanently attributable.
-                  </p>
+                  <h2 className="font-display text-3xl font-bold text-evergreen-deep">Points history</h2>
+                  <p className="text-zinc-600 mt-1">Every point added or spent, and which staff member did it. Entries can&rsquo;t be edited, only reversed.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="relative w-64">
@@ -1824,7 +1922,7 @@ export default function OwnerDashboardPage() {
               <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500">
                       <tr>
                         <th className="p-4">Timestamp (UTC)</th>
                         <th className="p-4">Action Type</th>
@@ -1849,7 +1947,7 @@ export default function OwnerDashboardPage() {
                               {new Date(tx.occurredAt).toLocaleString()}
                             </td>
                             <td className="p-4">
-                              <span className="font-sans font-bold uppercase text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                              <span className="font-sans font-bold capitalize text-xs px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
                                 {tx.type}
                               </span>
                             </td>
@@ -1859,7 +1957,7 @@ export default function OwnerDashboardPage() {
                             </td>
                             <td className="p-4">
                               <span
-                                className={`font-black text-sm ${
+                                className={`font-bold text-sm ${
                                   tx.pointsDelta > 0 ? "text-emerald-600" : "text-rose-600"
                                 }`}
                               >
@@ -1895,10 +1993,8 @@ export default function OwnerDashboardPage() {
           {activeTab === "links" && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-black text-slate-950 tracking-tight">Review Links & Customer Hub Page</h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Configure your Google Review URL, Instagram, Facebook, and private feedback channels with live mobile preview.
-                </p>
+                <h2 className="font-display text-3xl font-bold text-evergreen-deep">Reviews &amp; links</h2>
+                <p className="text-zinc-600 mt-1">Your Google review link and social pages, shown on every customer&rsquo;s card.</p>
               </div>
 
               <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-between">
@@ -1912,16 +2008,21 @@ export default function OwnerDashboardPage() {
 
               <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
                 <LinksAndPageEditor
-                  businessName="Your Business"
-                  brandPrimaryHex="#4f46e5"
+                  businessName={business?.name || "Your business"}
+                  brandPrimaryHex={business?.brandPrimaryHex || "#495e57"}
+                  logoUrl={business?.logoUrl}
                   initialLinks={links}
                   onSave={async (updatedLinks) => {
-                    await fetch("/api/v1/owner/links", {
+                    const res = await fetch("/api/v1/owner/links", {
                       method: "PUT",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify(updatedLinks),
                     });
-                    loadLinks();
+                    if (!res.ok) {
+                      const json = await res.json().catch(() => null);
+                      throw new Error(json?.error?.message || "Your links couldn't be saved. Try again.");
+                    }
+                    await loadLinks();
                   }}
                 />
               </div>
@@ -1934,19 +2035,17 @@ export default function OwnerDashboardPage() {
           {activeTab === "qr" && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-black text-slate-950 tracking-tight">Printable Signage & Counter Collateral</h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Download high-resolution print-ready posters and counter tent cards for customer scan-to-join.
-                </p>
+                <h2 className="font-display text-3xl font-bold text-evergreen-deep">QR posters</h2>
+                <p className="text-zinc-600 mt-1">Print this and put it by the till. Customers scan it to get your loyalty card.</p>
               </div>
 
               {qrData && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                   <div className="p-8 rounded-3xl bg-white text-slate-950 text-center shadow-lg border border-slate-200">
-                    <div className="text-xs font-black uppercase tracking-widest text-indigo-600 mb-2">
+                    <div className="text-xs font-bold text-indigo-600 mb-2">
                       Scan To Join & Earn Rewards
                     </div>
-                    <h3 className="text-2xl font-black text-slate-950 mb-4">Official Loyalty Pass</h3>
+                    <h3 className="text-2xl font-bold text-slate-950 mb-4">Official Loyalty Pass</h3>
                     <img
                       src={qrData.qrPng}
                       alt="Join QR Poster"
@@ -1984,10 +2083,8 @@ export default function OwnerDashboardPage() {
             <div className="space-y-5">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-950 tracking-tight">Team & Staff Access Control</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Assign frontline cashier terminals, manager override privileges, and review team activity.
-                  </p>
+                  <h2 className="font-display text-3xl font-bold text-evergreen-deep">Staff</h2>
+                  <p className="text-zinc-600 mt-1">Give each person their own login so they can scan cards and add points.</p>
                 </div>
                 <Button onClick={() => setShowAddStaff(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold">
                   <Plus className="h-4 w-4 mr-1.5" />
@@ -1998,7 +2095,7 @@ export default function OwnerDashboardPage() {
               <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500">
                     <tr>
                       <th className="p-4">Name</th>
                       <th className="p-4">Email Address</th>
@@ -2011,14 +2108,14 @@ export default function OwnerDashboardPage() {
                     {team.map((s) => (
                       <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                         <td className="p-4 font-bold text-slate-900 text-xs">{s.name || "Staff Member"}</td>
-                        <td className="p-4 text-slate-500 font-mono text-xs">{s.email}</td>
+                        <td className="p-4 text-slate-500 text-sm">{s.email}</td>
                         <td className="p-4">
-                          <span className="font-semibold uppercase text-[10px] px-2.5 py-1 rounded-full bg-slate-100 text-indigo-700 border border-slate-200">
+                          <span className="font-semibold capitalize text-xs px-2.5 py-1 rounded-full bg-slate-100 text-indigo-700 border border-slate-200">
                             {s.role}
                           </span>
                         </td>
                         <td className="p-4">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border ${
                             s.status === "active"
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                               : "bg-rose-50 text-rose-700 border-rose-200"
@@ -2053,10 +2150,8 @@ export default function OwnerDashboardPage() {
           {activeTab === "reports" && (
             <div className="space-y-6">
               <div>
-                <h2 className="text-2xl font-black text-slate-950 tracking-tight">Audited Data & CSV Reports</h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Export reconciled reports for tax accounting, loyalty liability auditing, and UK GDPR Subject Access Requests.
-                </p>
+                <h2 className="font-display text-3xl font-bold text-evergreen-deep">Downloads</h2>
+                <p className="text-zinc-600 mt-1">Spreadsheets of your customers, points and rewards, for your accountant or your own records.</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -2122,69 +2217,136 @@ export default function OwnerDashboardPage() {
         </main>
       </div>
 
-      {/* Adjust Points Modal (Light Theme) */}
+      {/* Adjust points */}
       {adjustingMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="max-w-md w-full p-6 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-950">
-              Adjust Points: {adjustingMember.name || `#${adjustingMember.memberNumber}`}
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-evergreen-deep/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="adjust-title"
+        >
+          <form
+            className="max-w-md w-full p-6 rounded-3xl bg-white border border-zinc-200 text-zinc-900 shadow-2xl"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleConfirmAdjust();
+            }}
+          >
+            <h3 id="adjust-title" className="font-display text-xl font-bold text-evergreen-deep">
+              Change points for {adjustingMember.name || `#${adjustingMember.memberNumber}`}
             </h3>
-            <p className="text-xs text-slate-500 mt-1 mb-4">
-              Current balance: <span className="text-slate-950 font-bold">{adjustingMember.balance} pts</span>. Balance cannot drop below 0.
+            <p className="text-sm text-zinc-600 mt-1 mb-5">
+              They have <strong className="text-zinc-900">{adjustingMember.balance} points</strong> now.
             </p>
 
-            <div className="space-y-3.5 text-xs">
+            <div className="grid grid-cols-2 gap-2 p-1 rounded-full bg-zinc-100 mb-4">
+              {(["add", "remove"] as const).map((dir) => (
+                <button
+                  key={dir}
+                  type="button"
+                  onClick={() => {
+                    setAdjustDirection(dir);
+                    setAdjustReason(dir === "add" ? "goodwill" : "correction");
+                    setAdjustError(null);
+                  }}
+                  className={`py-2 rounded-full text-sm font-semibold cursor-pointer transition-colors ${
+                    adjustDirection === dir ? "bg-evergreen text-white" : "text-zinc-600 hover:text-zinc-900"
+                  }`}
+                >
+                  {dir === "add" ? "Add points" : "Remove points"}
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-4">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Points Delta (+ or -)</label>
+                <label htmlFor="adjust-amount" className="text-sm font-semibold text-zinc-800 block mb-1">
+                  How many points
+                </label>
                 <Input
+                  id="adjust-amount"
                   type="number"
-                  placeholder="e.g. 20 or -15"
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
+                  autoFocus
+                  placeholder="e.g. 20"
                   value={adjustPoints}
-                  onChange={(e) => setAdjustPoints(e.target.value)}
-                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                  onChange={(e) => {
+                    setAdjustPoints(e.target.value.replace(/[^0-9]/g, ""));
+                    setAdjustError(null);
+                  }}
+                  className="text-lg font-semibold"
                 />
+                {adjustPoints && parseInt(adjustPoints, 10) > 0 && (
+                  <p className="text-sm text-zinc-600 mt-1.5">
+                    New balance will be{" "}
+                    <strong className="text-zinc-900">
+                      {adjustingMember.balance +
+                        (adjustDirection === "add" ? 1 : -1) * parseInt(adjustPoints, 10)}{" "}
+                      points
+                    </strong>
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Reason Code</label>
+                <label htmlFor="adjust-reason" className="text-sm font-semibold text-zinc-800 block mb-1">
+                  Reason
+                </label>
                 <select
+                  id="adjust-reason"
                   value={adjustReason}
                   onChange={(e) =>
                     setAdjustReason(e.target.value as "goodwill" | "correction" | "fraud_removal" | "other")
                   }
-                  className="w-full h-10 rounded-xl border border-slate-300 bg-slate-50 px-3 text-xs text-slate-900"
+                  className="w-full min-h-[44px] rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900"
                 >
-                  <option value="goodwill">Goodwill Bonus</option>
-                  <option value="correction">Billing Correction</option>
-                  <option value="fraud_removal">Fraud Removal</option>
-                  <option value="other">Other</option>
+                  <option value="goodwill">Thank-you or goodwill</option>
+                  <option value="correction">Fixing a mistake</option>
+                  <option value="fraud_removal">Points given by mistake or misuse</option>
+                  <option value="other">Something else</option>
                 </select>
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Operational Note (Mandatory)</label>
+                <label htmlFor="adjust-note" className="text-sm font-semibold text-zinc-800 block mb-1">
+                  Note
+                </label>
                 <Input
-                  placeholder="Explain why this adjustment is being made"
+                  id="adjust-note"
+                  placeholder="e.g. Missed stamp on Monday's visit"
                   value={adjustNote}
-                  onChange={(e) => setAdjustNote(e.target.value)}
-                  className="bg-slate-50 border-slate-300 text-xs text-slate-900"
+                  maxLength={300}
+                  onChange={(e) => {
+                    setAdjustNote(e.target.value);
+                    setAdjustError(null);
+                  }}
                 />
+                <p className="text-xs text-zinc-500 mt-1">Saved in your points history so you know why later.</p>
               </div>
 
-              <div className="flex gap-2.5 pt-3">
-                <Button variant="outline" className="flex-1 bg-white border-slate-300 text-xs font-bold text-slate-700" onClick={() => setAdjustingMember(null)}>
+              {adjustError && (
+                <p role="alert" className="text-sm text-rose-800 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                  {adjustError}
+                </p>
+              )}
+
+              <div className="flex gap-2.5 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 cursor-pointer"
+                  onClick={() => setAdjustingMember(null)}
+                >
                   Cancel
                 </Button>
-                <Button
-                  className="flex-1 font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
-                  onClick={handleConfirmAdjust}
-                  disabled={loading || !adjustPoints || !adjustNote}
-                >
-                  {loading ? "Saving..." : "Apply Adjustment"}
+                <Button type="submit" className="flex-1 font-semibold cursor-pointer" disabled={loading}>
+                  {loading ? "Saving..." : adjustDirection === "add" ? "Add points" : "Remove points"}
                 </Button>
               </div>
             </div>
-          </div>
+          </form>
         </div>
       )}
 
@@ -2570,7 +2732,7 @@ export default function OwnerDashboardPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="max-w-sm w-full p-6 rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-2xl text-center">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+              <span className="text-xs font-extrabold capitalize px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
                 Official Promo Collateral
               </span>
               <button
@@ -2581,7 +2743,7 @@ export default function OwnerDashboardPage() {
               </button>
             </div>
 
-            <h3 className="text-lg font-black text-slate-950 mb-1">{viewingPromoQr.title}</h3>
+            <h3 className="text-lg font-bold text-slate-950 mb-1">{viewingPromoQr.title}</h3>
             <p className="text-xs text-slate-500 mb-4 font-mono">
               Code: <span className="font-bold text-purple-700">{viewingPromoQr.code}</span>
             </p>
@@ -2608,7 +2770,7 @@ export default function OwnerDashboardPage() {
               <div className="flex justify-between">
                 <span>Status:</span>
                 <span
-                  className={`font-bold uppercase text-[10px] ${
+                  className={`font-bold capitalize text-xs ${
                     viewingPromoQr.status === "active" ? "text-emerald-600" : "text-rose-600"
                   }`}
                 >
@@ -2704,7 +2866,7 @@ export default function OwnerDashboardPage() {
                     onChange={(e) => setNewRewardCost(e.target.value)}
                     className="bg-slate-50 border-slate-300 text-xs text-slate-900"
                   />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">Points deducted upon claim</span>
+                  <span className="text-xs text-slate-400 mt-0.5 block">Points deducted upon claim</span>
                 </div>
 
                 <div>

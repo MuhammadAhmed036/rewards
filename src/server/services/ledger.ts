@@ -674,20 +674,28 @@ export async function adjustBalance(
 ) {
   assertCan(ctx, "ledger.adjust");
   if (!ctx.tenantId) throw new Error("tenantId required");
-  if (params.pointsDelta === 0) throw new Error("Points delta cannot be zero");
+  if (params.pointsDelta === 0) throw new Error("Enter how many points to add or remove");
 
   return await db.transaction(async (tx) => {
+    // Scoped to the caller's business: an owner can never adjust another business's customer.
     const [lockedBalance] = await tx
       .select()
       .from(membershipBalances)
-      .where(eq(membershipBalances.membershipId, params.membershipId))
+      .where(
+        and(
+          eq(membershipBalances.membershipId, params.membershipId),
+          eq(membershipBalances.tenantId, ctx.tenantId!)
+        )
+      )
       .for("update");
 
-    if (!lockedBalance) throw new Error("Membership balance not found");
+    if (!lockedBalance) throw new Error("Customer not found for this business");
 
     const newBalance = lockedBalance.balance + params.pointsDelta;
     if (newBalance < 0) {
-      throw new Error(`Adjustment would result in negative balance (${newBalance}). Rejected.`);
+      throw new Error(
+        `This customer only has ${lockedBalance.balance} points, so you can remove at most ${lockedBalance.balance}.`
+      );
     }
 
     const [entry] = await tx

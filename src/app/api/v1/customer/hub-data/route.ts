@@ -7,14 +7,16 @@ import {
   membershipBalances,
   ledgerEntries,
   users,
-  sessions,
 } from "@/server/db/schema";
 import { getVisibleLinks } from "@/server/services/links";
 import { getRewards } from "@/server/services/rewards";
-import { joinProgramme } from "@/server/services/member";
 import { generateMemberQrToken, generateQrDataUrl } from "@/server/qr";
-import { eq, and, gt, desc } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { eq, and, desc } from "drizzle-orm";
+import { logoRefSql, resolveLogoUrl } from "@/server/services/business-logo";
+import { getMemberStampCards } from "@/server/services/stamp-cards";
+import { getSessionContext } from "@/server/auth";
+import { readSessionCookie } from "@/server/auth/session-response";
+import { isBusinessAccount } from "@/server/auth/portal-access";
 
 export async function GET(request: NextRequest) {
   const slug = request.nextUrl.searchParams.get("slug");
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
       status: tenants.status,
       currency: tenants.currency,
       brandPrimaryHex: tenants.brandPrimaryHex,
-      logoUrl: tenants.logoUrl,
+      logoRef: logoRefSql,
     })
     .from(tenants)
     .where(eq(tenants.slug, slug))
@@ -61,21 +63,20 @@ export async function GET(request: NextRequest) {
   const visibleLinks = await getVisibleLinks(tenant.id);
 
   // 4. Check for logged in customer session
-  const cookieStore = await cookies();
-  const token = cookieStore.get("loyalty_session")?.value;
   let memberData = null;
   let currentBalance = 0;
 
-  if (token) {
-    const now = new Date();
-    const [session] = await db
-      .select({ userId: sessions.userId })
-      .from(sessions)
-      .where(and(eq(sessions.token, token), gt(sessions.expiresAt, now)))
-      .limit(1);
+  {
+    // Same decryption, expiry and idle-timeout rules as every other signed-in request
+    // Same decryption, expiry and idle-timeout rules as every other signed-in request.
+    // Only customers get a card here: owner, staff and admin accounts never see one.
+    const sessionCtx = await getSessionContext(readSessionCookie(request));
+    const session =
+      sessionCtx && !(await isBusinessAccount(sessionCtx.userId)) ? { userId: sessionCtx.userId } : null;
 
     if (session) {
-      let [membership] = await db
+      // A card exists only if the customer registered at this shop; nothing is created automatically.
+      const [membership] = await db
         .select({
           id: memberships.id,
           memberNumber: memberships.memberNumber,
@@ -95,46 +96,6 @@ export async function GET(request: NextRequest) {
           )
         )
         .limit(1);
-
-      if (!membership) {
-        const [u] = await db.select().from(users).where(eq(users.id, session.userId)).limit(1);
-        if (u) {
-          try {
-            await joinProgramme({
-              tenantSlug: slug,
-              email: u.email,
-              name: u.name || undefined,
-              marketingOptIn: true,
-              allowExistingUser: true,
-            });
-            const [newMem] = await db
-              .select({
-                id: memberships.id,
-                memberNumber: memberships.memberNumber,
-                publicId: memberships.publicId,
-                qrVersion: memberships.qrVersion,
-                status: memberships.status,
-                joinedAt: memberships.joinedAt,
-                userName: users.name,
-                userEmail: users.email,
-              })
-              .from(memberships)
-              .innerJoin(users, eq(memberships.userId, users.id))
-              .where(
-                and(
-                  eq(memberships.tenantId, tenant.id),
-                  eq(memberships.userId, session.userId)
-                )
-              )
-              .limit(1);
-            if (newMem) {
-              membership = newMem;
-            }
-          } catch (e) {
-            console.error("Auto join for existing session error", e);
-          }
-        }
-      }
 
       if (membership && membership.status === "active") {
         const [bal] = await db
@@ -170,6 +131,7 @@ export async function GET(request: NextRequest) {
           qrToken,
           qrDataUrl,
           recentHistory,
+          stampCards: await getMemberStampCards(tenant.id, membership.id),
         };
       }
     }
@@ -182,7 +144,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     data: {
-      tenant,
+      tenant: (({ logoRef, ...t }) => ({ ...t, logoUrl: resolveLogoUrl(t.id, logoRef) }))(tenant),
       programme: prog || { type: "points", name: `${tenant.name} Rewards` },
       member: memberData,
       rewards: rewardsList,
