@@ -3,6 +3,7 @@ import { users, verifications } from "../db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { checkEmailOtpRateLimit } from "../security/rate-limit";
 import { env } from "@/lib/env";
+import { getBaseUrl } from "@/lib/url";
 import { sendEmailNow } from "./email";
 import crypto from "crypto";
 
@@ -29,7 +30,7 @@ export async function createEmailVerificationToken(userId: string, email: string
   await sendEmailNow({
     toEmail: normalizedEmail,
     template: "email_verification",
-    payload: { userId, url: `${env.APP_URL}/verify-email?token=${token}` },
+    payload: { userId, url: `${getBaseUrl()}/verify-email?token=${token}` },
     kind: "transactional",
     tenantId,
   });

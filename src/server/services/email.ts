@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { emailOutbox } from "../db/schema";
 import { env } from "@/lib/env";
+import { getBaseUrl } from "@/lib/url";
 import { logger } from "@/lib/logger";
 import { eq, and, lte, or, inArray, asc } from "drizzle-orm";
 import nodemailer from "nodemailer";
@@ -89,6 +90,7 @@ export function renderEmailTemplate(
   payload: Record<string, unknown>
 ): { subject: string; html: string; text: string } {
   const appName = env.NEXT_PUBLIC_APP_NAME || "Loyalty Platform";
+  const appUrl = getBaseUrl();
 
   switch (template) {
     case "magic_link": {
@@ -147,7 +149,7 @@ The link works for 30 minutes and only once. If it wasn't you, ignore this email
     case "staff_invitation": {
       const businessName = String(payload.businessName || "your business");
       const role = String(payload.role || "staff");
-      const url = String(payload.url || `${env.APP_URL}/login`);
+      const url = String(payload.url || `${appUrl}/login`);
       const isNewAccount = payload.isNewAccount !== false;
       const roleWord = role === "manager" ? "a manager" : role === "marketing" ? "the marketing team" : "staff";
       return {
@@ -168,7 +170,7 @@ The link works for 30 minutes and only once. If it wasn't you, ignore this email
     }
     case "welcome": {
       const businessName = String(payload.businessName || "the shop");
-      const url = String(payload.hubUrl || env.APP_URL);
+      const url = String(payload.hubUrl || appUrl);
       const rule = payload.earningRule ? ` You get ${String(payload.earningRule)}.` : "";
       return {
         subject: `Your ${businessName} loyalty card is ready`,
@@ -186,7 +188,7 @@ The link works for 30 minutes and only once. If it wasn't you, ignore this email
       const ownerName = String(payload.ownerName || "Business Owner");
       const businessName = String(payload.businessName || "Your Store");
       const category = String(payload.category || "Commercial");
-      const storeUrl = String(payload.storeUrl || `${env.APP_URL}`);
+      const storeUrl = String(payload.storeUrl || `${appUrl}`);
 
       return {
         subject: `🎉 Congratulations! Your business "${businessName}" is registered on ${appName}`,
@@ -230,7 +232,7 @@ The link works for 30 minutes and only once. If it wasn't you, ignore this email
     case "points_expiring": {
       const businessName = String(payload.businessName || "the shop");
       const unit = String(payload.unit || "points");
-      const url = String(payload.hubUrl || env.APP_URL);
+      const url = String(payload.hubUrl || appUrl);
       const when = new Date(String(payload.expiresOn)).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
       return {
         subject: `Your ${businessName} ${unit} expire on ${when}`,
@@ -248,7 +250,7 @@ The link works for 30 minutes and only once. If it wasn't you, ignore this email
       const businessName = String(payload.businessName || "the shop");
       const subject = String(payload.subject || `News from ${businessName}`);
       const body = String(payload.body || "");
-      const url = String(payload.hubUrl || env.APP_URL);
+      const url = String(payload.hubUrl || appUrl);
       const escape = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const paragraphs = escape(body)
         .split(/\n{2,}/)
@@ -278,7 +280,7 @@ You're getting this because you said yes to offers from ${businessName}.${payloa
     case "reward_unlocked": {
       const businessName = String(payload.businessName || "the shop");
       const title = String(payload.rewardTitle || "a reward");
-      const url = String(payload.hubUrl || env.APP_URL);
+      const url = String(payload.hubUrl || appUrl);
       return {
         subject: `You can now get ${title} at ${businessName}`,
         text: `You have ${String(payload.balance)} ${String(payload.unit || "points")} at ${businessName}, enough for ${title}. Claim it on your card next time you visit:\n\n${url}${footerText(payload)}`,
@@ -294,7 +296,7 @@ You're getting this because you said yes to offers from ${businessName}.${payloa
     case "redemption_receipt": {
       const businessName = String(payload.businessName || "the shop");
       const title = String(payload.rewardTitle || "your reward");
-      const url = String(payload.hubUrl || env.APP_URL);
+      const url = String(payload.hubUrl || appUrl);
       const unit = String(payload.unit || "points");
       return {
         subject: `Receipt: ${title} at ${businessName}`,
@@ -336,7 +338,7 @@ You're getting this because you said yes to offers from ${businessName}.${payloa
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
             <h2 style="color: #0f172a;">Your Data Export is Ready</h2>
             <p style="color: #334155; font-size: 15px;">In accordance with your Subject Access Request (UK GDPR Article 15), your personal loyalty records have been compiled into machine-readable JSON format.</p>
-            <p style="color: #64748b; font-size: 13px;">You can download your export file at any time from your account settings at <a href="${env.APP_URL}/me" style="color: #4f46e5;">${env.APP_URL}/me</a>.</p>
+            <p style="color: #64748b; font-size: 13px;">You can download your export file at any time from your account settings at <a href="${appUrl}/me" style="color: #4f46e5;">${appUrl}/me</a>.</p>
           </div>
         `,
       };
@@ -359,15 +361,19 @@ export function getMailTransporter() {
       ? "127.0.0.1"
       : env.SMTP_HOST;
 
+  const port = env.SMTP_PORT || 1025;
+  // If port is 465, secure is true by default; for 587 or 25, STARTTLS (secure = false)
+  const isSecure = env.SMTP_SECURE !== undefined ? env.SMTP_SECURE : port === 465;
+
   return nodemailer.createTransport({
     host,
-    port: env.SMTP_PORT || 1025,
-    secure: env.SMTP_SECURE, // true for port 465; Mailpit (1025) needs neither TLS nor a login
-    ignoreTLS: !env.SMTP_USER,
+    port,
+    secure: isSecure,
+    ignoreTLS: !env.SMTP_USER && host === "127.0.0.1",
     auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS ?? "" } : undefined,
-    connectionTimeout: 4000,
-    greetingTimeout: 4000,
-    socketTimeout: 4000,
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 15000,
   });
 }
 
@@ -415,8 +421,13 @@ export async function processOutbox(
     );
 
     try {
+      const fromEmail =
+        env.EMAIL_FROM_TRANSACTIONAL && !env.EMAIL_FROM_TRANSACTIONAL.includes("example.com")
+          ? env.EMAIL_FROM_TRANSACTIONAL
+          : env.SMTP_USER || "no-reply@rewards-program-xi.vercel.app";
+
       await transporter.sendMail({
-        from: env.EMAIL_FROM_TRANSACTIONAL,
+        from: fromEmail,
         to: row.toEmail,
         subject: rendered.subject,
         text: rendered.text,

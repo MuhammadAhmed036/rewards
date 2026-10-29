@@ -3,6 +3,7 @@ import { users, verifications } from "../db/schema";
 import { and, eq, gt } from "drizzle-orm";
 import crypto from "crypto";
 import { env } from "@/lib/env";
+import { getBaseUrl } from "@/lib/url";
 import { hashPassword, invalidateUserSessions } from "../auth";
 import { checkEmailOtpRateLimit } from "../security/rate-limit";
 import { sendEmailNow } from "./email";
@@ -28,7 +29,7 @@ export async function requestPasswordReset(email: string) {
     .where(eq(users.email, normalizedEmail))
     .limit(1);
   if (!user || user.deletedAt) {
-    logger.info({ email: normalizedEmail }, "Password reset asked for an unknown email");
+    logger.warn({ email: normalizedEmail }, "Password reset requested for an unknown or unregistered email");
     return;
   }
 
@@ -40,10 +41,11 @@ export async function requestPasswordReset(email: string) {
     expiresAt: new Date(Date.now() + RESET_TTL_MS),
   });
 
+  const baseUrl = getBaseUrl();
   await sendEmailNow({
     toEmail: normalizedEmail,
     template: "password_reset",
-    payload: { url: `${env.APP_URL}/reset-password?token=${token}` },
+    payload: { url: `${baseUrl}/reset-password?token=${token}` },
     kind: "transactional",
   });
 }

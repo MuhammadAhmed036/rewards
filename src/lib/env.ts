@@ -13,16 +13,21 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional().default("mock-google-client-id"),
   GOOGLE_CLIENT_SECRET: z.string().optional().default("mock-google-client-secret"),
   RESEND_API_KEY: z.string().optional().default("re_mock_api_key"),
-  EMAIL_FROM_TRANSACTIONAL: z.string().optional().default("no-reply@app.example.com"),
+  EMAIL_FROM_TRANSACTIONAL: z.string().optional(),
   SMTP_HOST: z.string().default("localhost"),
   SMTP_PORT: z.coerce.number().default(1025),
   // Production mail servers need a login; local Mailpit does not
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_SECURE: z
-    .enum(["true", "false"])
+    .union([z.boolean(), z.string()])
     .optional()
-    .transform((v) => v === "true"),
+    .transform((v) => {
+      if (typeof v === "boolean") return v;
+      if (!v) return undefined;
+      const lower = String(v).trim().toLowerCase();
+      return lower === "true" || lower === "1" || lower === "yes";
+    }),
   UPSTASH_REDIS_REST_URL: z.string().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   BLOB_READ_WRITE_TOKEN: z.string().optional(),

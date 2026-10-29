@@ -5,6 +5,7 @@ import { invalidateUserSessions, hashPassword } from "../auth";
 import { eq, and, count, inArray, gt, isNull } from "drizzle-orm";
 import crypto from "crypto";
 import { env } from "@/lib/env";
+import { getBaseUrl } from "@/lib/url";
 import { sendEmailNow } from "./email";
 import { hashLinkToken } from "./verification";
 import { logAuditEvent } from "./audit";
@@ -138,7 +139,7 @@ export async function addStaffMember(ctx: RequestContext, params: AddStaffParams
       toEmail: normalizedEmail,
       template: "staff_invitation",
       tenantId: ctx.tenantId,
-      payload: { businessName: tenant?.name, role: params.role, isNewAccount: false, url: `${env.APP_URL}/login` },
+      payload: { businessName: tenant?.name, role: params.role, isNewAccount: false, url: `${getBaseUrl()}/login` },
     }).catch(() => undefined);
   }
   return created.staff;
@@ -161,7 +162,7 @@ async function sendStaffInvite(tenantId: string, email: string, role: string, bu
     toEmail: email,
     template: "staff_invitation",
     tenantId,
-    payload: { businessName, role, isNewAccount: true, url: `${env.APP_URL}/accept-invite?token=${token}` },
+    payload: { businessName, role, isNewAccount: true, url: `${getBaseUrl()}/accept-invite?token=${token}` },
   }).catch(() => undefined);
   return token;
 }
