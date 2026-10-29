@@ -10,11 +10,13 @@ import {
   redemptions,
   tenants,
   products,
+  locations,
 } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
 import { calculatePoints, RuleConfig } from "@/lib/points";
 import { hashRedemptionCode, generateRedemptionCode } from "../qr";
 import { logAuditEvent } from "./audit";
+import { notifyRedemption, notifyRewardsUnlocked } from "./notifications";
 import { sentry } from "@/lib/sentry";
 import { eq, and, sql, desc, gte, lt } from "drizzle-orm";
 
@@ -33,6 +35,17 @@ export interface EarnResult {
   newBalance: number;
   lifetimeEarned: number;
   isDuplicate: boolean;
+}
+
+/** Points can only be given or spent at one of this business's open locations. */
+async function assertOpenLocation(executor: DbExecutor, tenantId: string, locationId: string) {
+  const [location] = await executor
+    .select({ status: locations.status })
+    .from(locations)
+    .where(and(eq(locations.id, locationId), eq(locations.tenantId, tenantId)))
+    .limit(1);
+  if (!location) throw new Error("LOCATION_NOT_FOUND: That location isn't part of this business");
+  if (location.status !== "active") throw new Error("LOCATION_CLOSED: This location is closed. Pick another one.");
 }
 
 export async function previewEarn(
@@ -121,7 +134,7 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
   assertCan(ctx, "ledger.earn", { locationId: params.locationId });
   if (!ctx.tenantId) throw new Error("tenantId required");
 
-  return await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     // 0. Verify tenant is active (Section 19: Suspended tenant cannot earn/redeem)
     const [tenant] = await tx
       .select({ id: tenants.id, status: tenants.status })
@@ -132,6 +145,7 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
     if (!tenant || tenant.status !== "active") {
       throw new Error("TENANT_SUSPENDED: Business account is suspended");
     }
+    await assertOpenLocation(tx, ctx.tenantId!, params.locationId);
 
     // 1. Idempotency check: if entry already exists with this idempotency key for this tenant, return it safely
     const [existingEntry] = await tx
@@ -322,6 +336,12 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
       isDuplicate: false,
     };
   });
+
+  // Email the customer if this visit took them past a reward (never blocks or undoes the points)
+  if (!result.isDuplicate && result.pointsDelta > 0) {
+    await notifyRewardsUnlocked(params.membershipId, ctx.tenantId!, result.newBalance - result.pointsDelta, result.newBalance);
+  }
+  return result;
 }
 
 // ==========================================
@@ -523,7 +543,7 @@ export async function confirmRedemption(
 
   const hash = hashRedemptionCode(params.code);
 
-  return await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     // 0. Verify tenant is active
     const [tenant] = await tx
       .select({ id: tenants.id, status: tenants.status })
@@ -534,6 +554,7 @@ export async function confirmRedemption(
     if (!tenant || tenant.status !== "active") {
       throw new Error("TENANT_SUSPENDED: Business account is suspended");
     }
+    await assertOpenLocation(tx, ctx.tenantId!, params.locationId);
 
     // 1. Find redemption by code hash with row-level lock FOR UPDATE to prevent race conditions
     const [redemption] = await tx
@@ -652,11 +673,15 @@ export async function confirmRedemption(
 
     return {
       redemptionId: redemption.id,
+      membershipId: redemption.membershipId,
       pointsDeducted: redemption.costPoints,
       newBalance,
       rewardTitle: reward.title,
     };
   });
+
+  await notifyRedemption(result.membershipId, result.rewardTitle, result.pointsDeducted, result.newBalance);
+  return result;
 }
 
 // ==========================================
@@ -694,7 +719,7 @@ export async function redeemForMember(
   if (!ctx.tenantId) throw new Error("tenantId required");
   const tenantId = ctx.tenantId;
 
-  return await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     const [tenant] = await tx
       .select({ status: tenants.status })
       .from(tenants)
@@ -703,6 +728,7 @@ export async function redeemForMember(
     if (!tenant || tenant.status !== "active") {
       throw new Error("TENANT_SUSPENDED: Business account is suspended");
     }
+    if (params.locationId) await assertOpenLocation(tx, tenantId, params.locationId);
 
     // A retried request (double tap, flaky network) returns the first result instead of charging twice
     const [previous] = await tx
@@ -890,6 +916,11 @@ export async function redeemForMember(
 
     return { entryId: entry.id, title, pointsDeducted: cost, newBalance, isDuplicate: false };
   });
+
+  if (!result.isDuplicate) {
+    await notifyRedemption(params.membershipId, result.title, result.pointsDeducted, result.newBalance);
+  }
+  return result;
 }
 
 // ==========================================
@@ -910,7 +941,7 @@ export async function adjustBalance(
   if (!ctx.tenantId) throw new Error("tenantId required");
   if (params.pointsDelta === 0) throw new Error("Enter how many points to add or remove");
 
-  return await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     // Scoped to the caller's business: an owner can never adjust another business's customer.
     const [lockedBalance] = await tx
       .select()
@@ -977,6 +1008,11 @@ export async function adjustBalance(
       newBalance,
     };
   });
+
+  if (params.pointsDelta > 0) {
+    await notifyRewardsUnlocked(params.membershipId, ctx.tenantId!, result.newBalance - params.pointsDelta, result.newBalance);
+  }
+  return result;
 }
 
 export async function reverseTransaction(

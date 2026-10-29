@@ -108,7 +108,8 @@ describe("Privacy Compliance, Email Outbox & Maintenance Crons (M9)", () => {
     expect(email.status).toBe("queued");
 
     // 2. Process outbox (delivers to local Mailpit container on port 1025)
-    const result = await processOutbox(10);
+    // Target this email: other tests leave queued emails behind, and the queue runs oldest first
+    const result = await processOutbox(10, { ids: [email.id] });
     expect(result.processed).toBeGreaterThanOrEqual(1);
     expect(result.sent).toBeGreaterThanOrEqual(1);
 

@@ -25,6 +25,7 @@ interface Membership {
   memberNumber: string;
   status: string;
   marketingOptIn: boolean;
+  emailNotifications?: boolean;
   joinedAt: string;
   tenantName: string;
   tenantSlug: string;
@@ -38,8 +39,137 @@ interface Membership {
 interface UserProfile {
   id: string;
   name: string | null;
+  birthMonth?: number | null;
+  birthDay?: number | null;
   email: string;
   createdAt: string;
+}
+
+/** Lets a customer change the name shops see on their card. */
+function NameEditor({ name, onSaved }: { name: string; onSaved: (name: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(name);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const res = await fetch("/api/v1/customer/me", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: value }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) return setError(json.error?.message || "Couldn't save your name");
+    onSaved(json.data.name);
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <p className="mt-1 text-sm text-zinc-700">
+        Name on your cards: <strong>{name || "not set"}</strong>{" "}
+        <button
+          type="button"
+          onClick={() => {
+            setValue(name);
+            setEditing(true);
+          }}
+          className="font-semibold text-evergreen hover:underline cursor-pointer"
+        >
+          Change
+        </button>
+      </p>
+    );
+  }
+  return (
+    <form onSubmit={save} className="mt-2 flex flex-wrap items-center gap-2">
+      <label htmlFor="profile-name" className="sr-only">
+        Your name
+      </label>
+      <input
+        id="profile-name"
+        value={value}
+        maxLength={80}
+        onChange={(e) => setValue(e.target.value)}
+        className="min-h-[40px] rounded-xl border border-zinc-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+      />
+      <button type="submit" disabled={busy} className="min-h-[40px] px-4 rounded-full bg-evergreen text-white text-sm font-semibold cursor-pointer disabled:opacity-50">
+        {busy ? "Saving..." : "Save"}
+      </button>
+      <button type="button" onClick={() => setEditing(false)} className="min-h-[40px] px-3 text-sm font-semibold text-zinc-600 cursor-pointer">
+        Cancel
+      </button>
+      {error && <p className="w-full text-sm text-rose-700">{error}</p>}
+    </form>
+  );
+}
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** Optional birthday (day and month only) so shops can give a birthday treat. */
+function BirthdayEditor({ month, day, onSaved }: { month: number | null; day: number | null; onSaved: (m: number | null, d: number | null) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [m, setM] = useState(month ? String(month) : "");
+  const [d, setD] = useState(day ? String(day) : "");
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async (clear = false) => {
+    setError(null);
+    const body = clear ? { birthMonth: null, birthDay: null } : { birthMonth: Number(m), birthDay: Number(d) };
+    const res = await fetch("/api/v1/customer/me", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return setError(json.error?.message || "Couldn't save your birthday");
+    onSaved(body.birthMonth, body.birthDay);
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <p className="mt-1 text-sm text-zinc-700">
+        Birthday: <strong>{month && day ? `${day} ${MONTHS[month - 1]}` : "not added"}</strong>{" "}
+        <button type="button" onClick={() => setEditing(true)} className="font-semibold text-evergreen hover:underline cursor-pointer">
+          {month ? "Change" : "Add it for a birthday treat"}
+        </button>
+      </p>
+    );
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <select aria-label="Day" value={d} onChange={(e) => setD(e.target.value)} className="min-h-[40px] rounded-xl border border-zinc-300 px-2 text-sm">
+        <option value="">Day</option>
+        {Array.from({ length: 31 }, (_, i) => (
+          <option key={i + 1} value={i + 1}>
+            {i + 1}
+          </option>
+        ))}
+      </select>
+      <select aria-label="Month" value={m} onChange={(e) => setM(e.target.value)} className="min-h-[40px] rounded-xl border border-zinc-300 px-2 text-sm">
+        <option value="">Month</option>
+        {MONTHS.map((name, i) => (
+          <option key={name} value={i + 1}>
+            {name}
+          </option>
+        ))}
+      </select>
+      <button type="button" onClick={() => save()} disabled={!m || !d} className="min-h-[40px] px-4 rounded-full bg-evergreen text-white text-sm font-semibold cursor-pointer disabled:opacity-50">
+        Save
+      </button>
+      {month && (
+        <button type="button" onClick={() => save(true)} className="min-h-[40px] px-3 text-sm font-semibold text-zinc-600 cursor-pointer">
+          Remove
+        </button>
+      )}
+      <button type="button" onClick={() => setEditing(false)} className="min-h-[40px] px-3 text-sm font-semibold text-zinc-600 cursor-pointer">
+        Cancel
+      </button>
+      <span className="w-full text-xs text-zinc-500">We only keep the day and month, never the year.</span>
+      {error && <p className="w-full text-sm text-rose-700">{error}</p>}
+    </div>
+  );
 }
 
 export default function CustomerMePage() {
@@ -73,7 +203,7 @@ export default function CustomerMePage() {
     fetchPrivacyData();
   }, []);
 
-  const handleToggleConsent = async (membershipId: string, currentVal: boolean) => {
+  const handleToggleConsent = async (membershipId: string, currentVal: boolean, kind: "marketing" | "card" = "marketing") => {
     setUpdatingConsent(membershipId);
     try {
       const res = await fetch("/api/v1/customer/me/consents", {
@@ -83,17 +213,24 @@ export default function CustomerMePage() {
           membershipId,
           granted: !currentVal,
           source: "me_privacy_centre",
+          kind,
         }),
       });
 
       if (res.ok) {
         setMemberships((prev) =>
-          prev.map((m) => (m.id === membershipId ? { ...m, marketingOptIn: !currentVal } : m))
+          prev.map((m) =>
+            m.id === membershipId ? { ...m, ...(kind === "card" ? { emailNotifications: !currentVal } : { marketingOptIn: !currentVal }) } : m
+          )
         );
         setMessage(
-          !currentVal
-            ? "Subscribed to promotional communications."
-            : "Unsubscribed from marketing communications."
+          kind === "card"
+            ? !currentVal
+              ? "You'll get emails about this card."
+              : "Emails about this card are off."
+            : !currentVal
+              ? "You'll get offers from this shop."
+              : "Offers from this shop are off."
         );
         setTimeout(() => setMessage(null), 3000);
       }
@@ -156,6 +293,15 @@ export default function CustomerMePage() {
             <div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-zinc-950">Account &amp; Privacy Centre</h1>
               <p className="text-xs text-zinc-500 font-medium">{profile?.email}</p>
+              <NameEditor
+                name={profile?.name ?? ""}
+                onSaved={(name) => setProfile((p) => (p ? { ...p, name } : p))}
+              />
+              <BirthdayEditor
+                month={profile?.birthMonth ?? null}
+                day={profile?.birthDay ?? null}
+                onSaved={(birthMonth, birthDay) => setProfile((p) => (p ? { ...p, birthMonth, birthDay } : p))}
+              />
             </div>
           </div>
           <a
@@ -219,23 +365,51 @@ export default function CustomerMePage() {
                     </div>
                   </div>
 
+                  {/* Service emails about this card */}
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center space-x-2.5">
+                      <Mail className="w-4 h-4 text-zinc-400 shrink-0 stroke-[1.8]" />
+                      <div>
+                        <div className="text-xs font-semibold text-zinc-800">Emails about my card</div>
+                        <div className="text-[11px] text-zinc-500">When a reward is ready, and a receipt when you use points</div>
+                      </div>
+                    </div>
+                    <button
+                      role="switch"
+                      aria-checked={m.emailNotifications !== false}
+                      aria-label={`Emails about my ${m.tenantName} card`}
+                      onClick={() => handleToggleConsent(m.id, m.emailNotifications !== false, "card")}
+                      disabled={updatingConsent === m.id}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer shrink-0 ${
+                        m.emailNotifications !== false ? "bg-evergreen" : "bg-zinc-300"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          m.emailNotifications !== false ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+
                   {/* Marketing Opt-In Toggle */}
                   <div className="flex items-center justify-between pt-1">
                     <div className="flex items-center space-x-2.5">
                       <Mail className="w-4 h-4 text-zinc-400 shrink-0 stroke-[1.8]" />
                       <div>
-                        <div className="text-xs font-semibold text-zinc-800">Email Marketing Communications</div>
-                        <div className="text-[11px] text-zinc-400">
-                          Receive special offers, double points announcements &amp; birthday perks
-                        </div>
+                        <div className="text-xs font-semibold text-zinc-800">Offers from this shop</div>
+                        <div className="text-[11px] text-zinc-500">Special offers and double-points days</div>
                       </div>
                     </div>
 
                     <button
+                      role="switch"
+                      aria-checked={m.marketingOptIn}
+                      aria-label={`Offers from ${m.tenantName}`}
                       onClick={() => handleToggleConsent(m.id, m.marketingOptIn)}
                       disabled={updatingConsent === m.id}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer shrink-0 ${
-                        m.marketingOptIn ? "bg-zinc-950" : "bg-zinc-300"
+                        m.marketingOptIn ? "bg-evergreen" : "bg-zinc-300"
                       }`}
                     >
                       <span

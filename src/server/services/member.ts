@@ -17,6 +17,8 @@ import { getRewards } from "./rewards";
 import { getMemberStampCards } from "./stamp-cards";
 import { RequestContext, assertCan } from "../security/permissions";
 import { logAuditEvent } from "./audit";
+import { notifyWelcome } from "./notifications";
+import { grantWelcomeBonus } from "./loyalty-jobs";
 import { hashPassword } from "../auth";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
@@ -116,7 +118,7 @@ export async function joinProgramme(input: JoinProgrammeInput) {
   }
 
   // 3. Create new membership
-  return await db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const memberNumber = generateCrockfordCode(8);
     const publicId = `mem_${crypto.randomBytes(12).toString("hex")}`;
 
@@ -176,6 +178,11 @@ export async function joinProgramme(input: JoinProgrammeInput) {
       isNew: true,
     };
   });
+
+  // Welcome bonus first (if the shop gives one), then the welcome email with their customer ID
+  await grantWelcomeBonus(created.membership.tenantId, created.membership.id);
+  await notifyWelcome(created.membership.id);
+  return created;
 }
 
 /**
@@ -333,8 +340,10 @@ export async function revokeMemberQr(ctx: RequestContext, membershipId: string) 
 
   if (!membership) throw new Error("Membership not found");
 
-  // Owner, manager, or the member themselves can revoke
-  if (ctx.userId !== membership.userId && ctx.role !== "owner" && ctx.role !== "manager") {
+  // The member themselves, or an owner/manager of the same business, can revoke
+  const isSelf = ctx.userId === membership.userId;
+  const isShopManager = (ctx.role === "owner" || ctx.role === "manager") && ctx.tenantId === membership.tenantId;
+  if (!isSelf && !isShopManager) {
     throw new Error("FORBIDDEN: Cannot revoke another member's QR");
   }
 

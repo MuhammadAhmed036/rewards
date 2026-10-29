@@ -10,6 +10,7 @@ import { RewardsManager } from "@/components/rewards/RewardsManager";
 import { SlidingTabs } from "@/components/ui/sliding-tabs";
 import { CustomerMiniCard } from "@/components/loyalty/CustomerMiniCard";
 import { CountUp, DrawnCheck } from "@/components/ui/count-up";
+import { currencySymbol } from "@/lib/money";
 import { Input } from "@/components/ui/input";
 import { parsePence } from "@/lib/money";
 import {
@@ -75,6 +76,8 @@ interface BusinessInfo {
   logoUrl: string | null;
   brandPrimaryHex: string | null;
   programmeType: "points" | "stamps";
+  currency?: string | null;
+  locale?: string | null;
 }
 
 interface TransactionItem {
@@ -727,6 +730,8 @@ export default function StaffPage() {
     setSpendInput(nextTotal);
   };
 
+  const cur = currencySymbol(business?.currency || "GBP", business?.locale || "en-GB");
+
   return (
     <div className="min-h-screen bg-paper text-zinc-900 pb-20 overflow-x-hidden w-full max-w-full">
       {/* Top Header Bar - High-End POS Shell */}
@@ -934,7 +939,7 @@ export default function StaffPage() {
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-3 text-xl font-bold text-slate-400">
-                      £
+                      {cur}
                     </span>
                     <Input
                       id="spend-amount"
@@ -956,7 +961,7 @@ export default function StaffPage() {
                         onClick={() => setSpendInput(preset.toFixed(2))}
                         className="press min-h-[40px] px-2 bg-white hover:border-evergreen border border-zinc-200 text-zinc-800 rounded-full text-sm font-semibold transition-colors cursor-pointer"
                       >
-                        +£{preset}
+                        +{cur}{preset}
                       </button>
                     ))}
                   </div>
@@ -986,7 +991,7 @@ export default function StaffPage() {
                               className="press min-h-[36px] px-3 bg-white hover:border-evergreen border border-zinc-200 text-zinc-800 rounded-full text-sm font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
                             >
                               <span>{prod.name}</span>
-                              <span className="text-zinc-500 tabular-nums">£{finalPrice}</span>
+                              <span className="text-zinc-500 tabular-nums">{cur}{finalPrice}</span>
                               {discount > 0 && (
                                 <span className="text-[11px] bg-rose-100 text-rose-700 font-extrabold px-1 rounded-sm">
                                   -{discount}%
@@ -1606,11 +1611,11 @@ export default function StaffPage() {
                           <div className="flex items-center gap-3">
                             <div className="text-right">
                               <div className="font-bold text-sm text-slate-900 tabular-nums">
-                                £{finalPrice}
+                                {cur}{finalPrice}
                               </div>
                               {prod.discountPercent > 0 && (
                                 <div className="text-xs text-slate-400 line-through">
-                                  £{originalPrice} ({prod.discountPercent}% off)
+                                  {cur}{originalPrice} ({prod.discountPercent}% off)
                                 </div>
                               )}
                             </div>
@@ -1770,7 +1775,7 @@ export default function StaffPage() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Price (£)</label>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Price ({cur})</label>
                   <Input
                     type="number"
                     step="0.01"
@@ -1874,7 +1879,7 @@ export default function StaffPage() {
                     <option value="">-- Choose from menu --</option>
                     {productsList.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} (£{(p.priceMinor / 100).toFixed(2)})
+                        {p.name} ({cur}{(p.priceMinor / 100).toFixed(2)})
                       </option>
                     ))}
                   </select>

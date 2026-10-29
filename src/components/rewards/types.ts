@@ -8,6 +8,9 @@ export interface PointsReward {
   productName?: string | null;
   quantityTotal?: number | null;
   quantityRedeemed?: number;
+  perMemberLimit?: number | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
 }
 
 export interface MenuProduct {
@@ -32,8 +35,8 @@ export async function loadPointsRewards(): Promise<PointsReward[]> {
   return (await res.json()).data ?? [];
 }
 
-export function formatPrice(minor: number) {
-  return `£${(minor / 100).toFixed(2)}`;
+export function formatPrice(minor: number, symbol = "£") {
+  return `${symbol}${(minor / 100).toFixed(2)}`;
 }
 
 /** "1 stamp", "6 stamps", "1 point", "100 points" */

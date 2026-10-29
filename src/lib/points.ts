@@ -23,6 +23,13 @@ export const ruleConfigSchema = z.object({
     warnDays: z.number().int().min(1).default(30),
   }),
   locationEligibility: z.union([z.literal("all"), z.array(z.string())]).default("all"),
+  // Extra points outside purchases (FR-027); 0 means switched off
+  bonuses: z
+    .object({
+      welcomePoints: z.number().int().min(0).max(100000).default(0),
+      birthdayPoints: z.number().int().min(0).max(100000).default(0),
+    })
+    .default({}),
 });
 
 export type RuleConfig = z.infer<typeof ruleConfigSchema>;
@@ -102,3 +109,14 @@ export function calculatePoints(input: CalculatePointsInput): CalculatePointsRes
   };
 }
 
+
+/** One-line plain description of an earning rule, e.g. "1 point for every £1 spent". */
+export function describeRule(rule: RuleConfig, unit: string, symbol = "£") {
+  const money = (minor: number) => (minor % 100 === 0 ? `${symbol}${minor / 100}` : `${symbol}${(minor / 100).toFixed(2)}`);
+  const word = (n: number) => (n === 1 ? unit.replace(/s$/, "") : unit);
+  if (rule.earn.mode === "spend") {
+    const min = rule.earn.minEligibleMinor > 0 ? `, on spends of ${money(rule.earn.minEligibleMinor)} or more` : "";
+    return `${rule.earn.pointsPerUnit} ${word(rule.earn.pointsPerUnit)} for every ${money(rule.earn.unitMinor)} spent${min}`;
+  }
+  return `${rule.earn.pointsPerVisit} ${word(rule.earn.pointsPerVisit)} per visit`;
+}

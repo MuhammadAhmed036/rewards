@@ -32,6 +32,7 @@ import { StampCard, type StampCardData } from "@/components/loyalty/StampCard";
 import { CustomerChat } from "@/components/chat/CustomerChat";
 import { PointsMenu } from "@/components/rewards/PointsMenu";
 import { MemberCard3D } from "@/components/loyalty/MemberCard3D";
+import { ReportProblem } from "@/components/loyalty/ReportProblem";
 
 interface HubPayload {
   tenant: {
@@ -44,6 +45,9 @@ interface HubPayload {
   programme: {
     name: string;
     type: "points" | "stamps";
+    status?: "published" | "paused";
+    earningRule?: string | null;
+    expiryRule?: string | null;
   };
   member: {
     membershipId: string;
@@ -68,6 +72,8 @@ interface HubPayload {
     costPoints: number;
     eligible: boolean;
     pointsShortfall: number;
+    unavailableReason?: string | null;
+    timesRedeemed?: number;
     description?: string | null;
     productName?: string | null;
   }>;
@@ -82,7 +88,7 @@ interface HubPayload {
 /** Plain words for a points-history row, e.g. "Free Tea" instead of "redeem". */
 function historyLabel(item: { type: string; pointsDelta: number; note?: string | null }) {
   if (item.type === "redeem") return item.note ? `Used on ${item.note}` : "Reward claimed";
-  if (item.type === "earn") return "Points earned";
+  if (item.type === "earn") return item.note || "Points earned";
   if (item.type === "adjust") return item.pointsDelta > 0 ? "Points added by the shop" : "Points removed by the shop";
   if (item.type === "reverse") return "Correction";
   if (item.type === "expire") return "Points expired";
@@ -622,7 +628,7 @@ export default function BusinessHubPage(props: {
 
   // Calculate next reward progress
   const nextLockedReward = hubData.rewards
-    .filter((r) => !r.eligible)
+    .filter((r) => !r.eligible && !r.unavailableReason)
     .sort((a, b) => a.costPoints - b.costPoints)[0];
 
   const highestEligibleReward = hubData.rewards
@@ -1060,6 +1066,19 @@ export default function BusinessHubPage(props: {
                             : `You have ${member.balance} ${unitWord} here`}
                       </h2>
 
+                      {hubData.programme.status === "paused" ? (
+                        <p className="rise-in mt-4 max-w-md rounded-2xl bg-marigold/25 px-4 py-3 text-sm text-zinc-900" style={{ "--d": "350ms" } as React.CSSProperties}>
+                          {hubData.tenant.name} has paused earning for now. Your {unitWord} are safe and you can still spend them.
+                        </p>
+                      ) : (
+                        hubData.programme.earningRule && (
+                          <p className="rise-in mt-3 text-zinc-600" style={{ "--d": "350ms" } as React.CSSProperties}>
+                            You get {hubData.programme.earningRule}.
+                            {hubData.programme.expiryRule && <> {hubData.programme.expiryRule}.</>}
+                          </p>
+                        )
+                      )}
+
                       {nextLockedReward && (
                         <div className="rise-in mt-6 max-w-md" style={{ "--d": "400ms" } as React.CSSProperties}>
                           <div className="h-3 rounded-full bg-white border border-zinc-200 overflow-hidden">
@@ -1180,6 +1199,12 @@ export default function BusinessHubPage(props: {
                             })}
                           </ul>
                         )}
+                        <ReportProblem
+                          tenantId={hubData.tenant.id}
+                          membershipId={member.membershipId}
+                          unit={unitWord}
+                          history={member.recentHistory.map((h) => ({ ...h, label: historyLabel(h) }))}
+                        />
                       </section>
 
                       {hubData.links.length > 0 && (
@@ -1414,7 +1439,15 @@ export default function BusinessHubPage(props: {
                                 className="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
                               />
                               <span>
-                                I accept the programme terms and privacy policy. Points hold no cash value.
+                                I accept the{" "}
+                                <Link href={`/b/${slug}/terms`} target="_blank" className="font-semibold text-evergreen underline">
+                                  programme terms
+                                </Link>{" "}
+                                and{" "}
+                                <Link href="/privacy" target="_blank" className="font-semibold text-evergreen underline">
+                                  privacy notice
+                                </Link>
+                                . Points have no cash value.
                               </span>
                             </label>
 
@@ -1459,9 +1492,14 @@ export default function BusinessHubPage(props: {
                           </div>
 
                           <div>
-                            <label className="text-xs font-semibold text-zinc-800 block mb-1">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <label className="text-xs font-semibold text-zinc-800">
                               Password
                             </label>
+                              <Link href="/forgot-password" className="text-xs font-semibold text-evergreen hover:underline">
+                                Forgot password?
+                              </Link>
+                            </div>
                             <Input
                               type="password"
                               required
@@ -1522,7 +1560,12 @@ export default function BusinessHubPage(props: {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-zinc-800 block mb-1">Staff Password</label>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label className="text-xs font-semibold text-zinc-800">Staff Password</label>
+                    <Link href="/forgot-password" className="text-xs font-semibold text-evergreen hover:underline">
+                      Forgot password?
+                    </Link>
+                  </div>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3 stroke-[1.8]" />
                     <Input
@@ -1606,7 +1649,12 @@ export default function BusinessHubPage(props: {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-zinc-800 block mb-1">Password</label>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <label className="text-xs font-semibold text-zinc-800">Password</label>
+                    <Link href="/forgot-password" className="text-xs font-semibold text-evergreen hover:underline">
+                      Forgot password?
+                    </Link>
+                  </div>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3 stroke-[1.8]" />
                     <Input
@@ -1666,7 +1714,8 @@ export default function BusinessHubPage(props: {
           <span>&copy; {new Date().getFullYear()} {hubData.tenant.name}. Loyalty card by LoyaltyPlatform</span>
           <div className="flex items-center space-x-4">
             <Link href="/" className="hover:text-slate-800">LoyaltyPlatform</Link>
-            <a href={`/b/${slug}`} className="hover:text-slate-800">This shop&rsquo;s page</a>
+            <Link href={`/b/${slug}/terms`} className="hover:text-slate-800">Card terms</Link>
+            <Link href="/privacy" className="hover:text-slate-800">Privacy</Link>
           </div>
         </div>
       </footer>

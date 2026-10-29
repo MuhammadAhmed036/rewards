@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
         email: users.email,
         name: users.name,
         isPlatformAdmin: users.isPlatformAdmin,
+        emailVerifiedAt: users.emailVerifiedAt,
       })
       .from(users)
       .where(eq(users.id, ctx.userId))
@@ -37,6 +38,7 @@ export async function GET(request: NextRequest) {
         role: ctx.role,
         tenantId: ctx.tenantId || null,
         isPlatformAdmin: user.isPlatformAdmin,
+        emailVerified: Boolean(user.emailVerifiedAt),
       },
     });
   } catch (error) {

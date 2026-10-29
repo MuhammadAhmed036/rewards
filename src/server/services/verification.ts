@@ -1,105 +1,72 @@
 import { db } from "../db";
-import { users, verifications, emailOutbox } from "../db/schema";
+import { users, verifications } from "../db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { checkEmailOtpRateLimit } from "../security/rate-limit";
+import { env } from "@/lib/env";
+import { sendEmailNow } from "./email";
 import crypto from "crypto";
 
-export async function createEmailVerificationToken(
-  userId: string,
-  email: string,
-  tenantId?: string
-) {
+// Only a hash of each link token is stored, so a database leak can't be used to verify or reset accounts.
+export function hashLinkToken(token: string) {
+  return crypto.createHash("sha256").update(token.trim()).digest("hex");
+}
+
+const verifyKey = (email: string) => `verify:${email.toLowerCase().trim()}`;
+
+/** Emails a single-use, 24-hour link that confirms the address belongs to the account holder. */
+export async function createEmailVerificationToken(userId: string, email: string, tenantId?: string) {
   const normalizedEmail = email.toLowerCase().trim();
   const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours TTL per FR-015
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-  // Delete any existing tokens for this identifier
-  await db
-    .delete(verifications)
-    .where(eq(verifications.identifier, normalizedEmail));
-
-  // Insert new single-use token
+  await db.delete(verifications).where(eq(verifications.identifier, verifyKey(normalizedEmail)));
   await db.insert(verifications).values({
-    identifier: normalizedEmail,
-    value: token,
+    identifier: verifyKey(normalizedEmail),
+    value: hashLinkToken(token),
     expiresAt,
   });
 
-  // Queue transactional verification email
-  await db.insert(emailOutbox).values({
-    tenantId: tenantId || null,
+  await sendEmailNow({
     toEmail: normalizedEmail,
     template: "email_verification",
+    payload: { userId, url: `${env.APP_URL}/verify-email?token=${token}` },
     kind: "transactional",
-    status: "queued",
-    payload: {
-      userId,
-      token,
-      expiresAt: expiresAt.toISOString(),
-    },
+    tenantId,
   });
 
   return { token, expiresAt };
 }
 
 export async function verifyEmailToken(token: string) {
-  const trimmedToken = token.trim();
-  const now = new Date();
-
-  // Find valid verification record
   const [record] = await db
     .select()
     .from(verifications)
-    .where(and(eq(verifications.value, trimmedToken), gt(verifications.expiresAt, now)))
+    .where(and(eq(verifications.value, hashLinkToken(token)), gt(verifications.expiresAt, new Date())))
     .limit(1);
 
-  if (!record) {
-    throw new Error("Invalid or expired verification token");
+  if (!record || !record.identifier.startsWith("verify:")) {
+    throw new Error("This link has expired or was already used. Sign in and ask for a new one.");
   }
 
-  // Update user
+  const email = record.identifier.slice("verify:".length);
   const [user] = await db
     .update(users)
-    .set({ emailVerifiedAt: now })
-    .where(eq(users.email, record.identifier))
-    .returning();
+    .set({ emailVerifiedAt: new Date() })
+    .where(eq(users.email, email))
+    .returning({ id: users.id, email: users.email });
 
-  if (!user) {
-    throw new Error("User associated with verification token not found");
-  }
-
-  // Enforce single use: delete token
   await db.delete(verifications).where(eq(verifications.id, record.id));
+  if (!user) throw new Error("This link has expired or was already used. Sign in and ask for a new one.");
 
-  return {
-    success: true,
-    userId: user.id,
-    email: user.email,
-  };
+  return { success: true, userId: user.id, email: user.email };
 }
 
 export async function resendEmailVerification(userId: string) {
-  const [user] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) throw new Error("User not found");
+  if (user.emailVerifiedAt) return { alreadyVerified: true };
 
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  if (user.emailVerifiedAt) {
-    return { alreadyVerified: true };
-  }
-
-  // Rate limit: 3 per 10 minutes per email
   await checkEmailOtpRateLimit(user.email);
-
   const result = await createEmailVerificationToken(user.id, user.email);
-  return {
-    success: true,
-    ...result,
-  };
+  return { success: true, expiresAt: result.expiresAt };
 }
-

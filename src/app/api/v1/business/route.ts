@@ -14,6 +14,10 @@ async function loadBusiness(tenantId: string) {
       slug: tenants.slug,
       name: tenants.name,
       brandPrimaryHex: tenants.brandPrimaryHex,
+      industry: tenants.industry,
+      timezone: tenants.timezone,
+      currency: tenants.currency,
+      locale: tenants.locale,
       logoRef: logoRefSql,
     })
     .from(tenants)
@@ -54,11 +58,36 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ data: business });
 }
 
-const updateSchema = z.object({
-  logoDataUrl: z.string().nullable(),
-});
+// Currencies and languages the app can show today; add more here as they're supported
+const CURRENCIES = ["GBP", "EUR", "USD", "PKR", "AED", "SAR", "INR", "CAD", "AUD"] as const;
+const LOCALES = ["en-GB", "en-US", "en-IE", "en-AU", "en-CA", "en-PK", "en-IN", "en-AE"] as const;
 
-/** Owners upload, replace or remove their business logo. */
+const updateSchema = z
+  .object({
+    logoDataUrl: z.string().nullable().optional(),
+    name: z.string().trim().min(2, "Business name is too short").max(120).optional(),
+    brandPrimaryHex: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/, "Pick a colour like #495e57")
+      .optional(),
+    industry: z.string().trim().max(80).optional(),
+    timezone: z
+      .string()
+      .refine((tz) => {
+        try {
+          new Intl.DateTimeFormat("en-GB", { timeZone: tz });
+          return true;
+        } catch {
+          return false;
+        }
+      }, "That time zone isn't recognised")
+      .optional(),
+    currency: z.enum(CURRENCIES).optional(),
+    locale: z.enum(LOCALES).optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, "Nothing to change");
+
+/** Owners change their logo, name, brand colour, time zone, currency and language. */
 export async function PATCH(request: NextRequest) {
   const guard = await guardApiRequest(request, {
     allowedRoles: ["owner"],
@@ -67,27 +96,30 @@ export async function PATCH(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
-    const body = updateSchema.parse(await request.json());
-    const logoUrl = body.logoDataUrl === null ? null : validateLogoDataUrl(body.logoDataUrl);
+    const { logoDataUrl, ...settings } = updateSchema.parse(await request.json());
+    const changes: Partial<typeof tenants.$inferInsert> = { ...settings };
+    if (logoDataUrl !== undefined) {
+      changes.logoUrl = logoDataUrl === null ? null : validateLogoDataUrl(logoDataUrl);
+    }
 
-    await db.update(tenants).set({ logoUrl }).where(eq(tenants.id, guard.ctx.tenantId!));
+    await db.update(tenants).set(changes).where(eq(tenants.id, guard.ctx.tenantId!));
 
     await logAuditEvent(guard.ctx, {
-      action: logoUrl ? "tenant.logo_updated" : "tenant.logo_removed",
+      action:
+        logoDataUrl !== undefined && Object.keys(settings).length === 0
+          ? changes.logoUrl
+            ? "tenant.logo_updated"
+            : "tenant.logo_removed"
+          : "tenant.settings_updated",
       targetType: "tenant",
       targetId: guard.ctx.tenantId!,
+      metadata: { fields: Object.keys(changes) },
     });
 
     return NextResponse.json({ data: await loadBusiness(guard.ctx.tenantId!) });
   } catch (err) {
-    return NextResponse.json(
-      {
-        error: {
-          code: "LOGO_UPDATE_FAILED",
-          message: err instanceof Error ? err.message : "Failed to update logo",
-        },
-      },
-      { status: 400 }
-    );
+    const message =
+      err instanceof z.ZodError ? err.errors[0]?.message : err instanceof Error ? err.message : "Couldn't save your settings";
+    return NextResponse.json({ error: { code: "BUSINESS_UPDATE_FAILED", message } }, { status: 400 });
   }
 }

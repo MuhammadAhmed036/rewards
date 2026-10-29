@@ -13,7 +13,7 @@ import {
 import { invalidateUserSessions, purgeExpiredSessions } from "../auth";
 import { logAuditEvent } from "./audit";
 import { logoRefSql, resolveLogoUrl } from "./business-logo";
-import { eq, desc, lt } from "drizzle-orm";
+import { and, eq, desc, lt } from "drizzle-orm";
 import crypto from "crypto";
 
 export async function getCustomerPrivacyData(userId: string) {
@@ -23,6 +23,8 @@ export async function getCustomerPrivacyData(userId: string) {
       name: users.name,
       email: users.email,
       createdAt: users.createdAt,
+      birthMonth: users.birthMonth,
+      birthDay: users.birthDay,
     })
     .from(users)
     .where(eq(users.id, userId))
@@ -40,6 +42,7 @@ export async function getCustomerPrivacyData(userId: string) {
       memberNumber: memberships.memberNumber,
       status: memberships.status,
       marketingOptIn: memberships.marketingOptIn,
+      emailNotifications: memberships.emailNotifications,
       joinedAt: memberships.joinedAt,
       tenantName: tenants.name,
       tenantSlug: tenants.slug,
@@ -76,6 +79,17 @@ export async function getCustomerPrivacyData(userId: string) {
     })),
     consents,
   };
+}
+
+/** A customer switches service emails about one card on or off from their account (FR-055). */
+export async function updateCardEmails(userId: string, membershipId: string, on: boolean) {
+  const [updated] = await db
+    .update(memberships)
+    .set({ emailNotifications: on })
+    .where(and(eq(memberships.id, membershipId), eq(memberships.userId, userId)))
+    .returning();
+  if (!updated) throw new Error("Membership not found or unauthorized");
+  return updated;
 }
 
 export async function updateMarketingConsent(
@@ -211,6 +225,8 @@ export async function deleteAndAnonymiseAccount(userId: string) {
         email: anonymisedEmail,
         passwordHash: null,
         image: null,
+        birthMonth: null,
+        birthDay: null,
         deletedAt: new Date(),
       })
       .where(eq(users.id, userId));

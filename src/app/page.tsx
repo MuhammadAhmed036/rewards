@@ -61,7 +61,7 @@ const roles = [
 const faqs = [
   {
     q: "Do my customers need to download an app?",
-    a: "No. They scan your QR code with their phone camera and their card opens in the browser. They can add it to Apple Wallet or Google Wallet if they like.",
+    a: "No. They scan your QR code with their phone camera and their card opens in the browser. They can save it to their home screen so it opens like an app.",
   },
   {
     q: "How do my staff add points?",
@@ -360,6 +360,7 @@ export default function Home() {
             <Link href="/signup?role=owner" className="hover:text-evergreen-deep">Create a business</Link>
             <Link href="/dashboard" className="hover:text-evergreen-deep">Owner dashboard</Link>
             <Link href="/staff" className="hover:text-evergreen-deep">Staff scanner</Link>
+            <Link href="/privacy" className="hover:text-evergreen-deep">Privacy</Link>
           </nav>
         </div>
         <p className="max-w-6xl mx-auto px-4 sm:px-6 pb-8 text-xs text-zinc-400">

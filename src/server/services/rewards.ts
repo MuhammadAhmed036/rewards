@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { rewards, rewardLocations, programmes, tenants, products } from "../db/schema";
+import { rewards, rewardLocations, programmes, tenants, products, redemptions } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
 import { logAuditEvent } from "./audit";
 import { eq, and, asc, count, getTableColumns } from "drizzle-orm";
@@ -12,8 +12,8 @@ export const createRewardSchema = z.object({
   productId: z.string().uuid().optional(),
   type: z.enum(["free_item", "discount", "upgrade", "fixed_value", "custom"]).default("free_item"),
   costPoints: z.number().int().min(1, "Cost must be at least 1 point/stamp"),
-  startsAt: z.date().optional(),
-  endsAt: z.date().optional(),
+  startsAt: z.coerce.date().optional(),
+  endsAt: z.coerce.date().optional(),
   quantityTotal: z.number().int().min(1).optional(),
   perMemberLimit: z.number().int().min(1).optional(),
   locationIds: z.array(z.string().uuid()).optional(),
@@ -58,6 +58,9 @@ export async function createReward(ctx: RequestContext, input: CreateRewardInput
   }
 
   const validated = createRewardSchema.parse(input);
+  if (validated.startsAt && validated.endsAt && validated.endsAt <= validated.startsAt) {
+    throw new Error("The end date must be after the start date");
+  }
   if (validated.productId) await assertOwnProduct(ctx.tenantId, validated.productId);
 
   const [prog] = await db
@@ -116,8 +119,12 @@ export async function createReward(ctx: RequestContext, input: CreateRewardInput
 export async function updateReward(
   ctx: RequestContext,
   rewardId: string,
-  input: Omit<Partial<CreateRewardInput>, "productId"> & {
+  input: Omit<Partial<CreateRewardInput>, "productId" | "startsAt" | "endsAt" | "quantityTotal" | "perMemberLimit"> & {
     productId?: string | null;
+    startsAt?: Date | null;
+    endsAt?: Date | null;
+    quantityTotal?: number | null;
+    perMemberLimit?: number | null;
     status?: "active" | "paused" | "archived";
   }
 ) {
@@ -168,11 +175,15 @@ export type RewardItem = typeof rewards.$inferSelect & { productName: string | n
 export type RewardWithEligibility = RewardItem & {
   eligible: boolean;
   pointsShortfall: number;
+  /** Why it can't be claimed right now apart from points, in plain words (FR-062). */
+  unavailableReason: string | null;
+  /** How many times this customer has had it. */
+  timesRedeemed: number;
 };
 
 export async function getRewards(
   tenantId: string,
-  options: { includeInactive?: boolean; memberBalance: number }
+  options: { includeInactive?: boolean; memberBalance: number; membershipId?: string }
 ): Promise<RewardWithEligibility[]>;
 export async function getRewards(
   tenantId: string,
@@ -180,7 +191,7 @@ export async function getRewards(
 ): Promise<RewardItem[]>;
 export async function getRewards(
   tenantId: string,
-  options: { includeInactive?: boolean; memberBalance?: number } = {}
+  options: { includeInactive?: boolean; memberBalance?: number; membershipId?: string } = {}
 ): Promise<RewardItem[] | RewardWithEligibility[]> {
   // Cheapest first, so customers see the next thing they can reach at the top
   const list = await db
@@ -195,15 +206,39 @@ export async function getRewards(
     .orderBy(asc(rewards.costPoints), asc(rewards.title));
 
   if (options.memberBalance !== undefined) {
-    return list.map((r) => {
-      const eligible = options.memberBalance! >= r.costPoints;
-      const pointsShortfall = eligible ? 0 : r.costPoints - options.memberBalance!;
-      return {
-        ...r,
-        eligible,
-        pointsShortfall,
-      };
-    });
+    const balance = options.memberBalance;
+    const used = new Map<string, number>();
+    if (options.membershipId) {
+      const rows = await db
+        .select({ rewardId: redemptions.rewardId, count: count() })
+        .from(redemptions)
+        .where(and(eq(redemptions.membershipId, options.membershipId), eq(redemptions.status, "confirmed")))
+        .groupBy(redemptions.rewardId);
+      rows.forEach((r) => used.set(r.rewardId, Number(r.count)));
+    }
+    const now = new Date();
+    const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+    return list
+      // Rewards that ended a while ago just disappear; recently ended ones stay with a reason
+      .filter((r) => !r.endsAt || now.getTime() - r.endsAt.getTime() < 7 * 24 * 60 * 60 * 1000)
+      .map((r) => {
+        const timesRedeemed = used.get(r.id) ?? 0;
+        let unavailableReason: string | null = null;
+        if (r.startsAt && r.startsAt > now) unavailableReason = `Available from ${day(r.startsAt)}`;
+        else if (r.endsAt && r.endsAt < now) unavailableReason = `Ended on ${day(r.endsAt)}`;
+        else if (r.quantityTotal && r.quantityRedeemed >= r.quantityTotal) unavailableReason = "All gone for now";
+        else if (r.perMemberLimit && timesRedeemed >= r.perMemberLimit)
+          unavailableReason = r.perMemberLimit === 1 ? "You've already had this one" : `You've had this ${timesRedeemed} times, the most allowed`;
+        const enough = balance >= r.costPoints;
+        return {
+          ...r,
+          eligible: enough && !unavailableReason,
+          pointsShortfall: enough ? 0 : r.costPoints - balance,
+          unavailableReason,
+          timesRedeemed,
+        };
+      });
   }
 
   return list;

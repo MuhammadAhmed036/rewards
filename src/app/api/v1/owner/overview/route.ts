@@ -6,6 +6,7 @@ import {
   membershipBalances,
   ledgerEntries,
   linkClickEvents,
+  tenants,
 } from "@/server/db/schema";
 import { eq, and, sql, gte } from "drizzle-orm";
 
@@ -19,61 +20,72 @@ export async function GET(request: NextRequest) {
   const { ctx } = guard;
   const tenantId = ctx.tenantId!;
 
-  // 1. Total Members
+  // Date range in the business's own time zone: "today" means today where the shop is (FR-100, FR-101)
+  const RANGES = { "7d": 7, "30d": 30, "90d": 90, "12m": 365, all: 0 } as const;
+  const rangeParam = request.nextUrl.searchParams.get("range") as keyof typeof RANGES | null;
+  const range = rangeParam && rangeParam in RANGES ? rangeParam : "30d";
+  const [tenant] = await db.select({ timezone: tenants.timezone }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  const timezone = tenant?.timezone || "Europe/London";
+  const days = RANGES[range];
+  const [{ start }] = await db.execute<{ start: Date | null }>(
+    days === 0
+      ? sql`select null::timestamptz as start`
+      : sql`select ((date_trunc('day', now() at time zone ${timezone}) - make_interval(days => ${days - 1})) at time zone ${timezone}) as start`
+  );
+  const since = start ? new Date(start) : null;
+  const inRange = (col: Parameters<typeof gte>[0]) => (since ? gte(col, since) : undefined);
+
+  // Customers right now, and how many joined in the range
   const [totalMembersRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(memberships)
     .where(and(eq(memberships.tenantId, tenantId), eq(memberships.status, "active")));
+  const [newMembersRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(memberships)
+    .where(and(eq(memberships.tenantId, tenantId), inRange(memberships.joinedAt)));
 
-  // 2. Active Members in last 30 days
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  // Customers with any points activity in the range
   const [activeMembersRow] = await db
-    .select({
-      count: sql<number>`count(distinct ${ledgerEntries.membershipId})::int`,
-    })
+    .select({ count: sql<number>`count(distinct ${ledgerEntries.membershipId})::int` })
     .from(ledgerEntries)
-    .where(
-      and(
-        eq(ledgerEntries.tenantId, tenantId),
-        gte(ledgerEntries.occurredAt, thirtyDaysAgo)
-      )
-    );
+    .where(and(eq(ledgerEntries.tenantId, tenantId), inRange(ledgerEntries.occurredAt)));
 
-  // 3. Outstanding Points Liability
+  // Points held by customers right now (the business's liability)
   const [outstandingRow] = await db
-    .select({
-      totalLiability: sql<number>`COALESCE(SUM(balance), 0)::int`,
-    })
+    .select({ totalLiability: sql<number>`COALESCE(SUM(balance), 0)::int` })
     .from(membershipBalances)
     .where(eq(membershipBalances.tenantId, tenantId));
 
-  // 4. Earns Count & Points
   const [earnsRow] = await db
     .select({
       count: sql<number>`count(*)::int`,
       pointsAwarded: sql<number>`COALESCE(SUM(points_delta), 0)::int`,
     })
     .from(ledgerEntries)
-    .where(and(eq(ledgerEntries.tenantId, tenantId), eq(ledgerEntries.type, "earn")));
+    .where(and(eq(ledgerEntries.tenantId, tenantId), eq(ledgerEntries.type, "earn"), inRange(ledgerEntries.occurredAt)));
 
-  // 5. Redemptions Count & Points (points-menu rewards and items staff gave for points)
+  // Points-menu rewards and items staff gave for points
   const [redemptionsRow] = await db
     .select({
       count: sql<number>`count(*)::int`,
       pointsRedeemed: sql<number>`COALESCE(-SUM(points_delta), 0)::int`,
     })
     .from(ledgerEntries)
-    .where(and(eq(ledgerEntries.tenantId, tenantId), eq(ledgerEntries.type, "redeem")));
+    .where(and(eq(ledgerEntries.tenantId, tenantId), eq(ledgerEntries.type, "redeem"), inRange(ledgerEntries.occurredAt)));
 
-  // 6. Link Clicks Total
   const [clicksRow] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(linkClickEvents)
-    .where(eq(linkClickEvents.tenantId, tenantId));
+    .where(and(eq(linkClickEvents.tenantId, tenantId), inRange(linkClickEvents.clickedAt)));
 
   return NextResponse.json({
     data: {
+      range,
+      rangeStart: since,
+      timezone,
       totalMembers: totalMembersRow.count,
+      newMembers: newMembersRow.count,
       activeMembers30d: activeMembersRow.count,
       outstandingPoints: outstandingRow.totalLiability,
       earnsCount: earnsRow.count,

@@ -16,6 +16,8 @@ const updateRewardBodySchema = z.object({
   status: z.enum(["active", "paused", "archived"]).optional(),
   quantityTotal: z.number().int().min(1).nullable().optional(),
   perMemberLimit: z.number().int().min(1).nullable().optional(),
+  startsAt: z.coerce.date().nullable().optional(),
+  endsAt: z.coerce.date().nullable().optional(),
 });
 
 function failure(code: string, err: unknown, fallback: string) {
@@ -54,12 +56,8 @@ export async function PATCH(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
-    const { id, quantityTotal, perMemberLimit, ...updates } = updateRewardBodySchema.parse(await request.json());
-    const updated = await updateReward(guard.ctx, id, {
-      ...updates,
-      quantityTotal: quantityTotal ?? undefined,
-      perMemberLimit: perMemberLimit ?? undefined,
-    });
+    const { id, ...updates } = updateRewardBodySchema.parse(await request.json());
+    const updated = await updateReward(guard.ctx, id, updates);
     return NextResponse.json({ data: updated });
   } catch (err) {
     return failure("UPDATE_REWARD_FAILED", err, "Failed to update reward");

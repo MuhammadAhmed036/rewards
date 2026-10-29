@@ -4,6 +4,7 @@ import {
   listStaffMembers,
   addStaffMember,
   updateStaffMember,
+  resendStaffInvitation,
 } from "@/server/services/staff";
 import { z } from "zod";
 
@@ -68,6 +69,9 @@ const updateStaffSchema = z.object({
   staffMemberId: z.string().uuid(),
   role: z.enum(["owner", "manager", "staff", "marketing"]).optional(),
   status: z.enum(["active", "revoked"]).optional(),
+  locationIds: z.array(z.string().uuid()).optional(),
+  // Send the invite email again to someone who hasn't accepted yet
+  resendInvite: z.boolean().optional(),
 });
 
 export async function PATCH(request: NextRequest) {
@@ -81,6 +85,9 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const validated = updateStaffSchema.parse(body);
 
+    if (validated.resendInvite) {
+      return NextResponse.json({ data: await resendStaffInvitation(guard.ctx, validated.staffMemberId) });
+    }
     const updated = await updateStaffMember(guard.ctx, validated.staffMemberId, validated);
     return NextResponse.json({ data: updated });
   } catch (err) {

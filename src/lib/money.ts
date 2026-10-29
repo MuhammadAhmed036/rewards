@@ -42,3 +42,24 @@ export function formatPence(pence: number): string {
   return `£${pounds}.${remainder.toString().padStart(2, "0")}`;
 }
 
+
+/** The symbol for a business's currency, e.g. "£", "€", "Rs". Falls back to the code. */
+export function currencySymbol(currency = "GBP", locale = "en-GB"): string {
+  try {
+    const part = new Intl.NumberFormat(locale, { style: "currency", currency, currencyDisplay: "narrowSymbol" })
+      .formatToParts(0)
+      .find((p) => p.type === "currency");
+    return part?.value ?? currency;
+  } catch {
+    return currency;
+  }
+}
+
+/** Formats integer minor units in the business's currency, e.g. 1870 GBP -> "£18.70". */
+export function formatMoney(minor: number, currency = "GBP", locale = "en-GB"): string {
+  try {
+    return new Intl.NumberFormat(locale, { style: "currency", currency, currencyDisplay: "narrowSymbol" }).format(minor / 100);
+  } catch {
+    return `${currency} ${(minor / 100).toFixed(2)}`;
+  }
+}

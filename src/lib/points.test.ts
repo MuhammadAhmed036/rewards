@@ -25,6 +25,7 @@ describe("Points Calculation Pure Function (M2)", () => {
       warnDays: 30,
     },
     locationEligibility: "all",
+    bonuses: { welcomePoints: 0, birthdayPoints: 0 },
   };
 
   it("calculates points for £18.70 (1870p) with rounding down -> 18 points per spec", () => {

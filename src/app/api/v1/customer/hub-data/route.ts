@@ -7,11 +7,14 @@ import {
   membershipBalances,
   ledgerEntries,
   users,
+  ruleVersions,
 } from "@/server/db/schema";
+import { describeRule, ruleConfigSchema } from "@/lib/points";
+import { currencySymbol } from "@/lib/money";
 import { getVisibleLinks } from "@/server/services/links";
 import { getRewards } from "@/server/services/rewards";
 import { generateMemberQrToken, generateQrDataUrl } from "@/server/qr";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { logoRefSql, resolveLogoUrl } from "@/server/services/business-logo";
 import { getMemberStampCards } from "@/server/services/stamp-cards";
 import { getSessionContext } from "@/server/auth";
@@ -46,18 +49,54 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 2. Load published programme
-  const [prog] = await db
+  // 2. Load the programme (a paused one still shows cards and balances, just no new points)
+  const [progRow] = await db
     .select({
       id: programmes.id,
       name: programmes.name,
       type: programmes.type,
+      status: programmes.status,
       termsVersion: programmes.termsVersion,
       termsText: programmes.termsText,
+      currentRuleVersionId: programmes.currentRuleVersionId,
     })
     .from(programmes)
-    .where(and(eq(programmes.tenantId, tenant.id), eq(programmes.status, "published")))
+    .where(and(eq(programmes.tenantId, tenant.id), inArray(programmes.status, ["published", "paused"])))
     .limit(1);
+
+  // How customers earn, in plain words, so the rule is visible to them (FR-051)
+  let earningRule: string | null = null;
+  let expiryRule: string | null = null;
+  if (progRow?.currentRuleVersionId) {
+    const [rule] = await db
+      .select({ config: ruleVersions.config })
+      .from(ruleVersions)
+      .where(eq(ruleVersions.id, progRow.currentRuleVersionId))
+      .limit(1);
+    if (rule) {
+      const parsed = ruleConfigSchema.parse(rule.config);
+      if (parsed.expiry.enabled) {
+        expiryRule = `${progRow.type === "stamps" ? "Stamps" : "Points"} expire after ${parsed.expiry.months} months without a visit`;
+      }
+      earningRule = describeRule(
+        parsed,
+        progRow.type === "stamps" ? "stamps" : "points",
+        currencySymbol(tenant.currency || "GBP")
+      );
+    }
+  }
+  const prog = progRow
+    ? {
+        id: progRow.id,
+        name: progRow.name,
+        type: progRow.type,
+        status: progRow.status,
+        termsVersion: progRow.termsVersion,
+        termsText: progRow.termsText,
+        earningRule,
+        expiryRule,
+      }
+    : undefined;
 
   // 3. Anti-Gating: Load visible links (same for all members)
   const visibleLinks = await getVisibleLinks(tenant.id);
@@ -141,6 +180,7 @@ export async function GET(request: NextRequest) {
   // 5. Load rewards with eligibility based on member balance
   const rewardsList = await getRewards(tenant.id, {
     memberBalance: currentBalance,
+    membershipId: memberData?.membershipId,
   });
 
   return NextResponse.json({

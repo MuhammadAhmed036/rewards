@@ -27,6 +27,9 @@ export const users = pgTable(
     image: text("image"),
     isPlatformAdmin: boolean("is_platform_admin").default(false).notNull(),
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+    // Optional, for birthday treats; no year is stored (data minimisation)
+    birthMonth: integer("birth_month"),
+    birthDay: integer("birth_day"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
@@ -193,6 +196,8 @@ export const memberships = pgTable(
     joinedAt: timestamp("joined_at", { withTimezone: true }).defaultNow().notNull(),
     joinedLocationId: uuid("joined_location_id").references(() => locations.id),
     marketingOptIn: boolean("marketing_opt_in").default(false).notNull(),
+    // Service emails about this card (welcome, reward unlocked, receipts); customers can switch them off
+    emailNotifications: boolean("email_notifications").default(true).notNull(),
   },
   (table) => [
     uniqueIndex("memberships_tenant_user_idx").on(table.tenantId, table.userId),
@@ -519,6 +524,27 @@ export const conversationMessages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("conversation_messages_conversation_idx").on(table.conversationId, table.createdAt)]
+);
+
+// Email offers an owner sends to a chosen group of customers who agreed to marketing (FR-090, FR-091)
+export const campaigns = pgTable(
+  "campaigns",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    subject: varchar("subject", { length: 150 }).notNull(),
+    body: text("body").notNull(),
+    // { lastVisit?: { olderThanDays?: number; withinDays?: number }; minBalance?: number }
+    audience: jsonb("audience").default({}).notNull(),
+    status: varchar("status", { length: 32 }).default("sent").notNull(),
+    recipientCount: integer("recipient_count").default(0).notNull(),
+    createdBy: uuid("created_by").references(() => users.id),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("campaigns_tenant_created_idx").on(table.tenantId, table.createdAt)]
 );
 
 export const supportReports = pgTable(

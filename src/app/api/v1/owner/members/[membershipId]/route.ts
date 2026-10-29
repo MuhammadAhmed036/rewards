@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { suspendMembership, reactivateMembership } from "@/server/services/member";
 import { guardApiRequest } from "@/server/auth/route-guard";
 import { db } from "@/server/db";
 import {
@@ -114,9 +115,11 @@ export async function POST(
 }
 
 const statusUpdateSchema = z.object({
-  status: z.enum(["active", "suspended", "deleted"]),
+  status: z.enum(["active", "suspended"]),
+  reason: z.string().trim().max(300).optional(),
 });
 
+/** Suspend a misused card or reactivate it, with a reason kept in the audit log (FR-083). */
 export async function PATCH(
   request: NextRequest,
   props: { params: Promise<{ membershipId: string }> }
@@ -129,31 +132,16 @@ export async function PATCH(
   if ("response" in guard) return guard.response;
 
   try {
-    const body = await request.json();
-    const validated = statusUpdateSchema.parse(body);
-
-    const [updated] = await db
-      .update(memberships)
-      .set({ status: validated.status })
-      .where(
-        and(
-          eq(memberships.id, params.membershipId),
-          eq(memberships.tenantId, guard.ctx.tenantId!)
-        )
-      )
-      .returning();
-
+    const { status, reason } = statusUpdateSchema.parse(await request.json());
+    if (status === "suspended" && !reason) throw new Error("Say why you're suspending this card");
+    const updated =
+      status === "suspended"
+        ? await suspendMembership(guard.ctx, params.membershipId, reason!)
+        : await reactivateMembership(guard.ctx, params.membershipId, reason);
     return NextResponse.json({ data: updated });
   } catch (err) {
-    return NextResponse.json(
-      {
-        error: {
-          code: "UPDATE_FAILED",
-          message: err instanceof Error ? err.message : "Status update failed",
-        },
-      },
-      { status: 400 }
-    );
+    const message =
+      err instanceof z.ZodError ? err.errors[0]?.message : err instanceof Error ? err.message : "Status update failed";
+    return NextResponse.json({ error: { code: "UPDATE_FAILED", message } }, { status: 400 });
   }
 }
-

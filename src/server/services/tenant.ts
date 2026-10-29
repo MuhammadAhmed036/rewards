@@ -28,6 +28,7 @@ export interface RegisterOwnerParams {
   /** Pre-validated logo data URL (see business-logo.ts) */
   logoUrl?: string | null;
   status?: "active" | "pending" | "suspended";
+  emailVerified?: boolean;
   maxStaff?: number;
   maxLocations?: number;
 }
@@ -67,7 +68,8 @@ export async function registerOwnerAndTenant(params: RegisterOwnerParams) {
           email: normalizedEmail,
           name: params.name,
           passwordHash: hashedPassword,
-          emailVerifiedAt: new Date(),
+          // Self sign-ups confirm their email by link; seeded and test owners start confirmed
+          emailVerifiedAt: params.emailVerified === false ? null : new Date(),
         })
         .returning({ id: users.id });
       userId = newUser.id;
@@ -292,6 +294,59 @@ export async function createLocation(
   });
 
   return newLocation;
+}
+
+export async function updateLocation(
+  ctx: RequestContext,
+  locationId: string,
+  params: { name?: string; addressLine?: string; timezone?: string; status?: "active" | "closed" }
+) {
+  assertCan(ctx, "location.manage");
+  if (!ctx.tenantId) throw new Error("tenantId required");
+
+  const [existing] = await db
+    .select()
+    .from(locations)
+    .where(and(eq(locations.id, locationId), eq(locations.tenantId, ctx.tenantId)))
+    .limit(1);
+  if (!existing) throw new Error("Location not found");
+
+  if (params.status === "closed" && existing.status === "active") {
+    const [open] = await db
+      .select({ count: count() })
+      .from(locations)
+      .where(and(eq(locations.tenantId, ctx.tenantId), eq(locations.status, "active")));
+    if (Number(open?.count ?? 0) <= 1) throw new Error("You need at least one open location.");
+  }
+  if (params.timezone) {
+    try {
+      new Intl.DateTimeFormat("en-GB", { timeZone: params.timezone });
+    } catch {
+      throw new Error("That time zone isn't recognised");
+    }
+  }
+
+  const [updated] = await db
+    .update(locations)
+    .set({
+      name: params.name?.trim() || existing.name,
+      address:
+        params.addressLine !== undefined
+          ? { ...(existing.address as Record<string, unknown>), line: params.addressLine.trim() }
+          : existing.address,
+      timezone: params.timezone ?? existing.timezone,
+      status: params.status ?? existing.status,
+    })
+    .where(eq(locations.id, existing.id))
+    .returning();
+
+  await logAuditEvent(ctx, {
+    action: params.status && params.status !== existing.status ? `location.${params.status === "closed" ? "closed" : "reopened"}` : "location.updated",
+    targetType: "location",
+    targetId: existing.id,
+    metadata: { changes: params },
+  });
+  return updated;
 }
 
 export async function getLocations(ctx: RequestContext) {

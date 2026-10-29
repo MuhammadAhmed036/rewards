@@ -1,4 +1,10 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    { "path": "/api/cron/expire-redemptions", "schedule": "0 2 * * *" },
+    { "path": "/api/cron/retention", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/reconcile-balances", "schedule": "0 4 * * *" },
+    { "path": "/api/cron/loyalty-daily", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/send-outbox", "schedule": "0 5 * * *" }
+  ]
 }
-

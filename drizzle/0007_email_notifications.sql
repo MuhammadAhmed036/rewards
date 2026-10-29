@@ -1,0 +1,1 @@
+ALTER TABLE "memberships" ADD COLUMN "email_notifications" boolean DEFAULT true NOT NULL;

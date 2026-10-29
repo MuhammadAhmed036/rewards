@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireOwnMembership } from "@/server/auth/customer-membership";
 import { submitSupportReport } from "@/server/services/support";
 import { checkFeedbackRateLimit, getClientIp, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { z } from "zod";
@@ -15,6 +16,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validated = supportReportSchema.parse(body);
+
+    // A report tied to a card must come from that card's owner, and for that card's shop
+    if (validated.membershipId) {
+      const owned = await requireOwnMembership(request, validated.membershipId, validated.tenantId);
+      if ("response" in owned) return owned.response;
+    }
 
     const clientIp = getClientIp(request);
     await checkFeedbackRateLimit(validated.membershipId || clientIp);

@@ -1,7 +1,7 @@
 import { db } from "../db";
-import { supportReports, ledgerEntries } from "../db/schema";
+import { supportReports, ledgerEntries, memberships, users } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, getTableColumns } from "drizzle-orm";
 import { logAuditEvent } from "./audit";
 import { adjustBalance } from "./ledger";
 
@@ -62,9 +62,21 @@ export async function getSupportReports(
     conditions = and(conditions, eq(supportReports.status, options.status)) as typeof conditions;
   }
 
+  // Include who sent it and which transaction they mean, so the owner can act without digging
   return await db
-    .select()
+    .select({
+      ...getTableColumns(supportReports),
+      customerName: users.name,
+      memberNumber: memberships.memberNumber,
+      entryType: ledgerEntries.type,
+      entryPoints: ledgerEntries.pointsDelta,
+      entryNote: ledgerEntries.note,
+      entryOccurredAt: ledgerEntries.occurredAt,
+    })
     .from(supportReports)
+    .leftJoin(memberships, eq(memberships.id, supportReports.membershipId))
+    .leftJoin(users, eq(users.id, memberships.userId))
+    .leftJoin(ledgerEntries, eq(ledgerEntries.id, supportReports.ledgerEntryId))
     .where(conditions)
     .orderBy(desc(supportReports.createdAt));
 }

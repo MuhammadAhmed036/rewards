@@ -203,9 +203,21 @@ describe("Owner Dashboard API & Reports (M7)", () => {
         },
         body: JSON.stringify({
           status: "suspended",
+          reason: "Claimed points for purchases that didn't happen",
         }),
       }
     );
+    // Suspending without a reason is refused, so every suspension is explained in the audit log
+    const noReasonRes = await memberStatusRoute(
+      new NextRequest(`http://localhost:3000/api/v1/owner/members/${member1.membership.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${ownerToken}`, "x-tenant-id": tenantId },
+        body: JSON.stringify({ status: "suspended" }),
+      }),
+      { params: Promise.resolve({ membershipId: member1.membership.id }) }
+    );
+    expect(noReasonRes.status).toBe(400);
+
     const statusRes = await memberStatusRoute(statusReq, {
       params: Promise.resolve({ membershipId: member1.membership.id }),
     });

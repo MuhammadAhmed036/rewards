@@ -11,9 +11,28 @@ interface Draft {
   titleEdited: boolean;
   costPoints: string;
   description: string;
+  // Optional limits (FR-060): dates, total stock and how often one customer can have it
+  startsAt: string;
+  endsAt: string;
+  quantityTotal: string;
+  perMemberLimit: string;
 }
 
-const emptyDraft: Draft = { id: null, productId: "", title: "", titleEdited: false, costPoints: "100", description: "" };
+const emptyDraft: Draft = {
+  id: null,
+  productId: "",
+  title: "",
+  titleEdited: false,
+  costPoints: "100",
+  description: "",
+  startsAt: "",
+  endsAt: "",
+  quantityTotal: "",
+  perMemberLimit: "",
+};
+
+const dateInput = (iso?: string | null) => (iso ? new Date(iso).toISOString().slice(0, 10) : "");
+const positiveOrNull = (v: string) => (parseInt(v, 10) > 0 ? parseInt(v, 10) : null);
 
 /**
  * The points menu: "100 points = free tea". Owners and staff pick an item from their menu and set
@@ -89,6 +108,11 @@ export function RewardsManager({
         description: draft.description.trim() || undefined,
         productId: draft.productId || (draft.id ? null : undefined),
         type: "free_item",
+        // New rewards leave blank limits out; edits send null to clear them
+        startsAt: draft.startsAt ? new Date(`${draft.startsAt}T00:00:00`).toISOString() : draft.id ? null : undefined,
+        endsAt: draft.endsAt ? new Date(`${draft.endsAt}T23:59:59`).toISOString() : draft.id ? null : undefined,
+        quantityTotal: positiveOrNull(draft.quantityTotal) ?? (draft.id ? null : undefined),
+        perMemberLimit: positiveOrNull(draft.perMemberLimit) ?? (draft.id ? null : undefined),
       };
       const res = await fetch("/api/v1/business/rewards", {
         method: draft.id ? "PATCH" : "POST",
@@ -235,6 +259,52 @@ export function RewardsManager({
             />
           </label>
 
+          <details className="rounded-xl border border-zinc-200 bg-white px-4 py-3" open={Boolean(draft.startsAt || draft.endsAt || draft.quantityTotal || draft.perMemberLimit)}>
+            <summary className="cursor-pointer text-sm font-semibold text-zinc-800">Limits (optional)</summary>
+            <div className="mt-3 grid sm:grid-cols-2 gap-4">
+              <label className="block text-sm">
+                <span className="text-zinc-700">Starts on</span>
+                <input
+                  type="date"
+                  value={draft.startsAt}
+                  onChange={(e) => setDraft({ ...draft, startsAt: e.target.value })}
+                  className="mt-1 w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-zinc-700">Ends on</span>
+                <input
+                  type="date"
+                  value={draft.endsAt}
+                  onChange={(e) => setDraft({ ...draft, endsAt: e.target.value })}
+                  className="mt-1 w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-zinc-700">How many to give in total</span>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="No limit"
+                  value={draft.quantityTotal}
+                  onChange={(e) => setDraft({ ...draft, quantityTotal: e.target.value })}
+                  className="mt-1 w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="text-zinc-700">Times one customer can have it</span>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="No limit"
+                  value={draft.perMemberLimit}
+                  onChange={(e) => setDraft({ ...draft, perMemberLimit: e.target.value })}
+                  className="mt-1 w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+                />
+              </label>
+            </div>
+          </details>
+
           {draft.title.trim() && parseInt(draft.costPoints, 10) > 0 && (
             <p className="text-sm text-zinc-700">
               Customers will see: <strong>{draft.title.trim()}</strong> for{" "}
@@ -294,6 +364,8 @@ export function RewardsManager({
                       {r.productName ? `Menu item: ${r.productName}` : "Not linked to a menu item"}
                       {" · "}
                       Given {r.quantityRedeemed ?? 0} time{r.quantityRedeemed === 1 ? "" : "s"}
+                      {r.quantityTotal ? `, ${Math.max(0, r.quantityTotal - (r.quantityRedeemed ?? 0))} left` : ""}
+                      {r.endsAt ? `, ends ${new Date(r.endsAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}
                     </p>
                   </div>
                 </div>
@@ -308,6 +380,10 @@ export function RewardsManager({
                         titleEdited: true,
                         costPoints: String(r.costPoints),
                         description: r.description ?? "",
+                        startsAt: dateInput(r.startsAt),
+                        endsAt: dateInput(r.endsAt),
+                        quantityTotal: r.quantityTotal ? String(r.quantityTotal) : "",
+                        perMemberLimit: r.perMemberLimit ? String(r.perMemberLimit) : "",
                       });
                       setError(null);
                     }}

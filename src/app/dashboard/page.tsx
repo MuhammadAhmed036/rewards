@@ -14,6 +14,12 @@ import { SpendPointsPanel } from "@/components/rewards/SpendPointsPanel";
 import { SideNav } from "@/components/dashboard/SideNav";
 import { MemberCard3D } from "@/components/loyalty/MemberCard3D";
 import { CountUp } from "@/components/ui/count-up";
+import { currencySymbol } from "@/lib/money";
+import { EarningRulesEditor } from "@/components/dashboard/EarningRulesEditor";
+import { LocationsManager } from "@/components/dashboard/LocationsManager";
+import { BusinessSettings } from "@/components/dashboard/BusinessSettings";
+import { SupportReports } from "@/components/dashboard/SupportReports";
+import { CampaignsManager } from "@/components/dashboard/CampaignsManager";
 import {
   LayoutDashboard,
   Users,
@@ -39,11 +45,19 @@ import {
   Copy,
   MessageSquare,
   X,
+  Coins,
+  LifeBuoy,
+  Megaphone,
+  MapPin,
+  Settings,
 } from "lucide-react";
 
 interface OverviewMetrics {
   totalMembers: number;
   activeMembers30d: number;
+  newMembers?: number;
+  range?: string;
+  timezone?: string;
   outstandingPoints: number;
   earnsCount: number;
   pointsAwarded: number;
@@ -150,11 +164,29 @@ interface BusinessInfo {
   brandPrimaryHex: string | null;
   logoUrl: string | null;
   programmeType?: "points" | "stamps";
+  industry?: string | null;
+  timezone?: string | null;
+  currency?: string | null;
+  locale?: string | null;
 }
 
 export default function OwnerDashboardPage() {
   const [activeTab, setActiveTab] = useState<
-    "overview" | "members" | "ledger" | "rewards" | "products" | "links" | "qr" | "team" | "reports" | "messages"
+    | "overview"
+    | "members"
+    | "ledger"
+    | "rewards"
+    | "products"
+    | "links"
+    | "qr"
+    | "team"
+    | "reports"
+    | "messages"
+    | "programme"
+    | "locations"
+    | "settings"
+    | "support"
+    | "campaigns"
   >("overview");
 
   const [metrics, setMetrics] = useState<OverviewMetrics | null>(null);
@@ -179,6 +211,41 @@ export default function OwnerDashboardPage() {
   // Member whose points are being used at the counter
   const [spendingMember, setSpendingMember] = useState<MemberRow | null>(null);
   const clearRewardStart = useCallback(() => setRewardStartProductId(null), []);
+  // Member whose card is being suspended, reactivated or given a new QR code
+  const [managingMember, setManagingMember] = useState<MemberRow | null>(null);
+  const [manageReason, setManageReason] = useState("");
+  const [manageMessage, setManageMessage] = useState<string | null>(null);
+  const [manageBusy, setManageBusy] = useState(false);
+  const runMemberAction = async (action: "suspend" | "reactivate" | "new-qr") => {
+    if (!managingMember) return;
+    setManageBusy(true);
+    setManageMessage(null);
+    try {
+      const res =
+        action === "new-qr"
+          ? await fetch(`/api/v1/owner/members/${managingMember.id}/qr`, { method: "POST" })
+          : await fetch(`/api/v1/owner/members/${managingMember.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: action === "suspend" ? "suspended" : "active", reason: manageReason.trim() || undefined }),
+            });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "That didn't work. Try again.");
+      if (action === "new-qr") {
+        setManageMessage("Done. Their old QR code no longer works; their card shows a new one.");
+      } else {
+        const status = action === "suspend" ? "suspended" : "active";
+        setManagingMember({ ...managingMember, status });
+        setMembers((list) => list.map((m) => (m.id === managingMember.id ? { ...m, status } : m)));
+        setManageMessage(action === "suspend" ? "Card suspended. They can't earn or spend until you reactivate it." : "Card is active again.");
+        setManageReason("");
+      }
+    } catch (err) {
+      setManageMessage(err instanceof Error ? err.message : "That didn't work. Try again.");
+    } finally {
+      setManageBusy(false);
+    }
+  };
 
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProductName, setNewProductName] = useState("");
@@ -206,7 +273,9 @@ export default function OwnerDashboardPage() {
   const [showAddStaff, setShowAddStaff] = useState(false);
   const [newStaffEmail, setNewStaffEmail] = useState("");
   const [newStaffName, setNewStaffName] = useState("");
-  const [newStaffPassword, setNewStaffPassword] = useState("Password123!");
+  // Optional: by default the person gets an invite email and chooses their own password
+  const [newStaffPassword, setNewStaffPassword] = useState("");
+  const [teamNotice, setTeamNotice] = useState<string | null>(null);
   const [newStaffRole, setNewStaffRole] = useState<"manager" | "staff" | "marketing">("staff");
 
   // Promotional Campaign QR state
@@ -223,9 +292,11 @@ export default function OwnerDashboardPage() {
   const [viewingPromoQr, setViewingPromoQr] = useState<CampaignQrRow | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const loadOverview = async () => {
+  // Date range for the Home numbers, counted in the business's time zone
+  const [range, setRange] = useState<"7d" | "30d" | "90d" | "12m" | "all">("30d");
+  const loadOverview = async (r: string = range) => {
     try {
-      const res = await fetch("/api/v1/owner/overview");
+      const res = await fetch(`/api/v1/owner/overview?range=${r}`);
       if (res.status === 401) {
         window.location.href = "/login?redirect=/dashboard";
         return;
@@ -254,6 +325,25 @@ export default function OwnerDashboardPage() {
     const id = setInterval(() => document.visibilityState === "visible" && loadUnreadMessages(), 20000);
     return () => clearInterval(id);
   }, [loadUnreadMessages]);
+
+  // Owners who signed up with a password confirm their email by link
+  const [emailVerified, setEmailVerified] = useState(true);
+  const [verifyNotice, setVerifyNotice] = useState<string | null>(null);
+  const loadAccount = async () => {
+    try {
+      const res = await fetch("/api/v1/auth/session", { cache: "no-store" });
+      const json = await res.json();
+      if (json.user) setEmailVerified(json.user.emailVerified !== false);
+    } catch {
+      // Banner simply stays hidden
+    }
+  };
+  const resendVerification = async () => {
+    setVerifyNotice("Sending...");
+    const res = await fetch("/api/v1/auth/verify-email/resend", { method: "POST" });
+    const json = await res.json().catch(() => ({}));
+    setVerifyNotice(res.ok ? "Sent. Check your inbox (and spam folder)." : json.error?.message || "Couldn't send. Try again.");
+  };
 
   const loadBusiness = async () => {
     try {
@@ -366,6 +456,7 @@ export default function OwnerDashboardPage() {
     loadTeam();
     loadLinks();
     loadBusiness();
+    loadAccount();
   }, []);
 
   const loadCampaignQrs = async () => {
@@ -597,14 +688,19 @@ export default function OwnerDashboardPage() {
           email: newStaffEmail,
           name: newStaffName,
           role: newStaffRole,
-          temporaryPassword: newStaffPassword,
+          temporaryPassword: newStaffPassword.trim() || undefined,
         }),
       });
       if (res.ok) {
+        setTeamNotice(
+          newStaffPassword.trim()
+            ? `${newStaffName} can sign in now with the password you set.`
+            : `Invite sent to ${newStaffEmail}. They'll choose their own password from the email.`
+        );
         setShowAddStaff(false);
         setNewStaffEmail("");
         setNewStaffName("");
-        setNewStaffPassword("Password123!");
+        setNewStaffPassword("");
         loadTeam();
       } else {
         const json = await res.json();
@@ -737,6 +833,7 @@ export default function OwnerDashboardPage() {
     {
       title: "Your loyalty card",
       items: [
+        { id: "programme", label: "Earning rules", icon: Coins },
         { id: "rewards", label: "Rewards", icon: Gift },
         { id: "products", label: "Products & offers", icon: Tag },
         { id: "qr", label: "QR posters", icon: QrCode },
@@ -747,8 +844,17 @@ export default function OwnerDashboardPage() {
       title: "People",
       items: [
         { id: "messages", label: "Messages", icon: MessageSquare },
+        { id: "campaigns", label: "Email offers", icon: Megaphone },
         { id: "members", label: "Customers", icon: Users },
         { id: "team", label: "Staff", icon: UserCheck },
+        { id: "support", label: "Reported problems", icon: LifeBuoy },
+      ],
+    },
+    {
+      title: "Business",
+      items: [
+        { id: "locations", label: "Locations", icon: MapPin },
+        { id: "settings", label: "Settings", icon: Settings },
       ],
     },
     {
@@ -760,6 +866,8 @@ export default function OwnerDashboardPage() {
     },
   ];
   const allNavItems = navGroups.flatMap((g) => g.items);
+  const cur = currencySymbol(business?.currency || "GBP", business?.locale || "en-GB");
+  const rangeLabel = { "7d": "in the last 7 days", "30d": "in the last 30 days", "90d": "in the last 90 days", "12m": "in the last 12 months", all: "so far" }[range];
 
   const activeRewards = rewardsList.filter((r) => r.status === "active").length;
   const setupSteps: Array<{ done: boolean; title: string; detail: string; action: string; tab: typeof activeTab }> = [
@@ -877,6 +985,23 @@ export default function OwnerDashboardPage() {
 
         {/* Main */}
         <main className="flex-1 min-w-0 px-4 py-6 sm:px-8 sm:py-8 max-w-6xl">
+          {!emailVerified && (
+            <div className="mb-6 rounded-2xl bg-marigold/25 border border-marigold/60 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+              <p className="text-sm text-zinc-900">
+                <strong>Confirm your email.</strong> We sent you a link when you signed up. You need it to reset your password and to
+                publish your programme again after pausing it.
+              </p>
+              <div className="flex items-center gap-3 shrink-0">
+                {verifyNotice && <span className="text-sm text-zinc-700">{verifyNotice}</span>}
+                <button
+                  onClick={resendVerification}
+                  className="press min-h-[40px] px-4 rounded-full bg-evergreen text-white text-sm font-semibold hover:bg-evergreen-deep cursor-pointer"
+                >
+                  Send the email again
+                </button>
+              </div>
+            </div>
+          )}
           <div key={activeTab} className="tab-in">
           {/* ======================================================== */}
           {/* HOME                                                     */}
@@ -899,7 +1024,7 @@ export default function OwnerDashboardPage() {
                   <p className="rise-in mt-3 text-zinc-600" style={{ "--d": "350ms" } as React.CSSProperties}>
                     {(metrics?.totalMembers ?? 0) === 0
                       ? "Print your QR poster and put it by the till. Customers scan it to get their card."
-                      : `${metrics?.activeMembers30d ?? 0} came back in the last 30 days.`}
+                      : `${metrics?.newMembers ?? 0} joined and ${metrics?.activeMembers30d ?? 0} earned or spent points ${rangeLabel}.`}
                   </p>
                   <div className="rise-in mt-6 flex flex-wrap gap-3" style={{ "--d": "450ms" } as React.CSSProperties}>
                     <Link
@@ -935,12 +1060,41 @@ export default function OwnerDashboardPage() {
                 </div>
               </section>
 
-              {/* Numbers */}
+              {/* Numbers for the chosen period */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-1 p-1 rounded-full bg-white border border-zinc-200 w-fit" role="radiogroup" aria-label="Period">
+                  {([
+                    ["7d", "7 days"],
+                    ["30d", "30 days"],
+                    ["90d", "90 days"],
+                    ["12m", "12 months"],
+                    ["all", "All time"],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      role="radio"
+                      aria-checked={range === value}
+                      onClick={() => {
+                        setRange(value);
+                        loadOverview(value);
+                      }}
+                      className={`px-3.5 py-1.5 rounded-full text-sm font-semibold cursor-pointer transition-colors ${
+                        range === value ? "bg-evergreen text-white" : "text-zinc-600 hover:text-zinc-900"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-zinc-500">
+                  Counted in {metrics?.timezone?.replace("_", " ") || "your time zone"} time
+                </p>
+              </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 {[
-                  { label: "Customers", value: metrics?.totalMembers ?? 0, note: "signed up to your card" },
-                  { label: "Came back", value: metrics?.activeMembers30d ?? 0, note: "visited in the last 30 days" },
-                  { label: "Rewards claimed", value: metrics?.redemptionsCount ?? 0, note: "handed out so far" },
+                  { label: "New customers", value: metrics?.newMembers ?? 0, note: `joined ${rangeLabel}` },
+                  { label: "Came back", value: metrics?.activeMembers30d ?? 0, note: `earned or spent ${rangeLabel}` },
+                  { label: "Rewards claimed", value: metrics?.redemptionsCount ?? 0, note: `handed out ${rangeLabel}` },
                 ].map((stat) => (
                   <div key={stat.label} className="rounded-2xl bg-white border border-zinc-200 p-4 sm:p-5">
                     <p className="text-sm text-zinc-600">{stat.label}</p>
@@ -1115,6 +1269,59 @@ export default function OwnerDashboardPage() {
           {/* ======================================================== */}
           {/* TAB: PROGRAMME REWARDS & REDEMPTION RULES               */}
           {/* ======================================================== */}
+          {activeTab === "campaigns" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="font-display text-3xl font-bold text-evergreen-deep">Email offers</h2>
+                <p className="text-zinc-600 mt-1">Send an offer to customers who said yes to hearing from you.</p>
+              </div>
+              <CampaignsManager
+                businessName={business?.name || "Your business"}
+                unit={business?.programmeType === "stamps" ? "stamps" : "points"}
+              />
+            </div>
+          )}
+
+          {activeTab === "locations" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="font-display text-3xl font-bold text-evergreen-deep">Locations</h2>
+                <p className="text-zinc-600 mt-1">Add your branches and choose which staff work at each.</p>
+              </div>
+              <LocationsManager />
+            </div>
+          )}
+
+          {activeTab === "settings" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="font-display text-3xl font-bold text-evergreen-deep">Settings</h2>
+                <p className="text-zinc-600 mt-1">Your business name, card colour, currency and time zone.</p>
+              </div>
+              <BusinessSettings value={business} onSaved={(b) => setBusiness((prev) => (prev ? { ...prev, ...b } : prev))} />
+            </div>
+          )}
+
+          {activeTab === "support" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="font-display text-3xl font-bold text-evergreen-deep">Reported problems</h2>
+                <p className="text-zinc-600 mt-1">When a customer says their points are wrong, it shows up here.</p>
+              </div>
+              <SupportReports unit={business?.programmeType === "stamps" ? "stamps" : "points"} onChange={loadMembers} />
+            </div>
+          )}
+
+          {activeTab === "programme" && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="font-display text-3xl font-bold text-evergreen-deep">Earning rules</h2>
+                <p className="text-zinc-600 mt-1">Decide how many points customers get, and pause earning if you need to.</p>
+              </div>
+              <EarningRulesEditor symbol={cur} />
+            </div>
+          )}
+
           {activeTab === "rewards" && (
             <div className="space-y-6">
               <div>
@@ -1220,7 +1427,7 @@ export default function OwnerDashboardPage() {
                     <tr>
                       <th className="p-4">Item Name</th>
                       <th className="p-4">Category</th>
-                      <th className="p-4">Price (£)</th>
+                      <th className="p-4">Price ({cur})</th>
                       <th className="p-4">Points Awarded</th>
                       <th className="p-4">Discount</th>
                       <th className="p-4">Status</th>
@@ -1244,7 +1451,7 @@ export default function OwnerDashboardPage() {
                             </span>
                           </td>
                           <td className="p-4 font-mono font-bold text-slate-900">
-                            £{(prod.priceMinor / 100).toFixed(2)}
+                            {cur}{(prod.priceMinor / 100).toFixed(2)}
                           </td>
                           <td className="p-4">
                             <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold text-[11px] border border-indigo-200">
@@ -1732,6 +1939,18 @@ export default function OwnerDashboardPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                onClick={() => {
+                                  setManagingMember(m);
+                                  setManageReason("");
+                                  setManageMessage(null);
+                                }}
+                                className="bg-white border-slate-300 hover:bg-slate-50 text-xs font-semibold py-1 h-8 mr-2"
+                              >
+                                Card
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
                                 onClick={() => openAdjust(m)}
                                 className="bg-white border-slate-300 hover:bg-slate-50 text-xs font-semibold py-1 h-8"
                               >
@@ -1941,6 +2160,7 @@ export default function OwnerDashboardPage() {
                 <div>
                   <h2 className="font-display text-3xl font-bold text-evergreen-deep">Staff</h2>
                   <p className="text-zinc-600 mt-1">Give each person their own login so they can scan cards and add points.</p>
+                  {teamNotice && <p className="pop-in mt-3 rounded-2xl bg-mist text-evergreen-deep text-sm px-4 py-2.5">{teamNotice}</p>}
                 </div>
                 <Button onClick={() => setShowAddStaff(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold">
                   <Plus className="h-4 w-4 mr-1.5" />
@@ -1971,16 +2191,36 @@ export default function OwnerDashboardPage() {
                           </span>
                         </td>
                         <td className="p-4">
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold capitalize border ${
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
                             s.status === "active"
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : "bg-rose-50 text-rose-700 border-rose-200"
+                              : s.status === "invited"
+                                ? "bg-marigold/25 text-zinc-800 border-marigold/60"
+                                : "bg-rose-50 text-rose-700 border-rose-200"
                           }`}>
-                            {s.status}
+                            {s.status === "invited" ? "Invite sent" : s.status === "active" ? "Active" : "No access"}
                           </span>
                         </td>
                         <td className="p-4 text-right">
-                          {s.role !== "owner" && s.status === "active" && (
+                          {s.status === "invited" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs h-7 py-0 mr-2"
+                              onClick={async () => {
+                                const res = await fetch("/api/v1/owner/team", {
+                                  method: "PATCH",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ staffMemberId: s.id, resendInvite: true }),
+                                });
+                                const json = await res.json().catch(() => ({}));
+                                setTeamNotice(res.ok ? `Sent another invite to ${s.email}.` : json.error?.message || "Couldn't send the invite.");
+                              }}
+                            >
+                              Send again
+                            </Button>
+                          )}
+                          {s.role !== "owner" && (s.status === "active" || s.status === "invited") && (
                             <Button
                               variant="destructive"
                               size="sm"
@@ -2307,19 +2547,20 @@ export default function OwnerDashboardPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Login Password (Hand to Staff)</label>
+              <p className="rounded-xl bg-mist text-evergreen-deep text-sm px-3 py-2.5">
+                We&rsquo;ll email them a link to choose their own password. You never need to know it.
+              </p>
+              <details className="text-sm">
+                <summary className="cursor-pointer text-zinc-600">They don&rsquo;t have email access? Set a password for them</summary>
                 <Input
                   type="text"
-                  placeholder="e.g. Password123!"
+                  placeholder="At least 8 characters"
                   value={newStaffPassword}
                   onChange={(e) => setNewStaffPassword(e.target.value)}
-                  className="bg-slate-50 border-slate-300 text-xs text-slate-900 font-mono"
+                  className="mt-2 bg-white border-zinc-300 text-sm text-zinc-900"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Staff will use this password along with their email to log in at <code className="text-indigo-600 font-semibold">/staff</code>.
-                </p>
-              </div>
+                <p className="text-xs text-zinc-500 mt-1">Ask them to change it with &ldquo;Forgot password?&rdquo; after their first sign-in.</p>
+              </details>
 
               <div className="flex gap-2.5 pt-3">
                 <Button variant="outline" className="flex-1 bg-white border-slate-300 text-xs font-bold text-slate-700" onClick={() => setShowAddStaff(false)}>
@@ -2330,7 +2571,7 @@ export default function OwnerDashboardPage() {
                   onClick={handleAddStaff}
                   disabled={loading || !newStaffEmail || !newStaffName}
                 >
-                  {loading ? "Adding..." : "Add Member"}
+                  {loading ? "Adding..." : newStaffPassword.trim() ? "Add with this password" : "Send invite"}
                 </Button>
               </div>
             </div>
@@ -2370,7 +2611,7 @@ export default function OwnerDashboardPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-zinc-800 block mb-1">Price (£)</label>
+                  <label className="font-semibold text-zinc-800 block mb-1">Price ({cur})</label>
                   <Input
                     type="number"
                     step="0.01"
@@ -2478,7 +2719,7 @@ export default function OwnerDashboardPage() {
                     <option value="">-- Choose from your product menu --</option>
                     {productsList.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} (£{(p.priceMinor / 100).toFixed(2)})
+                        {p.name} ({cur}{(p.priceMinor / 100).toFixed(2)})
                       </option>
                     ))}
                   </select>
@@ -2688,6 +2929,84 @@ export default function OwnerDashboardPage() {
       )}
 
       {/* Add / Create Reward Modal */}
+      {managingMember && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-evergreen-deep/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="manage-card-title"
+          onClick={(e) => e.target === e.currentTarget && setManagingMember(null)}
+        >
+          <div className="pop-in max-w-md w-full p-6 rounded-3xl bg-white border border-zinc-200 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 id="manage-card-title" className="font-display text-xl font-bold text-evergreen-deep">
+                  {managingMember.name || "Customer"}&rsquo;s card
+                </h3>
+                <p className="text-sm text-zinc-600">
+                  #{managingMember.memberNumber},{" "}
+                  {managingMember.status === "active" ? "active" : <strong className="text-rose-700">suspended</strong>}
+                </p>
+              </div>
+              <button onClick={() => setManagingMember(null)} className="p-1.5 rounded-full hover:bg-zinc-100 cursor-pointer" aria-label="Close">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div className="rounded-2xl border border-zinc-200 p-4">
+                <p className="font-semibold text-zinc-900">Lost phone or shared QR code?</p>
+                <p className="text-sm text-zinc-600 mt-0.5">Cancel the current code. Their card shows a new one next time they open it.</p>
+                <button
+                  onClick={() => runMemberAction("new-qr")}
+                  disabled={manageBusy}
+                  className="press mt-3 min-h-[40px] px-4 rounded-full border border-zinc-300 text-sm font-semibold text-zinc-800 hover:border-evergreen cursor-pointer disabled:opacity-50"
+                >
+                  Cancel QR code
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-zinc-200 p-4">
+                {managingMember.status === "active" ? (
+                  <>
+                    <p className="font-semibold text-zinc-900">Suspend this card</p>
+                    <p className="text-sm text-zinc-600 mt-0.5">For misuse. They keep their points but can&rsquo;t earn or spend until you reactivate.</p>
+                    <input
+                      value={manageReason}
+                      onChange={(e) => setManageReason(e.target.value)}
+                      maxLength={300}
+                      placeholder="Why? e.g. Claimed points for purchases that didn't happen"
+                      aria-label="Reason for suspending"
+                      className="mt-3 w-full min-h-[44px] rounded-xl border border-zinc-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+                    />
+                    <button
+                      onClick={() => runMemberAction("suspend")}
+                      disabled={manageBusy || !manageReason.trim()}
+                      className="press mt-3 min-h-[40px] px-4 rounded-full bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 cursor-pointer disabled:opacity-50"
+                    >
+                      Suspend card
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold text-zinc-900">Reactivate this card</p>
+                    <p className="text-sm text-zinc-600 mt-0.5">They can earn and spend again straight away.</p>
+                    <button
+                      onClick={() => runMemberAction("reactivate")}
+                      disabled={manageBusy}
+                      className="press mt-3 min-h-[40px] px-4 rounded-full bg-evergreen text-white text-sm font-semibold hover:bg-evergreen-deep cursor-pointer disabled:opacity-50"
+                    >
+                      Reactivate card
+                    </button>
+                  </>
+                )}
+              </div>
+              {manageMessage && <p className="pop-in rounded-2xl bg-mist text-evergreen-deep text-sm px-4 py-3">{manageMessage}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {spendingMember && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-evergreen-deep/50 backdrop-blur-sm"

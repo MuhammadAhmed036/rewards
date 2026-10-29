@@ -50,6 +50,27 @@
       "when": 1793197051350,
       "tag": "0006_reward_products",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793256472897,
+      "tag": "0007_email_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793257088481,
+      "tag": "0008_campaigns",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793257404005,
+      "tag": "0009_birthdays",
+      "breakpoints": true
     }
   ]
 }

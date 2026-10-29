@@ -6,6 +6,7 @@ import { setSessionCookie } from "@/server/auth/session-response";
 import { registerOwnerAndTenant } from "@/server/services/tenant";
 import { validateLogoDataUrl } from "@/server/services/business-logo";
 import { queueEmail, processOutbox } from "@/server/services/email";
+import { createEmailVerificationToken } from "@/server/services/verification";
 import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/url";
 import { eq } from "drizzle-orm";
@@ -69,9 +70,16 @@ export async function POST(request: NextRequest) {
         programmeType: validated.programmeType,
         industry: validated.category || "Coffee Shop & Cafe",
         status: "pending", // Requires SuperAdmin approval before owner can log in
+        emailVerified: false,
         maxStaff: totalRequestedStaff,
         logoUrl,
       });
+
+      try {
+        await createEmailVerificationToken(result.user.id, normalizedEmail, result.tenant.id);
+      } catch (err) {
+        console.error("Failed to send verification email:", err);
+      }
 
       const baseUrl = getBaseUrl(request);
       const storeUrl = `${baseUrl}/b/${result.tenant.slug}`;

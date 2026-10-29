@@ -39,7 +39,8 @@ export type Action =
   | "customer.redeem"
   | "customer.feedback"
   | "support.read"
-  | "support.manage";
+  | "support.manage"
+  | "campaign.manage";
 
 // RBAC Action Matrix per Section 6
 const ROLE_PERMISSIONS: Record<UserRole, readonly Action[]> = {
@@ -64,6 +65,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Action[]> = {
     "qr.download",
     "support.read",
     "support.manage",
+    "campaign.manage",
   ],
   owner: [
     "tenant.manage",
@@ -85,6 +87,7 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Action[]> = {
     "analytics.view",
     "reports.export",
     "qr.download",
+    "campaign.manage",
   ],
   manager: [
     "location.manage",
@@ -113,6 +116,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Action[]> = {
   marketing: [
     "analytics.view",
     "member.read",
+    // Marketing staff send offers but can't change points (FR-090, role table)
+    "campaign.manage",
   ],
   customer: [
     "customer.profile",

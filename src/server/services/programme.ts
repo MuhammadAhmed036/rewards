@@ -28,7 +28,22 @@ export async function getProgramme(ctx: RequestContext) {
     }
   }
 
-  return { programme: prog, currentRule };
+  // Recent rule versions, newest first, so owners can see what changed and when (FR-024)
+  const history = await db
+    .select({
+      id: ruleVersions.id,
+      version: ruleVersions.version,
+      createdAt: ruleVersions.createdAt,
+      createdByName: users.name,
+      config: ruleVersions.config,
+    })
+    .from(ruleVersions)
+    .leftJoin(users, eq(users.id, ruleVersions.createdBy))
+    .where(eq(ruleVersions.programmeId, prog.id))
+    .orderBy(desc(ruleVersions.version))
+    .limit(10);
+
+  return { programme: prog, currentRule, history };
 }
 
 export async function publishRuleVersion(ctx: RequestContext, configInput: unknown) {
@@ -105,7 +120,7 @@ export async function setProgrammeStatus(
       .limit(1);
 
     if (!user || !user.emailVerifiedAt) {
-      throw new Error("Cannot publish programme: owner email must be verified first (FR-015)");
+      throw new Error("Confirm your email first. Use \"Send the email again\" at the top of your dashboard.");
     }
   }
 

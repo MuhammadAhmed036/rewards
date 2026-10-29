@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { guardApiRequest } from "@/server/auth/route-guard";
 import { db } from "@/server/db";
 import { locations } from "@/server/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const guard = await guardApiRequest(request, {
@@ -16,13 +16,14 @@ export async function GET(request: NextRequest) {
   let query = db
     .select()
     .from(locations)
-    .where(eq(locations.tenantId, ctx.tenantId!));
+    // Closed locations drop out of the staff location picker
+    .where(and(eq(locations.tenantId, ctx.tenantId!), eq(locations.status, "active")));
 
   if (ctx.locationIds && ctx.locationIds.length > 0) {
     query = db
       .select()
       .from(locations)
-      .where(inArray(locations.id, ctx.locationIds));
+      .where(and(inArray(locations.id, ctx.locationIds), eq(locations.status, "active")));
   }
 
   const list = await query;
