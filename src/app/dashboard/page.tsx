@@ -11,6 +11,9 @@ import { LogoUploader } from "@/components/brand/LogoUploader";
 import { BusinessInbox } from "@/components/chat/BusinessInbox";
 import { RewardsManager } from "@/components/rewards/RewardsManager";
 import { SpendPointsPanel } from "@/components/rewards/SpendPointsPanel";
+import { SideNav } from "@/components/dashboard/SideNav";
+import { MemberCard3D } from "@/components/loyalty/MemberCard3D";
+import { CountUp } from "@/components/ui/count-up";
 import {
   LayoutDashboard,
   Users,
@@ -866,64 +869,71 @@ export default function OwnerDashboardPage() {
 
       <div className="flex flex-1 flex-col md:flex-row">
         {/* Sidebar */}
-        <aside className="hidden md:flex md:w-60 border-r border-zinc-200 bg-white px-3 py-5 shrink-0 flex-col gap-6">
-          {navGroups.map((group, gi) => (
-            <div key={gi}>
-              {group.title && <p className="px-3 mb-1.5 text-xs font-semibold text-zinc-400">{group.title}</p>}
-              <div className="space-y-0.5">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => handleTabChange(item.id)}
-                      aria-current={isActive ? "page" : undefined}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                        isActive ? "bg-mist text-evergreen-deep font-semibold" : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
-                      }`}
-                    >
-                      <Icon className={`w-[18px] h-[18px] ${isActive ? "text-evergreen" : "text-zinc-400"}`} />
-                      <span className="flex-1 text-left">{item.label}</span>
-                      {item.id === "messages" && unreadMessages > 0 && (
-                        <span
-                          className="min-w-5 h-5 px-1.5 rounded-full bg-marigold text-evergreen-deep text-xs font-bold flex items-center justify-center"
-                          aria-label={`${unreadMessages} unread`}
-                        >
-                          {unreadMessages}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+        <aside className="hidden md:block md:w-60 border-r border-zinc-200 bg-white px-3 py-5 shrink-0">
+          <div className="sticky top-21">
+            <SideNav groups={navGroups} active={activeTab} onChange={handleTabChange} unread={{ messages: unreadMessages }} />
+          </div>
         </aside>
 
         {/* Main */}
         <main className="flex-1 min-w-0 px-4 py-6 sm:px-8 sm:py-8 max-w-6xl">
+          <div key={activeTab} className="tab-in">
           {/* ======================================================== */}
           {/* HOME                                                     */}
           {/* ======================================================== */}
           {activeTab === "overview" && (
             <div className="space-y-8">
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-                <div>
-                  <h2 className="font-display text-3xl font-bold text-evergreen-deep">Welcome back</h2>
-                  <p className="text-zinc-600 mt-1">Here&rsquo;s how your loyalty card is doing.</p>
+              <section className="grid lg:grid-cols-12 gap-10 items-center">
+                <div className="lg:col-span-7">
+                  <p className="rise-in text-zinc-600" style={{ "--d": "150ms" } as React.CSSProperties}>
+                    Welcome back
+                  </p>
+                  <h2
+                    className="rise-in mt-1 font-display text-4xl sm:text-5xl font-bold text-evergreen-deep leading-[1.05] max-w-[18ch]"
+                    style={{ "--d": "250ms" } as React.CSSProperties}
+                  >
+                    {(metrics?.totalMembers ?? 0) === 0
+                      ? "Your card is ready for its first customer"
+                      : `${(metrics?.totalMembers ?? 0).toLocaleString("en-GB")} ${metrics?.totalMembers === 1 ? "person carries" : "people carry"} your card`}
+                  </h2>
+                  <p className="rise-in mt-3 text-zinc-600" style={{ "--d": "350ms" } as React.CSSProperties}>
+                    {(metrics?.totalMembers ?? 0) === 0
+                      ? "Print your QR poster and put it by the till. Customers scan it to get their card."
+                      : `${metrics?.activeMembers30d ?? 0} came back in the last 30 days.`}
+                  </p>
+                  <div className="rise-in mt-6 flex flex-wrap gap-3" style={{ "--d": "450ms" } as React.CSSProperties}>
+                    <Link
+                      href="/staff"
+                      className="press inline-flex items-center gap-2 min-h-[46px] px-5 rounded-full bg-evergreen text-white font-semibold hover:bg-evergreen-deep"
+                    >
+                      <Smartphone className="w-4 h-4" />
+                      Add points for a customer
+                    </Link>
+                    <button
+                      onClick={() => {
+                        loadOverview();
+                        loadMembers();
+                      }}
+                      className="press inline-flex items-center gap-2 min-h-[46px] px-5 rounded-full border border-zinc-300 bg-white text-zinc-800 font-semibold hover:border-evergreen cursor-pointer"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh numbers
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => {
-                    loadOverview();
-                    loadMembers();
-                  }}
-                  className="self-start sm:self-auto inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-evergreen-deep px-3 py-2 rounded-full hover:bg-white border border-transparent hover:border-zinc-200 transition-colors cursor-pointer"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Refresh
-                </button>
-              </div>
+                <div className="lg:col-span-5">
+                  <MemberCard3D
+                    businessName={business?.name || "Your business"}
+                    logoUrl={business?.logoUrl}
+                    brandColor={business?.brandPrimaryHex}
+                    memberName="Your customer"
+                    memberNumber="A7K2Q9PX"
+                    balance={business?.programmeType === "stamps" ? 6 : 120}
+                    unit={business?.programmeType === "stamps" ? "stamps" : "points"}
+                  />
+                  <p className="mt-7 text-center text-sm text-zinc-500">The card your customers carry on their phone</p>
+                </div>
+              </section>
 
               {/* Numbers */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -934,17 +944,15 @@ export default function OwnerDashboardPage() {
                 ].map((stat) => (
                   <div key={stat.label} className="rounded-2xl bg-white border border-zinc-200 p-4 sm:p-5">
                     <p className="text-sm text-zinc-600">{stat.label}</p>
-                    <p className="font-display text-3xl sm:text-4xl font-bold text-evergreen-deep mt-1 tabular-nums">
-                      {stat.value.toLocaleString("en-GB")}
-                    </p>
+                    <CountUp value={stat.value} className="block font-display text-3xl sm:text-4xl font-bold text-evergreen-deep mt-1" />
                     <p className="text-xs text-zinc-500 mt-1">{stat.note}</p>
                   </div>
                 ))}
                 <div className="rounded-2xl bg-marigold p-4 sm:p-5 text-evergreen-deep">
-                  <p className="text-sm font-medium">Points waiting to be spent</p>
-                  <p className="font-display text-3xl sm:text-4xl font-bold mt-1 tabular-nums">
-                    {(metrics?.outstandingPoints ?? 0).toLocaleString("en-GB")}
+                  <p className="text-sm font-medium">
+                    {business?.programmeType === "stamps" ? "Stamps" : "Points"} waiting to be spent
                   </p>
+                  <CountUp value={metrics?.outstandingPoints ?? 0} className="block font-display text-3xl sm:text-4xl font-bold mt-1" />
                   <p className="text-xs mt-1 opacity-80">held by your customers</p>
                 </div>
               </div>
@@ -961,7 +969,7 @@ export default function OwnerDashboardPage() {
                     </div>
                     <div className="w-full sm:w-48 h-2 rounded-full bg-zinc-100 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-evergreen transition-all"
+                        className="bar-fill h-full rounded-full bg-evergreen transition-all"
                         style={{ width: `${(stepsDone / setupSteps.length) * 100}%` }}
                       />
                     </div>
@@ -2062,6 +2070,7 @@ export default function OwnerDashboardPage() {
               </div>
             </div>
           )}
+          </div>
         </main>
       </div>
 

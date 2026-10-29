@@ -92,7 +92,7 @@ export function PointsMenu({
                         aria-label={`${r.title} progress`}
                       >
                         <div
-                          className={`h-full rounded-full transition-[width] duration-500 ${r.eligible ? "bg-evergreen" : "bg-marigold"}`}
+                          className={`bar-fill h-full rounded-full transition-[width] duration-500 ${r.eligible ? "bg-evergreen" : "bg-marigold"}`}
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -110,7 +110,7 @@ export function PointsMenu({
                           <button
                             type="button"
                             onClick={() => onClaim(r)}
-                            className="min-h-[40px] px-4 rounded-full bg-evergreen text-white text-sm font-semibold hover:bg-evergreen-deep cursor-pointer shrink-0"
+                            className="press min-h-[40px] px-4 rounded-full bg-evergreen text-white text-sm font-semibold hover:bg-evergreen-deep cursor-pointer shrink-0"
                           >
                             Claim
                           </button>

@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, use, useCallback } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   QrCode,
   Gift,
@@ -14,9 +14,10 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
-  ArrowRight,
-  ShieldCheck,
   X,
+  Plus,
+  Minus,
+  ArrowUpRight,
   Store,
   Smartphone,
   User,
@@ -24,16 +25,13 @@ import {
   Mail,
   LogOut,
   AlertCircle,
-  LogIn,
-  UserPlus,
-  ExternalLink,
-  ChevronRight,
 } from "lucide-react";
 import { InstagramIcon, FacebookIcon } from "@/components/ui/icons";
 import { BusinessLogo } from "@/components/brand/BusinessLogo";
 import { StampCard, type StampCardData } from "@/components/loyalty/StampCard";
 import { CustomerChat } from "@/components/chat/CustomerChat";
 import { PointsMenu } from "@/components/rewards/PointsMenu";
+import { MemberCard3D } from "@/components/loyalty/MemberCard3D";
 
 interface HubPayload {
   tenant: {
@@ -131,7 +129,8 @@ export default function BusinessHubPage(props: {
   const [ownerLoggingIn, setOwnerLoggingIn] = useState(false);
 
   // QR Modal
-  const [showQrModal, setShowQrModal] = useState(false);
+  // The member card flips over to show the QR code staff scan
+  const [cardFlipped, setCardFlipped] = useState(false);
 
   // Redemption Modal & Polling
   const [activeRedemption, setActiveRedemption] = useState<{
@@ -619,6 +618,7 @@ export default function BusinessHubPage(props: {
   const brandColor = hubData.tenant.brandPrimaryHex || "#495e57";
   const member = hubData.member;
   const isStamps = hubData.programme.type === "stamps";
+  const unitWord: "points" | "stamps" = isStamps ? "stamps" : "points";
 
   // Calculate next reward progress
   const nextLockedReward = hubData.rewards
@@ -631,28 +631,28 @@ export default function BusinessHubPage(props: {
 
   return (
     <div
-      className="min-h-screen bg-paper text-slate-900 pb-20 flex flex-col justify-between overflow-x-hidden w-full max-w-full"
+      className="min-h-screen bg-paper text-slate-900 flex flex-col overflow-x-hidden w-full max-w-full"
       style={{ "--brand": brandColor } as React.CSSProperties}
     >
-      {/* Brand Header - Full Enterprise Widescreen Bar */}
-      <div>
-        <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-4 shadow-2xs">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Header and page body; the footer sits at the bottom of the screen on short pages */}
+      <div className="flex-1">
+        <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/90 backdrop-blur-md py-3.5">
+          <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between gap-3 sm:gap-4 ${member ? "items-center" : "flex-col sm:flex-row sm:items-center"}`}>
             {/* Store Brand Info */}
-            <div className="flex items-center space-x-3.5">
+            <div className="flex items-center gap-3 min-w-0">
               <BusinessLogo
                 name={hubData.tenant.name}
                 logoUrl={hubData.tenant.logoUrl}
                 brandColor={brandColor}
                 size="md"
               />
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h1 className="font-bold text-xl text-evergreen-deep leading-tight">
+                  <h1 className="font-display font-bold text-lg sm:text-xl text-evergreen-deep leading-tight truncate">
                     {hubData.tenant.name}
                   </h1>
                 </div>
-                <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 mt-0.5">
+                <span className="text-xs text-zinc-500 font-medium hidden sm:flex items-center gap-1.5 mt-0.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                   {isStamps ? "Collect stamps" : "Collect points"} with {hubData.programme.name}
                 </span>
@@ -660,7 +660,7 @@ export default function BusinessHubPage(props: {
             </div>
 
             {/* Header Right Actions / Role Switcher */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
+            <div className={`flex items-center gap-2.5 ${member ? "shrink-0" : "flex-col sm:flex-row items-stretch w-full sm:w-auto"}`}>
               {/* Role switcher: only for visitors who are not signed in to their card */}
               {!member && (
               <div className="flex bg-white p-1 border border-slate-200 rounded-full text-sm font-semibold w-full sm:w-auto overflow-x-auto">
@@ -718,11 +718,15 @@ export default function BusinessHubPage(props: {
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={() => setShowQrModal(true)}
-                    className="bg-evergreen hover:bg-evergreen-deep text-white font-semibold rounded-full text-sm cursor-pointer transition-colors"
+                    onClick={() => {
+                      setCardFlipped(true);
+                      document.getElementById("my-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }}
+                    className="press bg-evergreen hover:bg-evergreen-deep text-white font-semibold rounded-full text-sm cursor-pointer transition-colors"
                   >
                     <QrCode className="h-4 w-4 mr-1.5 stroke-[1.8]" />
-                    Show my card
+                    <span className="sm:hidden">My card</span>
+                    <span className="hidden sm:inline">Show my card</span>
                   </Button>
                   <button
                     type="button"
@@ -739,7 +743,7 @@ export default function BusinessHubPage(props: {
         </header>
 
         {/* Main Body - Full Enterprise Responsive Container */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-6">
           {/* Error notification banner */}
           {errorMsg && (
             <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 shadow-xs">
@@ -1021,250 +1025,205 @@ export default function BusinessHubPage(props: {
 
               {member ? (
                 <>
-                {member.stampCards && member.stampCards.length > 0 && (
-                  <section aria-labelledby="stamp-cards-heading" className="mb-8">
-                    <div className="flex items-end justify-between gap-3 mb-4">
-                      <div>
-                        <h2 id="stamp-cards-heading" className="font-display text-2xl font-bold text-evergreen-deep">
-                          Your stamp cards
-                        </h2>
-                        <p className="text-sm text-zinc-600">
-                          Get a stamp each time you buy. Fill a card to claim your reward.
-                        </p>
-                      </div>
+                  {/* Hero: the member's own card, and how close they are to the next reward */}
+                  <section className="grid lg:grid-cols-12 gap-10 lg:gap-14 items-center pt-2 sm:pt-6 pb-6">
+                    <div className="lg:col-span-6 lg:order-2" id="my-card">
+                      <MemberCard3D
+                        businessName={hubData.tenant.name}
+                        logoUrl={hubData.tenant.logoUrl}
+                        brandColor={brandColor}
+                        memberName={member.displayName}
+                        memberNumber={member.memberNumber}
+                        balance={member.balance}
+                        unit={unitWord}
+                        qrDataUrl={member.qrDataUrl}
+                        flipped={cardFlipped}
+                        onFlip={() => setCardFlipped((f) => !f)}
+                      />
+                      <p className="mt-8 text-center text-sm text-zinc-500">
+                        {cardFlipped ? "Tap the card to see your balance" : "Tap the card to show your QR code"}
+                      </p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 sm:gap-8">
-                      {member.stampCards.map((card) => (
-                        <StampCard
-                          key={card.offerId}
-                          card={card}
-                          businessName={hubData.tenant.name}
-                          logoUrl={hubData.tenant.logoUrl}
-                          brandColor={brandColor}
-                          onClaim={() => handleClaimStampCard(card.offerId)}
-                          claiming={claimingOfferId === card.offerId}
-                        />
-                      ))}
+
+                    <div className="lg:col-span-6 lg:order-1">
+                      <p className="rise-in text-lg text-zinc-600" style={{ "--d": "200ms" } as React.CSSProperties}>
+                        Hello, {member.displayName.split(" ")[0]}
+                      </p>
+                      <h2
+                        className="rise-in mt-2 font-display text-4xl sm:text-5xl font-bold text-evergreen-deep leading-[1.05] max-w-[16ch]"
+                        style={{ "--d": "300ms" } as React.CSSProperties}
+                      >
+                        {nextLockedReward
+                          ? `${nextLockedReward.pointsShortfall} more ${nextLockedReward.pointsShortfall === 1 ? unitWord.slice(0, -1) : unitWord} for ${nextLockedReward.title}`
+                          : highestEligibleReward
+                            ? `${highestEligibleReward.title} is ready for you`
+                            : `You have ${member.balance} ${unitWord} here`}
+                      </h2>
+
+                      {nextLockedReward && (
+                        <div className="rise-in mt-6 max-w-md" style={{ "--d": "400ms" } as React.CSSProperties}>
+                          <div className="h-3 rounded-full bg-white border border-zinc-200 overflow-hidden">
+                            <div
+                              className="bar-fill h-full rounded-full bg-marigold"
+                              style={{ width: `${Math.min(100, (member.balance / nextLockedReward.costPoints) * 100)}%` }}
+                            />
+                          </div>
+                          <p className="mt-2 text-sm text-zinc-600 tabular-nums">
+                            {member.balance} of {nextLockedReward.costPoints} {unitWord}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="rise-in mt-8 flex flex-wrap gap-3" style={{ "--d": "500ms" } as React.CSSProperties}>
+                        <button
+                          type="button"
+                          onClick={() => setCardFlipped(true)}
+                          className="press inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full bg-evergreen text-white font-semibold hover:bg-evergreen-deep cursor-pointer"
+                        >
+                          <QrCode className="w-5 h-5" />
+                          Show my QR code
+                        </button>
+                        <a
+                          href="#points-menu"
+                          className="press inline-flex items-center min-h-[48px] px-6 rounded-full border border-zinc-300 bg-white text-zinc-800 font-semibold hover:border-evergreen"
+                        >
+                          See what I can get
+                        </a>
+                      </div>
                     </div>
                   </section>
-                )}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                  {/* Left Column: Digital Pass & Quick Links (5 cols) */}
-                  <div className="lg:col-span-5 space-y-6">
-                    {/* Apple Wallet Style Digital Pass Card */}
-                    <div className="rounded-3xl border border-slate-200/90 shadow-xl overflow-hidden bg-white">
-                      <div
-                        className="p-7 text-white relative overflow-hidden"
-                        style={{
-                          background: `linear-gradient(135deg, ${brandColor || "#495e57"} 0%, #26302d 100%)`,
-                        }}
-                      >
-                        <div className="absolute -top-10 -right-10 w-44 h-44 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
 
-                        <div className="flex items-center gap-3 mb-5 relative z-10">
-                          <BusinessLogo
-                            name={hubData.tenant.name}
-                            logoUrl={hubData.tenant.logoUrl}
-                            brandColor={brandColor}
-                            size="sm"
-                          />
-                          <span className="font-display font-bold text-lg truncate">{hubData.tenant.name}</span>
-                        </div>
-                        <div className="flex justify-between items-start relative z-10">
-                          <div>
-                            <span className="text-xs text-slate-300 font-extrabold block">
-                              {isStamps ? "Verified Stamp Card" : "Loyalty Points Balance"}
-                            </span>
-                            <div className="text-4xl font-bold mt-1.5 tracking-tight text-white tabular-nums">
-                              {member.balance}{" "}
-                              <span className="text-xl font-bold font-sans text-slate-300">
-                                {isStamps ? "stamps" : "pts"}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className="text-xs text-slate-300 font-mono block">
-                              #{member.memberNumber}
-                            </span>
-                            <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-md text-white text-xs font-bold border border-white/20">
-                              Verified Pass
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Stamp Grid or Progress Bar */}
-                        {isStamps ? (
-                          <div className="mt-7 pt-4 border-t border-white/15 relative z-10">
-                            <div className="grid grid-cols-4 gap-2.5">
-                              {Array.from({ length: 8 }).map((_, idx) => {
-                                const isStamped = idx < member.balance;
-                                return (
-                                  <div
-                                    key={idx}
-                                    className={`h-12 rounded-xl flex items-center justify-center font-bold text-sm transition-all ${
-                                      isStamped
-                                        ? "bg-white text-slate-900 shadow-md ring-2 ring-amber-400/50"
-                                        : "border-2 border-dashed border-white/30 text-white/40"
-                                    }`}
-                                  >
-                                    {isStamped ? <Sparkles className="h-5 w-5 text-amber-500 animate-pulse" /> : idx + 1}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ) : nextLockedReward ? (
-                          <div className="mt-7 pt-4 border-t border-white/15 relative z-10">
-                            <div className="flex justify-between text-xs text-white/90 mb-1.5 font-medium">
-                              <span>Next unlock: <strong className="text-white">{nextLockedReward.title}</strong></span>
-                              <span className="font-bold text-amber-300">{nextLockedReward.pointsShortfall} pts needed</span>
-                            </div>
-                            <div className="h-2.5 w-full bg-white/20 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-amber-400 to-amber-300 rounded-full transition-all duration-500 shadow-sm"
-                                style={{
-                                  width: `${Math.min(
-                                    100,
-                                    (member.balance / nextLockedReward.costPoints) * 100
-                                  )}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ) : highestEligibleReward ? (
-                          <div className="mt-5 pt-3 border-t border-white/15 text-xs text-emerald-300 font-bold flex items-center relative z-10">
-                            <Sparkles className="h-4 w-4 mr-1 text-amber-300" />
-                            <span>You have rewards unlocked and ready to claim!</span>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {/* Card Bottom Toolbar */}
-                      <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-700 pl-2">
-                          Member: {member.displayName}
-                        </span>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => setShowQrModal(true)}
-                          className="rounded-xl font-semibold bg-zinc-950 hover:bg-zinc-800 text-white text-xs shadow-xs cursor-pointer transition-colors"
-                        >
-                          <QrCode className="h-3.5 w-3.5 mr-1.5 stroke-[1.8]" />
-                          Tap to Scan QR
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Official Reviews & Social Links (Anti-Gating Compliant) */}
-                    {hubData.links.length > 0 && (
-                      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 space-y-3">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                          <h3 className="text-sm font-bold text-slate-900 flex items-center">
-                            <Star className="h-4 w-4 mr-1.5 text-amber-500 fill-amber-500" />
-                            Official Reviews &amp; Social Links
-                          </h3>
-                          <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                            Anti-Gating Compliant
-                          </span>
-                        </div>
-
-                        <div className="space-y-2">
-                          {hubData.links.map((link) => {
-                            let IconComponent: React.ComponentType<{ className?: string }> = Globe;
-                            if (link.type === "google_review") IconComponent = Star;
-                            if (link.type === "instagram") IconComponent = InstagramIcon;
-                            if (link.type === "facebook") IconComponent = FacebookIcon;
-
-                            return (
-                              <a
-                                key={link.id}
-                                href={`/go/${link.id}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 transition-all font-bold text-xs group shadow-2xs"
-                              >
-                                <span className="flex items-center space-x-2.5 text-slate-800">
-                                  <IconComponent
-                                    className={`h-4 w-4 ${
-                                      link.type === "google_review"
-                                        ? "text-amber-500 fill-amber-500"
-                                        : link.type === "instagram"
-                                        ? "text-pink-600"
-                                        : link.type === "facebook"
-                                        ? "text-blue-600"
-                                        : "text-slate-600"
-                                    }`}
-                                  />
-                                  <span>{link.label}</span>
-                                </span>
-                                <ArrowRight className="h-3.5 w-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                              </a>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Chat with the shop: owner and staff reply, only the customer can end it */}
-                    <CustomerChat membershipId={member.membershipId} businessName={hubData.tenant.name} />
-                  </div>
-
-                  {/* Right Column: Available Rewards Grid & Ledger History (7 cols) */}
-                  <div className="lg:col-span-7 space-y-6">
-                    {/* Points menu: what their points get them, with progress towards each item */}
-                    <PointsMenu
-                      rewards={hubData.rewards}
-                      balance={member.balance}
-                      unit={isStamps ? "stamps" : "points"}
-                      onClaim={(reward) => handleStartRedeem(reward.id, reward.title, reward.costPoints)}
-                    />
-
-                    {/* Member Transaction History */}
-                    {member.recentHistory && member.recentHistory.length > 0 && (
-                      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 sm:p-7 space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                          <h3 className="text-sm font-bold text-slate-900 flex items-center">
-                            <History className="h-4 w-4 mr-1.5 text-slate-500" />
-                            Member Transaction History
-                          </h3>
-                          <span className="text-xs font-bold text-slate-400">Audited Ledger</span>
-                        </div>
-
-                        <div className="space-y-2">
-                          {member.recentHistory.map((item) => (
-                            <div
-                              key={item.id}
-                              className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-slate-50/60 text-xs shadow-2xs"
-                            >
-                              <div>
-                                <span className="font-bold text-slate-800">
-                                  {historyLabel(item)}
-                                </span>
-                                <span className="text-slate-400 block text-[11px] mt-0.5">
-                                  {new Date(item.occurredAt).toLocaleDateString([], {
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </span>
-                              </div>
-                              <span
-                                className={`font-bold text-base tabular-nums ${
-                                  item.pointsDelta > 0 ? "text-emerald-600" : "text-rose-600"
-                                }`}
-                              >
-                                {item.pointsDelta > 0 ? `+${item.pointsDelta}` : item.pointsDelta} pts
-                              </span>
-                            </div>
+                  {/* Phones: stamp cards, points menu, chat, activity. Desktop: two aligned columns. */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 lg:grid-rows-[auto_1fr] gap-6 lg:gap-x-8 items-start pt-4">
+                    {member.stampCards && member.stampCards.length > 0 && (
+                      <section aria-labelledby="stamp-cards-heading" className="lg:col-span-5 lg:col-start-8 lg:row-start-1 min-w-0">
+                        <h2 id="stamp-cards-heading" className="font-display text-lg font-bold text-evergreen-deep">
+                          Your stamp cards
+                        </h2>
+                        <p className="text-sm text-zinc-600 mt-0.5">A stamp each time you buy. Fill a card for your reward.</p>
+                        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-8">
+                          {member.stampCards.map((card) => (
+                            <StampCard
+                              key={card.offerId}
+                              card={card}
+                              businessName={hubData.tenant.name}
+                              logoUrl={hubData.tenant.logoUrl}
+                              brandColor={brandColor}
+                              onClaim={() => handleClaimStampCard(card.offerId)}
+                              claiming={claimingOfferId === card.offerId}
+                            />
                           ))}
                         </div>
-                      </div>
+                      </section>
                     )}
+
+                    {/* Main column: spending points and talking to the shop */}
+                    <div className="lg:col-span-7 lg:col-start-1 lg:row-start-1 lg:row-span-2 space-y-6 min-w-0">
+                      <div id="points-menu" className="scroll-mt-28">
+                        <PointsMenu
+                          rewards={hubData.rewards}
+                          balance={member.balance}
+                          unit={unitWord}
+                          onClaim={(reward) => handleStartRedeem(reward.id, reward.title, reward.costPoints)}
+                        />
+                      </div>
+                      <CustomerChat membershipId={member.membershipId} businessName={hubData.tenant.name} />
+                    </div>
+
+                    {/* Side column: what happened, and where to find the shop online */}
+                    <div className="lg:col-span-5 lg:col-start-8 lg:row-start-2 space-y-6 min-w-0">
+                      <section className="bg-white rounded-3xl border border-zinc-200 p-5 sm:p-7">
+                        <h3 className="font-display text-lg font-bold text-evergreen-deep flex items-center gap-2">
+                          <History className="h-5 w-5 text-evergreen" />
+                          Recent activity
+                        </h3>
+                        {member.recentHistory.length === 0 ? (
+                          <p className="mt-4 text-sm text-zinc-500">
+                            Nothing yet. Show your QR code when you pay and your {unitWord} will appear here.
+                          </p>
+                        ) : (
+                          <ul className="mt-4 divide-y divide-zinc-100">
+                            {member.recentHistory.map((item) => {
+                              const gained = item.pointsDelta > 0;
+                              const Icon = item.type === "redeem" ? Gift : gained ? Plus : Minus;
+                              return (
+                                <li key={item.id} className="flex items-center gap-3 py-3">
+                                  <span
+                                    className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                                      item.type === "redeem"
+                                        ? "bg-marigold/30 text-evergreen-deep"
+                                        : gained
+                                          ? "bg-mist text-evergreen"
+                                          : "bg-zinc-100 text-zinc-600"
+                                    }`}
+                                  >
+                                    <Icon className="w-4 h-4" />
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-semibold text-zinc-900 truncate">{historyLabel(item)}</span>
+                                    <span className="block text-xs text-zinc-500">
+                                      {new Date(item.occurredAt).toLocaleDateString([], {
+                                        day: "numeric",
+                                        month: "short",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </span>
+                                  </span>
+                                  <span
+                                    className={`text-sm font-semibold tabular-nums shrink-0 ${gained ? "text-evergreen" : "text-zinc-700"}`}
+                                  >
+                                    {gained ? `+${item.pointsDelta}` : item.pointsDelta}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </section>
+
+                      {hubData.links.length > 0 && (
+                        <section className="bg-white rounded-3xl border border-zinc-200 p-5 sm:p-7">
+                          <h3 className="font-display text-lg font-bold text-evergreen-deep flex items-center gap-2">
+                            <Star className="h-5 w-5 text-evergreen" />
+                            Find us online
+                          </h3>
+                          <p className="text-sm text-zinc-600 mt-0.5">Reviews help other people find {hubData.tenant.name}.</p>
+                          <div className="mt-4 space-y-2">
+                            {hubData.links.map((link) => {
+                              let IconComponent: React.ComponentType<{ className?: string }> = Globe;
+                              if (link.type === "google_review") IconComponent = Star;
+                              if (link.type === "instagram") IconComponent = InstagramIcon;
+                              if (link.type === "facebook") IconComponent = FacebookIcon;
+                              return (
+                                <a
+                                  key={link.id}
+                                  href={`/go/${link.id}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="press group flex items-center gap-3 min-h-[52px] px-4 rounded-2xl border border-zinc-200 hover:border-evergreen hover:bg-mist/50"
+                                >
+                                  <IconComponent
+                                    className={`h-5 w-5 shrink-0 ${
+                                      link.type === "google_review"
+                                        ? "text-marigold fill-marigold"
+                                        : link.type === "instagram"
+                                          ? "text-pink-600"
+                                          : link.type === "facebook"
+                                            ? "text-blue-600"
+                                            : "text-zinc-600"
+                                    }`}
+                                  />
+                                  <span className="flex-1 text-sm font-semibold text-zinc-800">{link.label}</span>
+                                  <ArrowUpRight className="h-4 w-4 text-zinc-400 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                                </a>
+                              );
+                            })}
+                          </div>
+                        </section>
+                      )}
+                    </div>
                   </div>
-                </div>
                 </>
               ) : (
                 /* PUBLIC CUSTOMER JOIN / SIGN IN ENTERPRISE 2-COLUMN VIEW */
@@ -1702,63 +1661,15 @@ export default function BusinessHubPage(props: {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200/80 bg-white py-4 px-4 sm:px-6 lg:px-8 mt-12">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+      <footer className="mt-16 border-t border-zinc-200 bg-white py-5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
           <span>&copy; {new Date().getFullYear()} {hubData.tenant.name}. Loyalty card by LoyaltyPlatform</span>
           <div className="flex items-center space-x-4">
-            <a href="/" className="hover:text-slate-800">LoyaltyPlatform</a>
+            <Link href="/" className="hover:text-slate-800">LoyaltyPlatform</Link>
             <a href={`/b/${slug}`} className="hover:text-slate-800">This shop&rsquo;s page</a>
           </div>
         </div>
       </footer>
-
-      {/* Member QR Modal */}
-      {showQrModal && member && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white text-slate-900 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl relative border border-slate-200">
-            <button
-              onClick={() => setShowQrModal(false)}
-              className="absolute right-4 top-4 p-2 text-slate-400 hover:text-slate-900 rounded-xl cursor-pointer"
-            >
-              <X className="h-5 w-5" />
-            </button>
-
-            <div className="flex items-center justify-center gap-2.5 mb-1">
-              <BusinessLogo
-                name={hubData.tenant.name}
-                logoUrl={hubData.tenant.logoUrl}
-                brandColor={brandColor}
-                size="sm"
-              />
-              <span className="font-semibold text-zinc-700">{hubData.tenant.name}</span>
-            </div>
-            <h3 className="text-xl font-bold mb-4 text-slate-900">{member.displayName}</h3>
-
-            <div className="p-4 bg-white rounded-2xl border-2 border-slate-900 mx-auto inline-block shadow-sm">
-              <img
-                src={member.qrDataUrl}
-                alt={`Member QR for ${member.memberNumber}`}
-                className="w-56 h-56 mx-auto"
-              />
-            </div>
-
-            <p className="mt-4 text-sm text-zinc-600">
-              No scanner? Staff can type your customer ID:
-            </p>
-            <p className="font-display text-2xl font-bold tracking-[0.12em] text-evergreen-deep">
-              {member.memberNumber}
-            </p>
-
-            <Button
-              variant="default"
-              className="w-full mt-5 font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl cursor-pointer"
-              onClick={() => setShowQrModal(false)}
-            >
-              Done
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Redemption Code One-Time Modal (With Live Polling & Countdown) */}
       {activeRedemption && (

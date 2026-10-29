@@ -7,7 +7,9 @@ import { QrCameraScanner } from "@/components/staff/QrCameraScanner";
 import { BusinessInbox } from "@/components/chat/BusinessInbox";
 import { SpendPointsPanel, type SpendResult } from "@/components/rewards/SpendPointsPanel";
 import { RewardsManager } from "@/components/rewards/RewardsManager";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { SlidingTabs } from "@/components/ui/sliding-tabs";
+import { CustomerMiniCard } from "@/components/loyalty/CustomerMiniCard";
+import { CountUp, DrawnCheck } from "@/components/ui/count-up";
 import { Input } from "@/components/ui/input";
 import { parsePence } from "@/lib/money";
 import {
@@ -27,6 +29,7 @@ import {
   Stamp,
   Check,
   MessageSquare,
+  ChevronRight,
 } from "lucide-react";
 
 interface LocationItem {
@@ -794,9 +797,9 @@ export default function StaffPage() {
 
         {/* Success Modal / Screen */}
         {successData && (
-          <div className="mb-6 rounded-3xl bg-white border-2 border-emerald-500/80 p-6 shadow-xl text-center animate-in zoom-in-95 relative overflow-hidden">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 mx-auto flex items-center justify-center mb-3 shadow-inner">
-              <CheckCircle2 className="h-9 w-9 text-emerald-600" />
+          <div className="pop-in mb-6 rounded-3xl bg-white border-2 border-evergreen p-6 shadow-xl text-center relative overflow-hidden">
+            <div className="mx-auto mb-3 w-16 h-16 text-evergreen">
+              <DrawnCheck className="w-16 h-16" />
             </div>
             <h2 className="text-2xl font-bold text-slate-900">{successData.title}</h2>
             <p className="mt-1 text-slate-600 text-xs font-medium">{successData.message}</p>
@@ -804,8 +807,9 @@ export default function StaffPage() {
               <span className="text-xs text-emerald-700 font-extrabold block">
                 New balance
               </span>
-              <div className="text-3xl font-bold text-emerald-800 mt-1 tabular-nums">
-                {successData.newBalance} pts
+              <div className="font-display text-4xl font-bold text-evergreen-deep mt-1">
+                <CountUp value={successData.newBalance} />{" "}
+                <span className="text-lg text-zinc-600">{business?.programmeType === "stamps" ? "stamps" : "points"}</span>
               </div>
             </div>
             <Button
@@ -821,40 +825,35 @@ export default function StaffPage() {
 
         {/* Active Member Selected Card */}
         {activeMember ? (
-          <div className="mb-6 bg-white rounded-3xl border border-slate-200/90 shadow-lg p-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
-              <div>
-                <span className="text-sm text-zinc-500">Serving</span>
-                <h3 className="text-2xl font-bold text-evergreen-deep">{activeMember.displayName}</h3>
-                <div className="text-xs text-slate-400 font-mono mt-0.5">
-                  Card #{activeMember.memberNumber}
-                </div>
+          <div className="pop-in mb-6 bg-white rounded-3xl border border-zinc-200 shadow-lg p-5 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-7 border-b border-zinc-100 pb-6 mb-5">
+              <CustomerMiniCard
+                key={activeMember.membershipId}
+                name={activeMember.displayName}
+                memberNumber={activeMember.memberNumber}
+                balance={activeMember.balance}
+                unit={business?.programmeType === "stamps" ? "stamps" : "points"}
+                brandColor={business?.brandPrimaryHex}
+                businessName={business?.name || "Loyalty card"}
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-zinc-500">Serving</p>
+                <h3 className="font-display text-3xl font-bold text-evergreen-deep truncate">{activeMember.displayName}</h3>
+                <p className="mt-1 text-sm text-zinc-600">
+                  Earned {activeMember.lifetimeEarned ?? 0} {business?.programmeType === "stamps" ? "stamps" : "points"} all-time
+                  {activeMember.lifetimeRedeemed ? `, used ${activeMember.lifetimeRedeemed}` : ""}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveMember(null)}
+                  className="press mt-4 min-h-[40px] px-4 rounded-full border border-zinc-300 text-sm font-semibold text-zinc-700 hover:border-evergreen cursor-pointer"
+                >
+                  Change customer
+                </button>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setActiveMember(null)}
-                className="text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl cursor-pointer"
-              >
-                Change customer
-              </Button>
             </div>
 
             <div>
-              {/* Balance Banner */}
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="rounded-2xl bg-marigold p-4 text-evergreen-deep">
-                  <p className="text-sm font-semibold">
-                    {business?.programmeType === "stamps" ? "Stamps to spend" : "Points to spend"}
-                  </p>
-                  <p className="font-display text-3xl font-bold tabular-nums">{activeMember.balance}</p>
-                </div>
-                <div className="rounded-2xl bg-paper border border-zinc-200 p-4 text-evergreen-deep">
-                  <p className="text-sm text-zinc-600">Earned all-time</p>
-                  <p className="font-display text-3xl font-bold tabular-nums">{activeMember.lifetimeEarned ?? 0}</p>
-                </div>
-              </div>
-
               {/* Stamp cards */}
               {activeMember.stampCards && activeMember.stampCards.length > 0 && (
                 <div className="mb-5">
@@ -929,17 +928,16 @@ export default function StaffPage() {
               {/* Earn Form */}
               <div className="space-y-4">
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-extrabold text-slate-700">
-                      Qualifying Spend (£)
-                    </label>
-                    <span className="text-[11px] text-slate-400 font-medium">Integer minor pence arithmetic</span>
-                  </div>
+                  <h4 className="font-display text-lg font-bold text-evergreen-deep">Add points for this purchase</h4>
+                  <label htmlFor="spend-amount" className="block text-sm text-zinc-600 mt-0.5 mb-2">
+                    How much did they spend?
+                  </label>
                   <div className="relative">
                     <span className="absolute left-4 top-3 text-xl font-bold text-slate-400">
                       £
                     </span>
                     <Input
+                      id="spend-amount"
                       type="text"
                       inputMode="decimal"
                       placeholder="0.00"
@@ -956,7 +954,7 @@ export default function StaffPage() {
                         key={preset}
                         type="button"
                         onClick={() => setSpendInput(preset.toFixed(2))}
-                        className="py-1.5 px-2 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                        className="press min-h-[40px] px-2 bg-white hover:border-evergreen border border-zinc-200 text-zinc-800 rounded-full text-sm font-semibold transition-colors cursor-pointer"
                       >
                         +£{preset}
                       </button>
@@ -967,15 +965,13 @@ export default function StaffPage() {
                   {productsList.length > 0 && (
                     <div className="mt-3 pt-2.5 border-t border-slate-100">
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-extrabold text-slate-500">
-                          Tap Menu Item to Add to Bill
-                        </span>
+                        <span className="text-sm text-zinc-600">Or tap what they bought</span>
                         <button
                           type="button"
                           onClick={() => setSpendInput("0.00")}
-                          className="text-xs font-bold text-rose-600 hover:underline cursor-pointer"
+                          className="text-sm font-semibold text-zinc-600 hover:text-zinc-900 hover:underline cursor-pointer"
                         >
-                          Clear Bill
+                          Clear
                         </button>
                       </div>
                       <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
@@ -987,10 +983,10 @@ export default function StaffPage() {
                               key={prod.id}
                               type="button"
                               onClick={() => handleTapProduct(prod)}
-                              className="py-1 px-2.5 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 border border-slate-200 text-slate-800 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-2xs transition-colors"
+                              className="press min-h-[36px] px-3 bg-white hover:border-evergreen border border-zinc-200 text-zinc-800 rounded-full text-sm font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
                             >
                               <span>{prod.name}</span>
-                              <span className="font-mono font-bold text-indigo-700">£{finalPrice}</span>
+                              <span className="text-zinc-500 tabular-nums">£{finalPrice}</span>
                               {discount > 0 && (
                                 <span className="text-[11px] bg-rose-100 text-rose-700 font-extrabold px-1 rounded-sm">
                                   -{discount}%
@@ -1005,10 +1001,11 @@ export default function StaffPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-500 block mb-1">
-                    Tip (£) — Excluded from loyalty calculation
+                  <label htmlFor="tip-amount" className="text-sm text-zinc-600 block mb-1">
+                    Tip, if any <span className="text-zinc-500">(doesn&rsquo;t earn points)</span>
                   </label>
                   <Input
+                    id="tip-amount"
                     type="text"
                     inputMode="decimal"
                     placeholder="0.00"
@@ -1022,15 +1019,15 @@ export default function StaffPage() {
                 {previewLoading ? (
                   <div className="flex items-center space-x-2 text-xs text-slate-500 py-1.5 px-3 bg-slate-50 rounded-xl">
                     <RefreshCw className="h-3.5 w-3.5 animate-spin text-indigo-600" />
-                    <span>Calculating ledger reward...</span>
+                    <span>Working out points...</span>
                   </div>
                 ) : previewPoints !== null ? (
-                  <div className="rounded-2xl bg-indigo-50/80 border border-indigo-200 p-3.5 flex items-center justify-between text-indigo-950 shadow-2xs">
-                    <span className="flex items-center text-xs font-extrabold">
-                      <Sparkles className="h-4 w-4 mr-1.5 text-indigo-600" />
-                      Will award to ledger:
+                  <div className="pop-in rounded-2xl bg-marigold/25 p-3.5 flex items-center justify-between text-evergreen-deep">
+                    <span className="flex items-center text-sm font-semibold">
+                      <Sparkles className="h-4 w-4 mr-1.5 text-evergreen" />
+                      They&rsquo;ll get
                     </span>
-                    <span className="text-lg font-bold text-indigo-600 tabular-nums">+{previewPoints} points</span>
+                    <span className="font-display text-xl font-bold tabular-nums">+{previewPoints} points</span>
                   </div>
                 ) : null}
 
@@ -1038,7 +1035,7 @@ export default function StaffPage() {
                 {managerOverride && (
                   <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 text-amber-900 shadow-2xs">
                     <label className="text-xs font-bold block mb-1">
-                      ⚠️ Duplicate Visit Protection: Manager Override Reason
+                      They already earned points a moment ago. Why add more?
                     </label>
                     <Input
                       placeholder="e.g. Split bill / second purchase with manager consent"
@@ -1053,11 +1050,11 @@ export default function StaffPage() {
                 <Button
                   variant="default"
                   size="lg"
-                  className="w-full text-sm font-bold shadow-md bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-12 cursor-pointer transition-all"
+                  className="press w-full text-base font-semibold bg-evergreen hover:bg-evergreen-deep text-white rounded-full h-13 cursor-pointer transition-colors"
                   onClick={handleConfirmEarn}
                   disabled={loading || !spendInput}
                 >
-                  {loading ? "Recording in Ledger..." : "Confirm & Award Points →"}
+                  {loading ? "Adding points..." : "Add points"}
                 </Button>
               </div>
 
@@ -1078,88 +1075,24 @@ export default function StaffPage() {
         ) : (
           /* Main Tab Navigation */
           <div>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 p-1.5 mb-5 bg-white rounded-2xl border border-zinc-200">
-              <button
-                onClick={() => setActiveTab("scan")}
-                className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
-                  activeTab === "scan"
-                    ? "bg-evergreen text-white"
-                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
-                }`}
-              >
-                <QrCode className="h-4 w-4 mb-1 stroke-[1.8]" />
-                <span className="truncate">Scan</span>
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab("search");
-                  handleSearch("");
-                }}
-                className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
-                  activeTab === "search"
-                    ? "bg-evergreen text-white"
-                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
-                }`}
-              >
-                <Search className="h-4 w-4 mb-1 stroke-[1.8]" />
-                <span className="truncate">Find</span>
-              </button>
-              <button
-                onClick={() => setActiveTab("code")}
-                className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
-                  activeTab === "code"
-                    ? "bg-evergreen text-white"
-                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
-                }`}
-              >
-                <Gift className="h-4 w-4 mb-1 stroke-[1.8]" />
-                <span className="truncate">Redeem</span>
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab("products");
-                  fetchProducts();
-                }}
-                className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
-                  activeTab === "products"
-                    ? "bg-evergreen text-white"
-                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
-                }`}
-              >
-                <Package className="h-4 w-4 mb-1 stroke-[1.8]" />
-                <span className="truncate">Menu &amp; rewards</span>
-              </button>
-              <button
-                onClick={handleLoadHistory}
-                className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
-                  activeTab === "history"
-                    ? "bg-evergreen text-white"
-                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
-                }`}
-              >
-                <History className="h-4 w-4 mb-1 stroke-[1.8]" />
-                <span className="truncate">Recent</span>
-              </button>
-              <button
-                onClick={() => setActiveTab("messages")}
-                className={`relative flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
-                  activeTab === "messages"
-                    ? "bg-evergreen text-white"
-                    : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50"
-                }`}
-              >
-                <MessageSquare className="h-4 w-4 mb-1 stroke-[1.8]" />
-                <span className="truncate">Messages</span>
-                {unreadMessages > 0 && (
-                  <span
-                    className="absolute top-1 right-2 min-w-5 h-5 px-1 rounded-full bg-marigold text-evergreen-deep text-xs font-bold flex items-center justify-center"
-                    aria-label={`${unreadMessages} unread`}
-                  >
-                    {unreadMessages}
-                  </span>
-                )}
-              </button>
-            </div>
+            <SlidingTabs
+              className="mb-5"
+              active={activeTab}
+              onChange={(tab) => {
+                if (tab === "history") return handleLoadHistory();
+                setActiveTab(tab);
+                if (tab === "search") handleSearch("");
+                if (tab === "products") fetchProducts();
+              }}
+              tabs={[
+                { id: "scan", label: "Scan", icon: QrCode },
+                { id: "search", label: "Find", icon: Search },
+                { id: "code", label: "Redeem", icon: Gift },
+                { id: "products", label: "Menu & rewards", icon: Package },
+                { id: "history", label: "Recent", icon: History },
+                { id: "messages", label: "Messages", icon: MessageSquare, badge: unreadMessages },
+              ]}
+            />
 
             {activeTab === "messages" && (
               <BusinessInbox businessName={business?.name || "Your shop"} onUnreadChange={loadUnreadMessages} />
@@ -1248,77 +1181,86 @@ export default function StaffPage() {
               </div>
             )}
 
-            {/* Tab 2: Registered Customers & Search Screen */}
+            {/* Tab 2: Find a customer by name, email or ID */}
             {activeTab === "search" && (
-              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5 space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="bg-white rounded-3xl border border-zinc-200 p-5 sm:p-6">
+                <div className="flex items-end justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">Enrolled Customers Directory</h3>
-                    <p className="text-[11px] text-slate-500">Live list of customers registered at your store</p>
+                    <h3 className="font-display text-xl font-bold text-evergreen-deep">Find a customer</h3>
+                    <p className="text-sm text-zinc-600 mt-0.5">Search by name, email or customer ID, then tap them.</p>
                   </div>
-                  <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
-                    {searchResults.length} Customers
-                  </span>
+                  <span className="text-sm text-zinc-500 shrink-0 tabular-nums">{searchResults.length} shown</span>
                 </div>
 
-                <div className="flex space-x-2">
-                  <Input
-                    placeholder="Search by customer name, email, or member #..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    className="text-xs rounded-xl bg-slate-50 border-slate-200"
-                  />
-                  <Button
-                    onClick={() => handleSearch()}
+                <form
+                  className="mt-5 flex gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSearch();
+                  }}
+                >
+                  <label htmlFor="customer-search" className="sr-only">
+                    Search customers
+                  </label>
+                  <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                    <input
+                      id="customer-search"
+                      type="search"
+                      placeholder="e.g. Priya or P9N7KCJG"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full min-h-[48px] rounded-full border border-zinc-300 bg-zinc-50 pl-11 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white"
+                    />
+                  </div>
+                  <button
+                    type="submit"
                     disabled={loading}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs px-4 cursor-pointer"
+                    className="press min-h-[48px] px-6 rounded-full bg-evergreen text-white text-sm font-semibold hover:bg-evergreen-deep cursor-pointer disabled:opacity-50"
                   >
                     Search
-                  </Button>
-                </div>
+                  </button>
+                </form>
 
                 {searchResults.length > 0 ? (
-                  <div className="space-y-2 pt-1 max-h-96 overflow-y-auto pr-1">
-                    {searchResults.map((member) => (
-                      <div
-                        key={member.membershipId}
-                        onClick={() => openMember({ membershipId: member.membershipId })}
-                        className="p-3.5 rounded-2xl border border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/30 flex items-center justify-between cursor-pointer transition-all shadow-2xs"
-                      >
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm text-slate-900">{member.name || member.displayName}</span>
-                            <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
-                              #{member.memberNumber}
+                  <ul className="mt-5 divide-y divide-zinc-100 max-h-[28rem] overflow-y-auto -mx-2">
+                    {searchResults.map((member) => {
+                      const name = member.name || member.displayName;
+                      return (
+                        <li key={member.membershipId}>
+                          <button
+                            type="button"
+                            onClick={() => openMember({ membershipId: member.membershipId })}
+                            className="press group w-full flex items-center gap-3 px-2 py-3 rounded-2xl text-left hover:bg-mist/60 cursor-pointer"
+                          >
+                            <span className="w-11 h-11 rounded-full bg-mist text-evergreen-deep flex items-center justify-center font-bold text-sm uppercase shrink-0">
+                              {name.slice(0, 2)}
                             </span>
-                          </div>
-                          {member.email && (
-                            <div className="text-sm text-slate-500">
-                              {member.email}
-                            </div>
-                          )}
-                          {member.joinedAt && (
-                            <div className="text-xs text-slate-400">
-                              Enrolled: {new Date(member.joinedAt).toLocaleDateString()}
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold text-sm text-indigo-700">
-                            {member.balance} pts
-                          </div>
-                          <span className="inline-block mt-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                            Select Member →
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-semibold text-zinc-900 truncate">{name}</span>
+                              <span className="block text-sm text-zinc-500 truncate">
+                                {member.memberNumber}
+                                {member.email ? `, ${member.email}` : ""}
+                              </span>
+                            </span>
+                            <span className="text-right shrink-0">
+                              <span className="block font-display text-lg font-bold text-evergreen-deep tabular-nums leading-none">
+                                {member.balance}
+                              </span>
+                              <span className="block text-xs text-zinc-500">
+                                {business?.programmeType === "stamps" ? "stamps" : "points"}
+                              </span>
+                            </span>
+                            <ChevronRight className="w-5 h-5 text-zinc-300 group-hover:text-evergreen group-hover:translate-x-0.5 transition-transform shrink-0" />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 ) : (
-                  <div className="p-8 text-center text-slate-400 text-xs">
-                    {searchQuery ? `No customers found matching "${searchQuery}".` : "No registered customers yet."}
-                  </div>
+                  <p className="mt-8 mb-4 text-center text-sm text-zinc-500">
+                    {searchQuery ? `No customer matches "${searchQuery}". Check the spelling or try their ID.` : "No customers yet."}
+                  </p>
                 )}
               </div>
             )}
@@ -1911,7 +1853,7 @@ export default function StaffPage() {
                 <label className="font-bold text-slate-700 block mb-1">Offer Type</label>
                 <select
                   value={promoOfferType}
-                  onChange={(e) => setPromoOfferType(e.target.value as any)}
+                  onChange={(e) => setPromoOfferType(e.target.value as typeof promoOfferType)}
                   className="w-full text-xs rounded-xl border border-slate-200 bg-slate-50 p-2.5 font-medium"
                 >
                   <option value="points_bonus">Bonus Points upon Scan</option>
