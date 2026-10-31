@@ -6,11 +6,13 @@ import {
   users,
   tenants,
   locations,
+  blockedEmails,
+  qrTokenUses,
 } from "../db/schema";
 import {
   generateCrockfordCode,
   generateMemberQrToken,
-  verifyMemberQrToken,
+  verifyAnyMemberQrToken,
   generateQrDataUrl,
 } from "../qr";
 import { getRewards } from "./rewards";
@@ -19,8 +21,9 @@ import { RequestContext, assertCan } from "../security/permissions";
 import { logAuditEvent } from "./audit";
 import { notifyWelcome } from "./notifications";
 import { grantWelcomeBonus } from "./loyalty-jobs";
+import { emitEvent } from "./events";
 import { hashPassword } from "../auth";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import crypto from "crypto";
 
 export interface JoinProgrammeInput {
@@ -32,6 +35,30 @@ export interface JoinProgrammeInput {
   termsVersion?: string;
   locationPublicId?: string;
   allowExistingUser?: boolean;
+  /** A friend's member number: when given, they both get a bonus after this customer's first purchase. */
+  referralCode?: string;
+}
+
+/**
+ * Gmail ignores dots and anything after a "+" in the part before the @. Returns a masked version of an
+ * existing account's email when a different spelling of the same Gmail inbox is already registered.
+ */
+async function findGmailLookalike(email: string): Promise<string | null> {
+  const [local, domain] = email.split("@");
+  if (domain !== "gmail.com" && domain !== "googlemail.com") return null;
+  const base = local.split("+")[0].replace(/\./g, "");
+  const rows = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(
+      sql`split_part(${users.email}, '@', 2) in ('gmail.com', 'googlemail.com')
+        and replace(split_part(split_part(${users.email}, '@', 1), '+', 1), '.', '') = ${base}
+        and ${users.email} <> ${email}`
+    )
+    .limit(1);
+  if (rows.length === 0) return null;
+  const [name, host] = rows[0].email.split("@");
+  return `${name.slice(0, 1)}***@${host}`;
 }
 
 export async function joinProgramme(input: JoinProgrammeInput) {
@@ -46,6 +73,14 @@ export async function joinProgramme(input: JoinProgrammeInput) {
 
   if (!tenant) throw new Error(`Business "${input.tenantSlug}" not found`);
   if (tenant.status !== "active") throw new Error("This loyalty programme is currently inactive");
+
+  // A business can bar an email from its programme. The same message either way, so it reveals nothing else.
+  const [blocked] = await db
+    .select({ id: blockedEmails.id })
+    .from(blockedEmails)
+    .where(and(eq(blockedEmails.tenantId, tenant.id), eq(blockedEmails.email, normalizedEmail)))
+    .limit(1);
+  if (blocked) throw new Error("EMAIL_BLOCKED: This email can't be used to join this business's programme.");
 
   let locationId: string | null = null;
   if (input.locationPublicId) {
@@ -73,6 +108,13 @@ export async function joinProgramme(input: JoinProgrammeInput) {
     }
     userId = existingUsers[0].id;
   } else {
+    // The same Gmail inbox can be written many ways (j.smith@, jsmith+cafe@); don't open a second account for it
+    const lookalike = await findGmailLookalike(normalizedEmail);
+    if (lookalike) {
+      throw new Error(
+        `DUPLICATE_ACCOUNT: This looks like the same inbox as an existing account (${lookalike}). Sign in with that email instead.`
+      );
+    }
     let passwordHash: string | null = null;
     if (input.password && input.password.trim()) {
       passwordHash = await hashPassword(input.password);
@@ -117,6 +159,18 @@ export async function joinProgramme(input: JoinProgrammeInput) {
     };
   }
 
+  // A friend's code only counts when it is a real, active card at this same business
+  let referredByMembershipId: string | null = null;
+  const referralCode = input.referralCode?.toUpperCase().trim();
+  if (referralCode) {
+    const [referrer] = await db
+      .select({ id: memberships.id, userId: memberships.userId })
+      .from(memberships)
+      .where(and(eq(memberships.tenantId, tenant.id), eq(memberships.memberNumber, referralCode), eq(memberships.status, "active")))
+      .limit(1);
+    if (referrer && referrer.userId !== userId) referredByMembershipId = referrer.id;
+  }
+
   // 3. Create new membership
   const created = await db.transaction(async (tx) => {
     const memberNumber = generateCrockfordCode(8);
@@ -132,6 +186,7 @@ export async function joinProgramme(input: JoinProgrammeInput) {
         qrVersion: 1,
         status: "active",
         joinedLocationId: locationId,
+        referredByMembershipId,
         marketingOptIn: !!input.marketingOptIn,
       })
       .returning();
@@ -181,6 +236,13 @@ export async function joinProgramme(input: JoinProgrammeInput) {
 
   // Welcome bonus first (if the shop gives one), then the welcome email with their customer ID
   await grantWelcomeBonus(created.membership.tenantId, created.membership.id);
+  await emitEvent(created.membership.tenantId, "membership.created", {
+    membershipId: created.membership.id,
+    memberNumber: created.membership.memberNumber,
+    referred: Boolean(referredByMembershipId),
+  });
+  await emitEvent(created.membership.tenantId, "qr.issued", { membershipId: created.membership.id, kind: "member" });
+  if (input.marketingOptIn) await emitEvent(created.membership.tenantId, "consent.granted", { membershipId: created.membership.id, purpose: "marketing_email", source: "join_web" });
   await notifyWelcome(created.membership.id);
   return created;
 }
@@ -250,6 +312,25 @@ async function buildStaffMemberSummary(ctx: RequestContext, membership: StaffMem
   };
 }
 
+/** Whether this business only accepts live (30-second) QR codes. */
+export async function tenantUsesLiveQr(tenantId: string): Promise<boolean> {
+  const [t] = await db.select({ features: tenants.features }).from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+  return Boolean((t?.features as { liveQr?: boolean } | null)?.liveQr);
+}
+
+/** Owner switches live QR codes on or off for the whole business. */
+export async function setLiveQr(ctx: RequestContext, enabled: boolean) {
+  assertCan(ctx, "tenant.manage");
+  if (!ctx.tenantId) throw new Error("tenantId required");
+  const [t] = await db.select({ features: tenants.features }).from(tenants).where(eq(tenants.id, ctx.tenantId)).limit(1);
+  await db
+    .update(tenants)
+    .set({ features: { ...((t?.features as Record<string, unknown>) ?? {}), liveQr: enabled } })
+    .where(eq(tenants.id, ctx.tenantId));
+  await logAuditEvent(ctx, { action: enabled ? "tenant.live_qr_enabled" : "tenant.live_qr_disabled", targetType: "tenant", targetId: ctx.tenantId });
+  return { enabled };
+}
+
 export async function resolveMemberQrForStaff(
   ctx: RequestContext,
   token: string,
@@ -258,8 +339,9 @@ export async function resolveMemberQrForStaff(
   assertCan(ctx, "member.read", { locationId });
   if (!ctx.tenantId) throw new Error("Staff must be scoped to a tenant");
 
-  const verifyResult = verifyMemberQrToken(token);
+  const verifyResult = verifyAnyMemberQrToken(token);
   if (!verifyResult.valid || !verifyResult.membershipPublicId) {
+    await emitEvent(ctx.tenantId, "qr.validation_failed", { reason: verifyResult.error || "invalid" });
     throw new Error(verifyResult.error || "Invalid Member QR code");
   }
 
@@ -280,6 +362,24 @@ export async function resolveMemberQrForStaff(
   // Revocation check
   if (membership.qrVersion !== verifyResult.qrVersion) {
     throw new Error("QR code has expired or was revoked. Please refresh your membership card.");
+  }
+
+  // A business that uses live QR codes doesn't accept a printed or screenshotted one
+  if (!verifyResult.live && (await tenantUsesLiveQr(membership.tenantId))) {
+    await emitEvent(ctx.tenantId, "qr.validation_failed", { reason: "static_code_not_accepted" });
+    throw new Error("This business uses live QR codes. Ask the customer to open their card so the code refreshes, or type their customer ID.");
+  }
+  // A live code works once: scanning the same one again is refused, so a photo can't be replayed
+  if (verifyResult.live) {
+    const used = await db
+      .insert(qrTokenUses)
+      .values({ tenantId: membership.tenantId, membershipId: membership.id, windowStart: verifyResult.slot! })
+      .onConflictDoNothing()
+      .returning({ slot: qrTokenUses.windowStart });
+    if (used.length === 0) {
+      await emitEvent(ctx.tenantId, "qr.validation_failed", { reason: "code_already_used" });
+      throw new Error("This QR code was already scanned. Ask the customer to hold up their card again for a fresh one.");
+    }
   }
 
   return buildStaffMemberSummary(ctx, membership);
@@ -361,6 +461,7 @@ export async function revokeMemberQr(ctx: RequestContext, membershipId: string) 
     targetId: membershipId,
     metadata: { oldVersion: membership.qrVersion, newVersion: newQrVersion },
   });
+  await emitEvent(ctx.tenantId, "qr.revoked", { membershipId, newVersion: newQrVersion });
 
   const newQrToken = generateMemberQrToken(updated.publicId, updated.qrVersion);
   const newQrDataUrl = await generateQrDataUrl(newQrToken);
@@ -394,6 +495,7 @@ export async function suspendMembership(
     targetId: membershipId,
     reason,
   });
+  await emitEvent(ctx.tenantId, "membership.suspended", { membershipId, reason });
 
   return updated;
 }
@@ -420,6 +522,7 @@ export async function reactivateMembership(
     targetId: membershipId,
     reason: reason || "Reactivated by management",
   });
+  await emitEvent(ctx.tenantId, "membership.updated", { membershipId, change: "reactivated" });
 
   return updated;
 }

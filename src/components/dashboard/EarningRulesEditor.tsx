@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pause, Play, History as HistoryIcon } from "lucide-react";
-import { calculatePoints, describeRule, ruleConfigSchema, type RuleConfig } from "@/lib/points";
+import { calculatePoints, describeRule, ruleConfigSchema, type LocationOverride, type RuleConfig } from "@/lib/points";
 
 interface ProgrammeData {
   programme: { id: string; name: string; type: "points" | "stamps"; status: string };
@@ -10,8 +10,41 @@ interface ProgrammeData {
   history: Array<{ id: string; version: number; createdAt: string; createdByName: string | null; config: RuleConfig }>;
 }
 
+/** An ISO time as the "YYYY-MM-DDTHH:mm" a date-time box wants, in the browser's own zone. */
+const toLocalInput = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : "");
+
 const pounds = (minor: number) => (minor / 100).toFixed(2);
 const toMinor = (v: string) => Math.round(parseFloat(v || "0") * 100);
+
+/** A money box that lets you type "1." on the way to "1.50"; reports whole pence. */
+function MoneyBox({ minor, onChange, symbol, label }: { minor: number; onChange: (minor: number) => void; symbol: string; label: string }) {
+  const [text, setText] = useState((minor / 100).toFixed(2));
+  return (
+    <span className="inline-flex items-center rounded-xl border border-zinc-300 bg-white focus-within:ring-2 focus-within:ring-evergreen">
+      <span className="pl-3 text-zinc-500">{symbol}</span>
+      <input
+        aria-label={label}
+        type="text"
+        inputMode="decimal"
+        value={text}
+        onChange={(e) => {
+          const v = e.target.value.replace(/[^0-9.]/g, "");
+          setText(v);
+          onChange(Math.max(1, Math.round(parseFloat(v || "0") * 100)));
+        }}
+        className="w-20 min-h-[44px] bg-transparent px-2 text-base font-semibold focus:outline-none"
+      />
+    </span>
+  );
+}
+
+interface LocationRow { id: string; name: string; status: string }
 
 /**
  * Owner screen for how customers earn: per spend or per visit, rounding, minimum spend and limits.
@@ -26,6 +59,7 @@ export function EarningRulesEditor({ symbol = "£" }: { symbol?: string }) {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [places, setPlaces] = useState<LocationRow[]>([]);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/v1/owner/programme", { cache: "no-store" });
@@ -42,6 +76,10 @@ export function EarningRulesEditor({ symbol = "£" }: { symbol?: string }) {
 
   useEffect(() => {
     load();
+    fetch("/api/v1/owner/locations", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => j && setPlaces((j.data as LocationRow[]).filter((l) => l.status === "active")))
+      .catch(() => undefined);
   }, [load]);
 
   const unit = data?.programme.type === "stamps" ? "stamps" : "points";
@@ -62,8 +100,22 @@ export function EarningRulesEditor({ symbol = "£" }: { symbol?: string }) {
   const setEarn = (patch: Partial<RuleConfig["earn"]>) => setRule({ ...rule, earn: { ...rule.earn, ...patch } });
   const setCaps = (patch: Partial<RuleConfig["caps"]>) => setRule({ ...rule, caps: { ...rule.caps, ...patch } });
   const setBonuses = (patch: Partial<RuleConfig["bonuses"]>) => setRule({ ...rule, bonuses: { ...rule.bonuses, ...patch } });
+  const setWindow = (patch: Partial<RuleConfig["earningWindow"]>) => setRule({ ...rule, earningWindow: { ...rule.earningWindow, ...patch } });
+  const eligible = rule.locationEligibility;
+  const setEligible = (v: "all" | string[]) => setRule({ ...rule, locationEligibility: v });
+  const setTiers = (patch: Partial<RuleConfig["tiers"]>) => setRule({ ...rule, tiers: { ...rule.tiers, ...patch } });
+  const setMultipliers = (list: RuleConfig["multipliers"]) => setRule({ ...rule, multipliers: list });
   const setExpiry = (patch: Partial<RuleConfig["expiry"]>) => setRule({ ...rule, expiry: { ...rule.expiry, ...patch } });
   const live = data.programme.status === "published";
+
+  // A location with no entry earns the programme-wide rate; an entry changes only the rate fields it lists
+  const overrides = rule.locationOverrides ?? {};
+  const setOverride = (id: string, next: LocationOverride | null) => {
+    const copy = { ...overrides };
+    if (next) copy[id] = next;
+    else delete copy[id];
+    setRule({ ...rule, locationOverrides: copy });
+  };
 
   const save = async () => {
     setSaving(true);
@@ -235,6 +287,236 @@ export function EarningRulesEditor({ symbol = "£" }: { symbol?: string }) {
             </p>
           )}
 
+          {places.length > 1 && (
+            <div>
+              <h3 className="font-display text-lg font-bold text-evergreen-deep">Different rate at one location</h3>
+              <p className="text-sm text-zinc-600 mt-0.5">
+                Switch this on for a location that should earn at its own rate. Others follow the rule above.
+              </p>
+              <ul className="mt-4 space-y-3">
+                {places.map((l) => {
+                  const o = overrides[l.id];
+                  const spend = rule.earn.mode === "spend";
+                  return (
+                    <li key={l.id} className="rounded-2xl border border-zinc-200 p-4">
+                      <label className="flex items-center gap-3 font-medium text-zinc-900 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(o)}
+                          onChange={(e) =>
+                            setOverride(
+                              l.id,
+                              e.target.checked
+                                ? { earn: spend ? { pointsPerUnit: rule.earn.pointsPerUnit, unitMinor: Math.max(1, toMinor(unitPounds)) } : { pointsPerVisit: rule.earn.pointsPerVisit }, caps: {} }
+                                : null
+                            )
+                          }
+                          className="w-5 h-5 accent-evergreen"
+                        />
+                        {l.name}
+                      </label>
+                      {o && (
+                        <p className="mt-3 flex flex-wrap items-center gap-2 text-zinc-800">
+                          {spend ? (
+                            <>
+                              Give {numberField(o.earn.pointsPerUnit ?? rule.earn.pointsPerUnit, (n) => setOverride(l.id, { ...o, earn: { ...o.earn, pointsPerUnit: n } }), 1)} {unit} for every{" "}
+                              <MoneyBox
+                                minor={o.earn.unitMinor ?? rule.earn.unitMinor}
+                                onChange={(m) => setOverride(l.id, { ...o, earn: { ...o.earn, unitMinor: m } })}
+                                symbol={symbol}
+                                label={`Spend per reward unit at ${l.name}`}
+                              />{" "}
+                              spent
+                            </>
+                          ) : (
+                            <>
+                              Give {numberField(o.earn.pointsPerVisit ?? rule.earn.pointsPerVisit, (n) => setOverride(l.id, { ...o, earn: { ...o.earn, pointsPerVisit: n } }), 1)} {unit} each time they visit
+                            </>
+                          )}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {places.length > 1 && (
+            <div>
+              <h3 className="font-display text-lg font-bold text-evergreen-deep">Where {unit} can be earned</h3>
+              <label className="mt-3 flex items-center gap-3 text-zinc-800 cursor-pointer">
+                <input type="radio" name="eligibility" checked={eligible === "all"} onChange={() => setEligible("all")} className="w-5 h-5 accent-evergreen" />
+                At every location
+              </label>
+              <label className="mt-2 flex items-center gap-3 text-zinc-800 cursor-pointer">
+                <input
+                  type="radio"
+                  name="eligibility"
+                  checked={eligible !== "all"}
+                  onChange={() => setEligible(places.map((p) => p.id))}
+                  className="w-5 h-5 accent-evergreen"
+                />
+                Only at the ones I choose
+              </label>
+              {eligible !== "all" && (
+                <ul className="mt-2 ml-8 space-y-1.5">
+                  {places.map((p) => (
+                    <li key={p.id}>
+                      <label className="flex items-center gap-2 text-zinc-800 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={eligible.includes(p.id)}
+                          onChange={(e) => setEligible(e.target.checked ? [...eligible, p.id] : eligible.filter((x) => x !== p.id))}
+                          className="w-5 h-5 accent-evergreen"
+                        />
+                        {p.name}
+                      </label>
+                    </li>
+                  ))}
+                  {eligible.length === 0 && <li className="text-sm text-rose-700">Pick at least one, or {unit} can&rsquo;t be earned anywhere.</li>}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <div>
+            <h3 className="font-display text-lg font-bold text-evergreen-deep">When {unit} can be earned</h3>
+            <label className="mt-3 flex items-center gap-3 text-zinc-800 cursor-pointer">
+              <input type="checkbox" checked={rule.earningWindow.enabled} onChange={(e) => setWindow({ enabled: e.target.checked })} className="w-5 h-5 accent-evergreen" />
+              Only on certain days and hours
+            </label>
+            {rule.earningWindow.enabled && (
+              <div className="mt-3 space-y-3 text-zinc-800">
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Days">
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d, i) => {
+                    const on = rule.earningWindow.days.includes(i);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setWindow({ days: on ? rule.earningWindow.days.filter((x) => x !== i) : [...rule.earningWindow.days, i] })}
+                        className={`min-h-[40px] px-3 rounded-full border text-sm font-semibold cursor-pointer ${on ? "border-evergreen bg-mist/60 text-evergreen-deep" : "border-zinc-300 text-zinc-600"}`}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="flex flex-wrap items-center gap-2">
+                  Between
+                  <input type="time" value={rule.earningWindow.from} onChange={(e) => setWindow({ from: e.target.value || "00:00" })} aria-label="From" className="min-h-[44px] rounded-xl border border-zinc-300 px-3" />
+                  and
+                  <input type="time" value={rule.earningWindow.to} onChange={(e) => setWindow({ to: e.target.value || "23:59" })} aria-label="To" className="min-h-[44px] rounded-xl border border-zinc-300 px-3" />
+                  <span className="text-sm text-zinc-500">in your shop&rsquo;s time zone</span>
+                </p>
+                {rule.earningWindow.days.length === 0 && <p className="text-sm text-rose-700">Pick at least one day.</p>}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="font-display text-lg font-bold text-evergreen-deep">Bonus offers</h3>
+            <p className="text-sm text-zinc-600 mt-0.5">Earn more for a limited time, such as double {unit} on Fridays.</p>
+            <ul className="mt-4 space-y-3">
+              {rule.multipliers.map((m, i) => (
+                <li key={m.id} className="rounded-2xl border border-zinc-200 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2 text-zinc-800">
+                    <input
+                      aria-label="Offer name"
+                      value={m.label}
+                      maxLength={60}
+                      onChange={(e) => setMultipliers(rule.multipliers.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
+                      className="min-h-[44px] flex-1 min-w-[10rem] rounded-xl border border-zinc-300 px-3 focus:outline-none focus:ring-2 focus:ring-evergreen"
+                    />
+                    <span>earns</span>
+                    {numberField(m.percent, (n) => setMultipliers(rule.multipliers.map((x, j) => (j === i ? { ...x, percent: Math.min(1000, Math.max(101, n)) } : x))), 101)}
+                    <span>% of the usual {unit}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-700">
+                    From
+                    <input
+                      type="datetime-local"
+                      aria-label="Offer starts"
+                      value={toLocalInput(m.startsAt)}
+                      onChange={(e) => setMultipliers(rule.multipliers.map((x, j) => (j === i ? { ...x, startsAt: fromLocalInput(e.target.value) } : x)))}
+                      className="min-h-[44px] rounded-xl border border-zinc-300 px-3"
+                    />
+                    to
+                    <input
+                      type="datetime-local"
+                      aria-label="Offer ends"
+                      value={toLocalInput(m.endsAt)}
+                      onChange={(e) => setMultipliers(rule.multipliers.map((x, j) => (j === i ? { ...x, endsAt: fromLocalInput(e.target.value) } : x)))}
+                      className="min-h-[44px] rounded-xl border border-zinc-300 px-3"
+                    />
+                    <button type="button" onClick={() => setMultipliers(rule.multipliers.filter((_, j) => j !== i))} className="ml-auto text-sm font-semibold text-rose-700 hover:underline cursor-pointer">
+                      Remove
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => {
+                const start = new Date();
+                const end = new Date(start.getTime() + 24 * 3600_000);
+                setMultipliers([...rule.multipliers, { id: crypto.randomUUID().slice(0, 8), label: "Double points", percent: 200, startsAt: start.toISOString(), endsAt: end.toISOString() }]);
+              }}
+              disabled={rule.multipliers.length >= 20}
+              className="press mt-3 min-h-[44px] px-5 rounded-full border border-zinc-300 text-sm font-semibold text-zinc-800 hover:border-evergreen cursor-pointer disabled:opacity-50"
+            >
+              Add a bonus offer
+            </button>
+          </div>
+
+          <div>
+            <h3 className="font-display text-lg font-bold text-evergreen-deep">Loyalty levels</h3>
+            <label className="mt-3 flex items-center gap-3 text-zinc-800 cursor-pointer">
+              <input type="checkbox" checked={rule.tiers.enabled} onChange={(e) => setTiers({ enabled: e.target.checked })} className="w-5 h-5 accent-evergreen" />
+              Give regular customers levels (like Silver and Gold)
+            </label>
+            {rule.tiers.enabled && (
+              <div className="mt-3 space-y-3 text-zinc-800">
+                <p className="flex flex-wrap items-center gap-2">
+                  Count {unit} earned in the last {numberField(rule.tiers.qualificationMonths, (n) => setTiers({ qualificationMonths: Math.min(36, n) }), 1)} months. A customer who earns less than a level needs drops back down.
+                </p>
+                <ul className="space-y-2">
+                  {rule.tiers.levels.map((l, i) => (
+                    <li key={i} className="flex flex-wrap items-center gap-2 rounded-2xl border border-zinc-200 p-3">
+                      <input
+                        aria-label="Level name"
+                        value={l.name}
+                        maxLength={30}
+                        onChange={(e) => setTiers({ levels: rule.tiers.levels.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)) })}
+                        className="min-h-[44px] w-32 rounded-xl border border-zinc-300 px-3 focus:outline-none focus:ring-2 focus:ring-evergreen"
+                      />
+                      <span>from</span>
+                      {numberField(l.minPoints, (n) => setTiers({ levels: rule.tiers.levels.map((x, j) => (j === i ? { ...x, minPoints: n } : x)) }), 1)}
+                      <span>{unit}, earns</span>
+                      {numberField(l.earnPercent, (n) => setTiers({ levels: rule.tiers.levels.map((x, j) => (j === i ? { ...x, earnPercent: Math.min(500, n) } : x)) }), 100)}
+                      <span>%</span>
+                      <button type="button" onClick={() => setTiers({ levels: rule.tiers.levels.filter((_, j) => j !== i) })} className="ml-auto text-sm font-semibold text-rose-700 hover:underline cursor-pointer">
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-sm text-zinc-500">100% is the normal rate, 150% earns half as much again on every purchase.</p>
+                <button
+                  type="button"
+                  onClick={() => setTiers({ levels: [...rule.tiers.levels, { name: "Silver", minPoints: 100, earnPercent: 110 }] })}
+                  disabled={rule.tiers.levels.length >= 6}
+                  className="press min-h-[44px] px-5 rounded-full border border-zinc-300 text-sm font-semibold text-zinc-800 hover:border-evergreen cursor-pointer disabled:opacity-50"
+                >
+                  Add a level
+                </button>
+              </div>
+            )}
+          </div>
+
           <div>
             <h3 className="font-display text-lg font-bold text-evergreen-deep">Limits</h3>
             <p className="text-sm text-zinc-600 mt-0.5">These stop mistakes and misuse at the till.</p>
@@ -263,6 +545,18 @@ export function EarningRulesEditor({ symbol = "£" }: { symbol?: string }) {
                 Give {numberField(rule.bonuses.birthdayPoints, (n) => setBonuses({ birthdayPoints: n }), 0)} {unit} on their birthday
                 <span className="text-sm text-zinc-500">(for customers who add their birthday)</span>
               </p>
+              <p className="flex flex-wrap items-center gap-2">
+                Give {numberField(rule.bonuses.referralPoints, (n) => setBonuses({ referralPoints: n }), 0)} {unit} to both when a friend they invite makes their first purchase
+              </p>
+              <p className="flex flex-wrap items-center gap-2">
+                Email customers who haven&rsquo;t been back for {numberField(rule.journeys.inactivityDays, (n) => setRule({ ...rule, journeys: { ...rule.journeys, inactivityDays: Math.min(730, n) } }), 0)} days
+                <span className="text-sm text-zinc-500">(0 means off; only customers who said yes to offers, once per quiet spell)</span>
+              </p>
+              {rule.bonuses.referralPoints > 0 && (
+                <p className="flex flex-wrap items-center gap-2">
+                  Reward each customer for at most {numberField(rule.bonuses.maxReferralsPerMember, (n) => setBonuses({ maxReferralsPerMember: n }), 1)} friends
+                </p>
+              )}
             </div>
           </div>
 

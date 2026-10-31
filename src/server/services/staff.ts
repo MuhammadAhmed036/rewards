@@ -1,4 +1,6 @@
 import { db } from "../db";
+import { assertGrowthAllowed } from "./billing";
+import { emitEvent } from "./events";
 import { staffMembers, users, staffLocationScopes, locations, tenants, staffInvitations, memberships } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
 import { invalidateUserSessions, hashPassword } from "../auth";
@@ -21,6 +23,7 @@ export interface AddStaffParams {
 export async function addStaffMember(ctx: RequestContext, params: AddStaffParams) {
   assertCan(ctx, "staff.manage");
   if (!ctx.tenantId) throw new Error("tenantId required");
+  await assertGrowthAllowed(ctx.tenantId, "Adding team members");
 
   const normalizedEmail = params.email.toLowerCase().trim();
 
@@ -142,6 +145,7 @@ export async function addStaffMember(ctx: RequestContext, params: AddStaffParams
       payload: { businessName: tenant?.name, role: params.role, isNewAccount: false, url: `${getBaseUrl()}/login` },
     }).catch(() => undefined);
   }
+  await emitEvent(ctx.tenantId, "staff.invited", { staffMemberId: created.staff.id, role: params.role, invited: created.needsInvite });
   return created.staff;
 }
 
@@ -357,6 +361,9 @@ export async function updateStaffMember(
     targetId: existing.id,
     metadata: { changes: params },
   });
+  if (params.role && params.role !== existing.role) {
+    await emitEvent(ctx.tenantId, "staff.role_changed", { staffMemberId: existing.id, from: existing.role, to: params.role });
+  }
 
   return updated;
 }

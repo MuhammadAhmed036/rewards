@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
 // Currencies and languages the app can show today; add more here as they're supported
 const CURRENCIES = ["GBP", "EUR", "USD", "PKR", "AED", "SAR", "INR", "CAD", "AUD"] as const;
-const LOCALES = ["en-GB", "en-US", "en-IE", "en-AU", "en-CA", "en-PK", "en-IN", "en-AE"] as const;
+const LOCALES = ["en-GB", "en-US", "en-IE", "en-AU", "en-CA", "en-PK", "en-IN", "en-AE", "es-ES", "es-MX", "ur-PK"] as const;
 
 const updateSchema = z
   .object({

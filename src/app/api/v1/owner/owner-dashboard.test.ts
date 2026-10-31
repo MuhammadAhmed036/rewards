@@ -37,6 +37,8 @@ describe("Owner Dashboard API & Reports (M7)", () => {
     });
 
     const ownerToken = business.session.token;
+    // Exports, point changes and team changes need a recent password confirmation (Section 8)
+    await db.update(sessions).set({ reauthedAt: new Date() }).where(eq(sessions.token, (await sessionLookupKey(ownerToken))!));
     const tenantId = business.tenant.id;
     const locationId = business.location.id;
 

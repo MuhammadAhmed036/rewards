@@ -26,14 +26,15 @@ export async function checkPortalAccess(
   tenantSlug?: string
 ): Promise<{ ok: true } | PortalDenial> {
   const [user] = await db
-    .select({ isPlatformAdmin: users.isPlatformAdmin })
+    .select({ isPlatformAdmin: users.isPlatformAdmin, isSupportAgent: users.isSupportAgent })
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
   const isAdmin = Boolean(user?.isPlatformAdmin);
 
   if (portal === "admin") {
-    return isAdmin
+    // The platform team signs in here, support agents included
+    return isAdmin || user?.isSupportAgent
       ? { ok: true }
       : {
           ok: false,
@@ -111,11 +112,11 @@ export async function checkPortalAccess(
 /** True for owners, staff and platform admins — accounts that can never be customer cards. */
 export async function isBusinessAccount(userId: string): Promise<boolean> {
   const [user] = await db
-    .select({ isPlatformAdmin: users.isPlatformAdmin })
+    .select({ isPlatformAdmin: users.isPlatformAdmin, isSupportAgent: users.isSupportAgent })
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
-  if (user?.isPlatformAdmin) return true;
+  if (user?.isPlatformAdmin || user?.isSupportAgent) return true;
   const [staff] = await db
     .select({ id: staffMembers.id })
     .from(staffMembers)

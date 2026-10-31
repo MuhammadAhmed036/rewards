@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { emitEvent } from "./events";
 import {
   tenants,
   locations,
@@ -242,6 +243,9 @@ export async function updateTenantByAdmin(
       }
     }
 
+    if (input.status === "suspended" && existing.status !== "suspended") {
+      await emitEvent(tenantId, "tenant.suspended", { reason: input.reason });
+    }
     const action =
       input.status === "suspended"
         ? "tenant.suspended"

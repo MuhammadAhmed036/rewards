@@ -4,7 +4,8 @@ import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/url";
 import { logger } from "@/lib/logger";
 import { eq, and, lte, or, inArray, asc } from "drizzle-orm";
-import nodemailer from "nodemailer";
+import { isSuppressed, recordEmailEvent, suppressEmail } from "./email-events";
+import nodemailer, { type SendMailOptions } from "nodemailer";
 
 export type EmailTemplate =
   | "magic_link"
@@ -17,6 +18,7 @@ export type EmailTemplate =
   | "owner_business_registered"
   | "email_verification"
   | "password_reset"
+  | "security_code"
   | "campaign"
   | "points_expiring";
 
@@ -87,6 +89,14 @@ export async function sendEmailNow(options: QueueEmailOptions) {
   } catch (err) {
     logger.error({ err }, "Immediate email send crashed; queued for retry");
   }
+  // The mail server is answering, so use this moment to clear a few emails an earlier hiccup left waiting.
+  // (Scheduled retries only run once a day on this hosting plan.)
+  if (sent) {
+    await processOutbox(3).catch((err) => logger.warn({ err }, "Clearing waiting emails failed"));
+    // Same idea for offers scheduled for a time that has now passed
+    const { runDueCampaigns } = await import("./campaigns");
+    await runDueCampaigns().catch((err) => logger.warn({ err }, "Sending due offers failed"));
+  }
   return { ...entry, sent };
 }
 
@@ -149,6 +159,25 @@ The link works for 30 minutes and only once. If it wasn't you, ignore this email
           url,
           "If it wasn't you, ignore this email. Your password stays the same."
         ),
+      };
+    }
+    case "security_code": {
+      const code = String(payload.code || "");
+      const reason =
+        payload.purpose === "login" ? "sign in" : payload.purpose === "mfa_enable" ? "turn on sign-in codes" : "confirm a sensitive action";
+      return {
+        subject: `Your ${appName} code: ${code}`,
+        text: `Your code to ${reason} is ${code}.
+
+It works once, for 10 minutes. If you didn't ask for it, ignore this email and consider changing your password.`,
+        html: `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #26302d;">
+      <h2 style="margin: 0 0 12px;">Your code</h2>
+      <p style="line-height: 1.5; font-size: 16px; color: #45474b;">Use this code to ${reason}. It works once, for 10 minutes.</p>
+      <p style="margin: 24px 0; font-size: 34px; letter-spacing: 8px; font-weight: 700; color: #495e57;">${code}</p>
+      <p style="font-size: 13px; color: #6c7476;">If you didn't ask for it, ignore this email and consider changing your password.</p>
+    </div>
+  `,
       };
     }
     case "staff_invitation": {
@@ -255,7 +284,8 @@ The link works for 30 minutes and only once. If it wasn't you, ignore this email
       const businessName = String(payload.businessName || "the shop");
       const subject = String(payload.subject || `News from ${businessName}`);
       const body = String(payload.body || "");
-      const url = String(payload.hubUrl || appUrl);
+      // clickUrl is a tracked link to the same place (added when the email is sent)
+      const url = String(payload.clickUrl || payload.hubUrl || appUrl);
       const escape = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const paragraphs = escape(body)
         .split(/\n{2,}/)
@@ -357,6 +387,31 @@ You're getting this because you said yes to offers from ${businessName}.${payloa
   }
 }
 
+/** A refused login or address won't get better by trying again; a dropped connection or timeout might. */
+function isTemporarySmtpError(err: unknown) {
+  const e = err as { code?: string; responseCode?: number };
+  if (e.code === "EAUTH" || e.code === "EENVELOPE") return false;
+  if (typeof e.responseCode === "number" && e.responseCode >= 500 && e.responseCode < 600) return false;
+  return true;
+}
+
+/** The mail server said this address does not exist or refuses mail: retrying will never help. */
+function isHardBounce(err: unknown) {
+  const e = err as { responseCode?: number };
+  return typeof e.responseCode === "number" && [550, 551, 553, 554].includes(e.responseCode);
+}
+
+/** One quick second try for a temporary hiccup, so a blip doesn't push an email to the next retry run. */
+async function sendMailWithRetry(transporter: ReturnType<typeof nodemailer.createTransport>, message: SendMailOptions) {
+  try {
+    return await transporter.sendMail(message);
+  } catch (err) {
+    if (!isTemporarySmtpError(err)) throw err;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return await transporter.sendMail(message);
+  }
+}
+
 /**
  * Creates SMTP transport targeting local Mailpit or configured SMTP server
  */
@@ -421,10 +476,15 @@ export async function processOutbox(
   let failedCount = 0;
 
   for (const row of rows) {
-    const rendered = renderEmailTemplate(
-      row.template as EmailTemplate,
-      row.payload as Record<string, unknown>
-    );
+    // Offers never go to an address that bounced or complained before
+    if (row.kind === "marketing" && (await isSuppressed(row.toEmail))) {
+      await db.update(emailOutbox).set({ status: "dead", lastError: "Address is on the suppression list" }).where(eq(emailOutbox.id, row.id));
+      const { emitEvent } = await import("./events");
+      await emitEvent(row.tenantId, "campaign.suppressed", { campaignId: (row.payload as { campaignId?: string }).campaignId ?? null, reason: "suppression_list" });
+      continue;
+    }
+    const payload = row.template === "campaign" ? { ...(row.payload as Record<string, unknown>), clickUrl: `${getBaseUrl()}/e/c/${row.id}` } : (row.payload as Record<string, unknown>);
+    const rendered = renderEmailTemplate(row.template as EmailTemplate, payload);
 
     try {
       const fromEmail =
@@ -432,7 +492,7 @@ export async function processOutbox(
           ? env.EMAIL_FROM_TRANSACTIONAL.trim()
           : env.SMTP_USER?.trim() || "no-reply@rewards-program-xi.vercel.app";
 
-      await transporter.sendMail({
+      await sendMailWithRetry(transporter, {
         from: fromEmail,
         to: row.toEmail,
         subject: rendered.subject,
@@ -446,6 +506,8 @@ export async function processOutbox(
           status: "sent",
           sentAt: new Date(),
           lastError: null,
+          // A sign-in code has done its job once emailed; don't keep it readable in the outbox
+          ...(row.template === "security_code" ? { payload: { purpose: (row.payload as { purpose?: string }).purpose } } : {}),
         })
         .where(eq(emailOutbox.id, row.id));
 
@@ -453,10 +515,21 @@ export async function processOutbox(
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "SMTP Send Error";
       const newAttempts = row.attempts + 1;
-      const isDead = newAttempts >= 5;
+      const hardBounce = isHardBounce(err);
+      const isDead = newAttempts >= 5 || hardBounce;
+      if (hardBounce) {
+        await suppressEmail(row.toEmail, "bounce");
+        await recordEmailEvent({
+          type: "bounce",
+          tenantId: row.tenantId,
+          outboxId: row.id,
+          campaignId: (row.payload as { campaignId?: string }).campaignId ?? null,
+          detail: errorMsg,
+        });
+      }
 
-      // Exponential backoff: 2^attempts minutes
-      const nextAttempt = new Date(Date.now() + Math.pow(2, newAttempts) * 60 * 1000);
+      // Exponential backoff: 1, 2, 4, 8 minutes
+      const nextAttempt = new Date(Date.now() + Math.pow(2, newAttempts - 1) * 60 * 1000);
 
       await db
         .update(emailOutbox)

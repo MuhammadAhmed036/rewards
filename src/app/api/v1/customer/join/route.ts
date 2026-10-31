@@ -16,6 +16,8 @@ const joinSchema = z.object({
   name: z.string().optional(),
   marketingOptIn: z.boolean().optional(),
   locationPublicId: z.string().optional(),
+  // A friend's member number, from an invite link
+  referralCode: z.string().max(16).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -94,7 +96,8 @@ export async function POST(request: NextRequest) {
     if (err instanceof RateLimitError) {
       return rateLimitResponse(err);
     }
-    const msg = err instanceof Error ? err.message : "Failed to join programme";
+    // Messages like "EMAIL_BLOCKED: ..." carry a code in front; the customer only needs the sentence
+    const msg = (err instanceof Error ? err.message : "Failed to join programme").replace(/^[A-Z_]+:\s*/, "");
     const isDuplicate = msg.toLowerCase().includes("already exists");
     return NextResponse.json(
       {

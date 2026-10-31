@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { SecuritySettings } from "@/components/auth/SecuritySettings";
+import { SupportAgentsPanel } from "@/components/dashboard/SupportAgentsPanel";
+import { TenantBillingModal } from "@/components/dashboard/TenantBillingModal";
 import {
   ShieldAlert,
   Building2,
@@ -102,6 +105,7 @@ export default function PlatformAdminPage() {
 
   // Modals
   const [selectedTenant, setSelectedTenant] = useState<TenantSummary | null>(null);
+  const [billingTenant, setBillingTenant] = useState<TenantSummary | null>(null);
   const [actionType, setActionType] = useState<"suspend" | "reactivate" | "plan" | "delete" | null>(null);
   const [reason, setReason] = useState("");
   const [confirmName, setConfirmName] = useState("");
@@ -655,6 +659,9 @@ export default function PlatformAdminPage() {
                                 Reactivate
                               </Button>
                             )}
+                            <Button size="sm" variant="outline" onClick={() => setBillingTenant(t)} className="border-slate-700 text-slate-300 text-xs">
+                              Billing
+                            </Button>
                             <Button
                               size="sm"
                               variant="outline"
@@ -937,7 +944,11 @@ export default function PlatformAdminPage() {
             </Card>
           </div>
         )}
+        <SupportAgentsPanel />
+        <SecuritySettings />
       </main>
+
+      {billingTenant && <TenantBillingModal tenantId={billingTenant.id} tenantName={billingTenant.name} onClose={() => setBillingTenant(null)} />}
 
       {/* Action Modal (Suspend / Reactivate / Plan) */}
       {selectedTenant && actionType && (

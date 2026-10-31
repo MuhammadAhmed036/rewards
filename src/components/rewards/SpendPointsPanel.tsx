@@ -1,4 +1,5 @@
 "use client";
+import { isOffline, networkAwareMessage, OFFLINE_MESSAGE } from "@/lib/use-online";
 
 import React, { useEffect, useState } from "react";
 import { CheckCircle2, Gift, ShoppingBag } from "lucide-react";
@@ -63,6 +64,10 @@ export function SpendPointsPanel({
 
   const confirm = async () => {
     if (!pending) return;
+    if (isOffline()) {
+      setError(OFFLINE_MESSAGE);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -81,7 +86,7 @@ export function SpendPointsPanel({
       setNote("");
       onSpent?.(json.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't use the points.");
+      setError(networkAwareMessage(err, "Couldn't use the points."));
     } finally {
       setBusy(false);
     }

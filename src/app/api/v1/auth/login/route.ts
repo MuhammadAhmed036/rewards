@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { users, tenants } from "@/server/db/schema";
-import { verifyPassword, createSession, getSessionContext, deleteSession, sessionKindForUser } from "@/server/auth";
-import { setSessionCookie } from "@/server/auth/session-response";
+import { users } from "@/server/db/schema";
+import { verifyPassword } from "@/server/auth";
+import { completeSignIn } from "@/server/auth/sign-in";
+import { issueEmailCode, CodeError } from "@/server/services/email-codes";
+import crypto from "crypto";
 import { checkPortalAccess } from "@/server/auth/portal-access";
 import { checkLoginRateLimit, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+
+/** "j***@gmail.com": enough to recognise the inbox without handing it to a stranger. */
+function maskEmail(email: string) {
+  const [name, domain] = email.split("@");
+  return `${name.slice(0, 1)}***@${domain}`;
+}
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -60,74 +68,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Session length depends on who is signing in: admins and staff get short sessions, customers long ones.
-    const kind = await sessionKindForUser(user.id);
-    const userAgent = request.headers.get("user-agent") || undefined;
-    const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined;
-
-    const session = await createSession(user.id, kind, userAgent, ipAddress);
-
-    // Resolve context to get role and tenant
-    const ctx = await getSessionContext(session.token);
-
-    // If user is owner or staff, verify business approval status
-    if (ctx?.tenantId && !user.isPlatformAdmin) {
-      const [tenant] = await db
-        .select({ id: tenants.id, status: tenants.status, name: tenants.name })
-        .from(tenants)
-        .where(eq(tenants.id, ctx.tenantId))
-        .limit(1);
-
-      if (tenant?.status === "pending" || tenant?.status === "suspended") {
-        // Don't leave a usable session behind for an account that can't sign in yet.
-        await deleteSession(session.token);
+    // Some people ask for an emailed code after the password; the sign-in finishes on /login/verify
+    if (user.mfaEmailEnabled) {
+      const challengeId = crypto.randomUUID();
+      try {
+        await issueEmailCode({ userId: user.id, email: user.email, purpose: "login", challengeId });
+      } catch (err) {
+        if (err instanceof CodeError) {
+          return NextResponse.json({ error: { code: err.code, message: err.message } }, { status: 502 });
+        }
+        throw err;
       }
-
-      if (tenant?.status === "pending") {
-        return NextResponse.json(
-          {
-            error: {
-              code: "PENDING_APPROVAL",
-              message:
-                "Your business registration is pending approval by the Super Admin. You will be able to log in once approved.",
-            },
-          },
-          { status: 403 }
-        );
-      }
-
-      if (tenant?.status === "suspended") {
-        return NextResponse.json(
-          {
-            error: {
-              code: "TENANT_SUSPENDED",
-              message:
-                "Your business account has been suspended. Please contact platform support.",
-            },
-          },
-          { status: 403 }
-        );
-      }
+      return NextResponse.json({
+        success: true,
+        data: { mfaRequired: true, challenge: `${user.id}.${challengeId}`, emailHint: maskEmail(user.email) },
+      });
     }
 
-    const response = NextResponse.json({
-      success: true,
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          isPlatformAdmin: user.isPlatformAdmin,
-          role: ctx?.role || "customer",
-          tenantId: ctx?.tenantId || null,
-        },
-      },
-    });
-
-    // Set HTTP-only session cookie
-    setSessionCookie(response, session);
-
-    return response;
+    return await completeSignIn(request, user);
   } catch (error) {
     if (error instanceof RateLimitError) {
       return rateLimitResponse(error);

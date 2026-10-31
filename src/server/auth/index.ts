@@ -52,11 +52,12 @@ export type { SessionKind };
 /** Session kind for a user: platform admins and active staff get short sessions, everyone else is a customer. */
 export async function sessionKindForUser(userId: string, executor: DbExecutor = db): Promise<SessionKind> {
   const [user] = await executor
-    .select({ isPlatformAdmin: users.isPlatformAdmin })
+    .select({ isPlatformAdmin: users.isPlatformAdmin, isSupportAgent: users.isSupportAgent })
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
-  if (user?.isPlatformAdmin) return "admin";
+  // Support agents get the same short, strict session as admins
+  if (user?.isPlatformAdmin || user?.isSupportAgent) return "admin";
 
   const [staff] = await executor
     .select({ id: staffMembers.id })
@@ -210,7 +211,7 @@ export async function getSessionContext(
           )
         );
 
-  const kind: SessionKind = user.isPlatformAdmin ? "admin" : staffRows.length > 0 ? "staff" : "customer";
+  const kind: SessionKind = user.isPlatformAdmin || user.isSupportAgent ? "admin" : staffRows.length > 0 ? "staff" : "customer";
   const policy = SESSION_POLICY[kind];
 
   // Absolute limit: staff and admin sessions end a fixed time after sign-in, however active.
@@ -242,6 +243,11 @@ export async function getSessionContext(
       requestId,
       isPlatformAdmin: true,
     };
+  }
+
+  // 1b. Support agent: looks at a business only through the support area, and only while its owner allows it
+  if (user.isSupportAgent) {
+    return { userId: user.id, tenantId: undefined, role: "support_agent", requestId, isPlatformAdmin: false };
   }
 
   // 2. Tenant Staff check

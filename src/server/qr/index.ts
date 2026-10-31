@@ -35,6 +35,48 @@ export function generateMemberQrToken(
   return `LP1.${membershipPublicId}.${qrVersion}.${hmac}`;
 }
 
+/** A live QR code is only good for this long, so a photo of it is useless a moment later (FR-039). */
+export const LIVE_QR_WINDOW_SECONDS = 30;
+// One window either side is accepted, so a slow scan or a slightly wrong phone clock still works
+const LIVE_QR_GRACE_WINDOWS = 1;
+
+const liveSlot = (nowMs: number) => Math.floor(nowMs / 1000 / LIVE_QR_WINDOW_SECONDS);
+
+function liveSignature(publicId: string, qrVersion: number, slot: number, secret: string) {
+  return crypto.createHmac("sha256", secret).update(`LP2.${publicId}.${qrVersion}.${slot}`).digest("base64url").slice(0, 24);
+}
+
+/** Member QR that changes every 30 seconds: LP2.{membershipPublicId}.{qrVersion}.{slot}.{hmac} */
+export function generateLiveQrToken(membershipPublicId: string, qrVersion: number, nowMs: number = Date.now(), secret: string = env.QR_SIGNING_SECRET): string {
+  const slot = liveSlot(nowMs);
+  return `LP2.${membershipPublicId}.${qrVersion}.${slot}.${liveSignature(membershipPublicId, qrVersion, slot, secret)}`;
+}
+
+export interface VerifyAnyQrResult extends VerifyMemberQrResult {
+  live?: boolean;
+  slot?: number;
+}
+
+/** Checks either kind of member QR: the printed one (LP1) or the live one (LP2, which also has to be recent). */
+export function verifyAnyMemberQrToken(token: string, nowMs: number = Date.now(), secret: string = env.QR_SIGNING_SECRET): VerifyAnyQrResult {
+  if (typeof token === "string" && token.startsWith("LP2.")) {
+    const parts = token.split(".");
+    if (parts.length !== 5) return { valid: false, error: "Unsupported QR protocol or malformed token" };
+    const [, publicId, versionStr, slotStr, signature] = parts;
+    const qrVersion = parseInt(versionStr, 10);
+    const slot = parseInt(slotStr, 10);
+    if (isNaN(qrVersion) || qrVersion < 1 || isNaN(slot)) return { valid: false, error: "Invalid QR code" };
+    const expected = Buffer.from(liveSignature(publicId, qrVersion, slot, secret));
+    const given = Buffer.from(signature);
+    if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) return { valid: false, error: "Invalid or tampered QR signature" };
+    if (Math.abs(liveSlot(nowMs) - slot) > LIVE_QR_GRACE_WINDOWS) {
+      return { valid: false, error: "This QR code has expired. Ask the customer to hold up their card again so it refreshes." };
+    }
+    return { valid: true, membershipPublicId: publicId, qrVersion, live: true, slot };
+  }
+  return { ...verifyMemberQrToken(token, secret), live: false };
+}
+
 export interface VerifyMemberQrResult {
   valid: boolean;
   membershipPublicId?: string;

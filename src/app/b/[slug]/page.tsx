@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, use, useCallback } from "react";
+import { loginRequest } from "@/lib/security-client";
+import { isOffline, OFFLINE_MESSAGE } from "@/lib/use-online";
+import { LANGS, LOCALES, isLang, langFromLocale, t as translate, type Lang, type MessageKey } from "@/lib/i18n";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -41,6 +44,7 @@ interface HubPayload {
     name: string;
     brandPrimaryHex: string;
     logoUrl?: string | null;
+    locale?: string;
   };
   programme: {
     name: string;
@@ -48,6 +52,10 @@ interface HubPayload {
     status?: "published" | "paused";
     earningRule?: string | null;
     expiryRule?: string | null;
+    activeBoost?: { label: string; percent: number; endsAt: string | null } | null;
+    tierLevels?: Array<{ name: string; minPoints: number; earnPercent: number }>;
+    tierMonths?: number;
+    referralPoints?: number;
   };
   member: {
     membershipId: string;
@@ -58,6 +66,9 @@ interface HubPayload {
     qrToken: string;
     qrDataUrl: string;
     stampCards?: StampCardData[];
+    rotatingQr?: boolean;
+    tier?: { name: string | null; earnPercent: number; next: string | null; pointsToNext: number; earnedInWindow: number } | null;
+    referralCode?: string;
     recentHistory: Array<{
       id: string;
       type: string;
@@ -118,6 +129,48 @@ export default function BusinessHubPage(props: {
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [joining, setJoining] = useState(false);
+  // A friend's invite link carries their code: ?ref=ABCD1234
+  const [refCode, setRefCode] = useState("");
+  const [inviteCopied, setInviteCopied] = useState(false);
+  // The customer's language: their own choice if they made one, otherwise the business's locale
+  const [chosenLang, setChosenLang] = useState<Lang | null>(null);
+  useEffect(() => {
+    const saved = window.localStorage.getItem("lp_lang");
+    if (isLang(saved)) setChosenLang(saved);
+  }, []);
+  // The page reads right to left for languages that do (Urdu)
+  const shownLocale = hubData?.tenant.locale;
+  useEffect(() => {
+    const l = chosenLang ?? langFromLocale(shownLocale);
+    document.documentElement.lang = l;
+    document.documentElement.dir = LOCALES[l].dir;
+    return () => {
+      document.documentElement.lang = "en";
+      document.documentElement.dir = "ltr";
+    };
+  }, [chosenLang, shownLocale]);
+  // A live QR code changes every 30 seconds, so keep the card's copy fresh while it is open
+  const liveQr = hubData?.member?.rotatingQr;
+  useEffect(() => {
+    if (!liveQr) return;
+    const refresh = async () => {
+      if (document.hidden) return;
+      const res = await fetch(`/api/v1/customer/qr?slug=${encodeURIComponent(slug)}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const { data } = await res.json();
+      setHubData((prev) => (prev && prev.member ? { ...prev, member: { ...prev.member, qrToken: data.qrToken, qrDataUrl: data.qrDataUrl } } : prev));
+    };
+    const timer = setInterval(refresh, 25_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [liveQr, slug]);
+  useEffect(() => {
+    const r = new URLSearchParams(window.location.search).get("ref");
+    if (r) setRefCode(r.toUpperCase().slice(0, 16));
+  }, []);
 
   // Customer Existing Member Sign In State
   const [customerLoginEmail, setCustomerLoginEmail] = useState("");
@@ -415,6 +468,7 @@ export default function BusinessHubPage(props: {
           password: joinPassword.trim() || undefined,
           name: joinName.trim() || undefined,
           marketingOptIn,
+          referralCode: refCode || undefined,
         }),
       });
       const json = await res.json();
@@ -454,17 +508,12 @@ export default function BusinessHubPage(props: {
     setCustomerLoggingIn(true);
     setErrorMsg(null);
     try {
-      const res = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const { res, json } = await loginRequest({
           email: customerLoginEmail.trim(),
           password: customerLoginPassword,
           portal: "customer",
           tenantSlug: slug,
-        }),
-      });
-      const json = await res.json();
+        });
       if (!res.ok) {
         if (json.error?.code === "NOT_A_MEMBER") {
           // Registered elsewhere but not here: take them to "New here" with their email filled in
@@ -498,17 +547,12 @@ export default function BusinessHubPage(props: {
     setStaffLoggingIn(true);
     setErrorMsg(null);
     try {
-      const res = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const { res, json } = await loginRequest({
           email: staffEmail.trim(),
           password: staffPassword,
           portal: "staff",
           tenantSlug: slug,
-        }),
-      });
-      const json = await res.json();
+        });
       if (!res.ok) throw new Error(json.error?.message || "Invalid staff credentials");
       // Redirect to staff scanner terminal
       window.location.href = "/staff";
@@ -529,17 +573,12 @@ export default function BusinessHubPage(props: {
     setOwnerLoggingIn(true);
     setErrorMsg(null);
     try {
-      const res = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const { res, json } = await loginRequest({
           email: ownerEmail.trim(),
           password: ownerPassword,
           portal: "owner",
           tenantSlug: slug,
-        }),
-      });
-      const json = await res.json();
+        });
       if (!res.ok) {
         if (json.error?.code === "PENDING_APPROVAL") {
           throw new Error("⏳ Your business registration is pending approval by the Super Admin.");
@@ -568,6 +607,10 @@ export default function BusinessHubPage(props: {
   // Handle Request Redemption
   const handleStartRedeem = async (rewardId: string, rewardTitle: string, costPoints: number) => {
     if (!hubData?.member) return;
+    if (isOffline()) {
+      setErrorMsg(OFFLINE_MESSAGE);
+      return;
+    }
     setErrorMsg(null);
     try {
       const res = await fetch("/api/v1/customer/redeem", {
@@ -625,6 +668,9 @@ export default function BusinessHubPage(props: {
   const member = hubData.member;
   const isStamps = hubData.programme.type === "stamps";
   const unitWord: "points" | "stamps" = isStamps ? "stamps" : "points";
+  const lang: Lang = chosenLang ?? langFromLocale(hubData.tenant.locale);
+  const tr = (key: MessageKey, vars?: Record<string, string | number>) => translate(lang, key, vars);
+  const unitText = tr(unitWord);
 
   // Calculate next reward progress
   const nextLockedReward = hubData.rewards
@@ -667,6 +713,27 @@ export default function BusinessHubPage(props: {
 
             {/* Header Right Actions / Role Switcher */}
             <div className={`flex items-center gap-2.5 ${member ? "shrink-0" : "flex-col sm:flex-row items-stretch w-full sm:w-auto"}`}>
+              <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                <span className="sr-only">{tr("language")}</span>
+                <select
+                  value={lang}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (isLang(next)) {
+                      setChosenLang(next);
+                      window.localStorage.setItem("lp_lang", next);
+                    }
+                  }}
+                  aria-label={tr("language")}
+                  className="min-h-[40px] rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-evergreen"
+                >
+                  {LANGS.map((l) => (
+                    <option key={l} value={l}>
+                      {LOCALES[l].label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               {/* Role switcher: only for visitors who are not signed in to their card */}
               {!member && (
               <div className="flex bg-white p-1 border border-slate-200 rounded-full text-sm font-semibold w-full sm:w-auto overflow-x-auto">
@@ -1073,10 +1140,61 @@ export default function BusinessHubPage(props: {
                       ) : (
                         hubData.programme.earningRule && (
                           <p className="rise-in mt-3 text-zinc-600" style={{ "--d": "350ms" } as React.CSSProperties}>
-                            You get {hubData.programme.earningRule}.
+                            {tr("you_get", { rule: hubData.programme.earningRule })}
                             {hubData.programme.expiryRule && <> {hubData.programme.expiryRule}.</>}
                           </p>
                         )
+                      )}
+
+                      {(hubData.programme.activeBoost || member.tier || ((hubData.programme.referralPoints ?? 0) > 0 && member.referralCode)) && (
+                        <div className="rise-in mt-5 max-w-md space-y-3" style={{ "--d": "380ms" } as React.CSSProperties}>
+                          {hubData.programme.activeBoost && (
+                            <p className="rounded-2xl bg-marigold/25 px-4 py-3 text-sm text-zinc-900">
+                              <strong>{hubData.programme.activeBoost.label}:</strong> earn {hubData.programme.activeBoost.percent}% of the usual {unitWord}
+                              {hubData.programme.activeBoost.endsAt && <> until {new Date(hubData.programme.activeBoost.endsAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</>}.
+                            </p>
+                          )}
+                          {member.tier && (
+                            <p className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-800">
+                              {member.tier.name ? (
+                                <>
+                                  You&rsquo;re <strong>{member.tier.name}</strong>
+                                  {member.tier.earnPercent > 100 && <> and earn {member.tier.earnPercent}% on every purchase</>}.{" "}
+                                </>
+                              ) : (
+                                <>Collect {unitWord} to reach your first level. </>
+                              )}
+                              {member.tier.next && (
+                                <>
+                                  {member.tier.pointsToNext} more {unitWord} in the last {hubData.programme.tierMonths ?? 12} months to reach {member.tier.next}.
+                                </>
+                              )}
+                            </p>
+                          )}
+                          {(hubData.programme.referralPoints ?? 0) > 0 && member.referralCode && (
+                            <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-800">
+                              <p>
+                                {tr("invite_text", { n: hubData.programme.referralPoints ?? 0, unit: unitText })}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const link = `${window.location.origin}/b/${slug}?ref=${member.referralCode}`;
+                                  try {
+                                    await navigator.clipboard.writeText(link);
+                                    setInviteCopied(true);
+                                    setTimeout(() => setInviteCopied(false), 2000);
+                                  } catch {
+                                    window.prompt("Copy your invite link", link);
+                                  }
+                                }}
+                                className="press mt-2 min-h-[40px] px-4 rounded-full border border-zinc-300 text-sm font-semibold text-zinc-800 hover:border-evergreen cursor-pointer"
+                              >
+                                {inviteCopied ? tr("link_copied") : tr("copy_invite")}
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {nextLockedReward && (
@@ -1100,7 +1218,7 @@ export default function BusinessHubPage(props: {
                           className="press inline-flex items-center gap-2 min-h-[48px] px-6 rounded-full bg-evergreen text-white font-semibold hover:bg-evergreen-deep cursor-pointer"
                         >
                           <QrCode className="w-5 h-5" />
-                          Show my QR code
+                          {tr("show_qr")}
                         </button>
                         <a
                           href="#points-menu"
@@ -1154,7 +1272,7 @@ export default function BusinessHubPage(props: {
                       <section className="bg-white rounded-3xl border border-zinc-200 p-5 sm:p-7">
                         <h3 className="font-display text-lg font-bold text-evergreen-deep flex items-center gap-2">
                           <History className="h-5 w-5 text-evergreen" />
-                          Recent activity
+                          {tr("recent_activity")}
                         </h3>
                         {member.recentHistory.length === 0 ? (
                           <p className="mt-4 text-sm text-zinc-500">
@@ -1284,7 +1402,7 @@ export default function BusinessHubPage(props: {
                     {hubData.rewards.length > 0 && (
                       <div className="bg-white rounded-2xl border border-zinc-200/90 shadow-xs p-5 sm:p-6 space-y-3">
                         <span className="text-xs font-semibold text-zinc-400 block">
-                          Rewards you can get
+                          {tr("rewards_you_can_get")}
                         </span>
                         <div className="space-y-2">
                           {hubData.rewards.slice(0, 4).map((r) => (
@@ -1309,12 +1427,12 @@ export default function BusinessHubPage(props: {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
                         <div>
                           <h3 className="text-lg sm:text-xl font-bold text-zinc-950">
-                            {customerAuthMode === "join" ? "Get your loyalty card" : "Sign in to your card"}
+                            {customerAuthMode === "join" ? tr("card_join_title") : tr("card_signin_title")}
                           </h3>
                           <p className="text-xs text-zinc-500 mt-0.5">
                             {customerAuthMode === "join"
-                              ? "It takes about 30 seconds"
-                              : "Enter your email & password to view balance and rewards"}
+                              ? tr("card_join_subtitle")
+                              : tr("card_signin_subtitle")}
                           </p>
                         </div>
 
@@ -1329,7 +1447,7 @@ export default function BusinessHubPage(props: {
                                 : "text-zinc-600 hover:text-zinc-900"
                             }`}
                           >
-                            New here
+                            {tr("tab_new")}
                           </button>
                           <button
                             type="button"
@@ -1340,7 +1458,7 @@ export default function BusinessHubPage(props: {
                                 : "text-zinc-600 hover:text-zinc-900"
                             }`}
                           >
-                            Sign In
+                            {tr("tab_signin")}
                           </button>
                         </div>
                       </div>
@@ -1373,14 +1491,14 @@ export default function BusinessHubPage(props: {
                             />
                           </svg>
                           <span>
-                            {customerAuthMode === "join" ? "Join with Google" : "Sign in with Google"}
+                            {customerAuthMode === "join" ? tr("join_google") : tr("signin_google")}
                           </span>
                         </a>
 
                         <div className="flex items-center my-4">
                           <div className="flex-1 border-t border-zinc-200" />
                           <span className="px-3 text-xs font-semibold text-zinc-400">
-                            or with email
+                            {tr("or_with_email")}
                           </span>
                           <div className="flex-1 border-t border-zinc-200" />
                         </div>
@@ -1391,7 +1509,7 @@ export default function BusinessHubPage(props: {
                         <form onSubmit={handleJoin} className="space-y-3.5">
                           <div>
                             <label className="text-xs font-semibold text-zinc-800 block mb-1">
-                              Email Address <span className="text-rose-500">*</span>
+                              {tr("email_address")} <span className="text-rose-500">*</span>
                             </label>
                             <Input
                               type="email"
@@ -1405,7 +1523,7 @@ export default function BusinessHubPage(props: {
 
                           <div>
                             <label className="text-xs font-semibold text-zinc-800 block mb-1">
-                              Your Name (Optional)
+                              {tr("name_optional")}
                             </label>
                             <Input
                               type="text"
@@ -1418,7 +1536,7 @@ export default function BusinessHubPage(props: {
 
                           <div>
                             <label className="text-xs font-semibold text-zinc-800 block mb-1">
-                              Create Password (Optional)
+                              {tr("password_create_optional")}
                             </label>
                             <Input
                               type="password"
@@ -1471,7 +1589,7 @@ export default function BusinessHubPage(props: {
                             className="w-full font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
                             disabled={joining || !joinEmail}
                           >
-                            {joining ? "Creating your card..." : "Get my card"}
+                            {joining ? tr("creating_card") : tr("get_my_card")}
                           </Button>
                         </form>
                       ) : (
@@ -1497,7 +1615,7 @@ export default function BusinessHubPage(props: {
                               Password
                             </label>
                               <Link href="/forgot-password?role=customer" className="text-xs font-semibold text-evergreen hover:underline">
-                                Forgot password?
+                                {tr("forgot_password")}
                               </Link>
                             </div>
                             <Input
@@ -1517,7 +1635,7 @@ export default function BusinessHubPage(props: {
                             className="w-full font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
                             disabled={customerLoggingIn || !customerLoginEmail || !customerLoginPassword}
                           >
-                            {customerLoggingIn ? "Signing In..." : "Sign In to View Pass →"}
+                            {customerLoggingIn ? tr("signing_in") : tr("signin_view_pass")}
                           </Button>
                         </form>
                       )}

@@ -1,4 +1,5 @@
 "use client";
+import { loginRequest } from "@/lib/security-client";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -124,19 +125,20 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
     setError(null);
 
     try {
-      const res = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: e, password: p, portal: "admin" }),
-      });
-
-      const json = await res.json();
+      const { res, json } = await loginRequest({ email: e, password: p, portal: "admin" });
 
       if (!res.ok) {
         throw new Error(json.error?.message || "Invalid administrator credentials");
       }
 
       const isAdmin = json.data?.user?.isPlatformAdmin;
+
+      // The support team has its own read-only area
+      if (!isAdmin && json.data?.user?.role === "support_agent") {
+        router.push("/support");
+        router.refresh();
+        return;
+      }
 
       if (!isAdmin) {
         setError("This login is restricted to Platform Super Admins. Business owners and staff log in directly on their store page.");

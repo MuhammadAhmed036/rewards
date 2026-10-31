@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { BusinessLogo } from "@/components/brand/BusinessLogo";
 import { QrCameraScanner } from "@/components/staff/QrCameraScanner";
 import { BusinessInbox } from "@/components/chat/BusinessInbox";
+import { isOffline, networkAwareMessage, OFFLINE_MESSAGE } from "@/lib/use-online";
 import { SpendPointsPanel, type SpendResult } from "@/components/rewards/SpendPointsPanel";
 import { RewardsManager } from "@/components/rewards/RewardsManager";
 import { SlidingTabs } from "@/components/ui/sliding-tabs";
@@ -196,7 +197,11 @@ export default function StaffPage() {
   // Earn state
   const [spendInput, setSpendInput] = useState("");
   const [tipInput, setTipInput] = useState("");
+  // Part of the bill that does not earn points (gift cards, discounted items)
+  const [excludedInput, setExcludedInput] = useState("");
   const [previewPoints, setPreviewPoints] = useState<number | null>(null);
+  // Name of the offer or level boosting this award, e.g. "Double Fridays"
+  const [previewBoost, setPreviewBoost] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [managerOverride, setManagerOverride] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
@@ -319,6 +324,10 @@ export default function StaffPage() {
   // Add a stamp for a qualifying purchase, or hand over a full card's reward
   const handleStampAction = async (offerId: string, action: "add" | "give_reward") => {
     if (!activeMember) return;
+    if (isOffline()) {
+      setErrorMsg(OFFLINE_MESSAGE);
+      return;
+    }
     setStampBusyId(offerId);
     setErrorMsg(null);
     setStampNotice(null);
@@ -333,7 +342,7 @@ export default function StaffPage() {
       setActiveMember((m) => (m ? { ...m, stampCards: json.data.stampCards } : m));
       setStampNotice(json.data.message);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Stamp action failed");
+      setErrorMsg(networkAwareMessage(err, "Stamp action failed"));
     } finally {
       setStampBusyId(null);
     }
@@ -367,6 +376,7 @@ export default function StaffPage() {
       setPreviewLoading(true);
       const amountMinor = parsePence(spendInput);
       const tipMinor = tipInput ? parsePence(tipInput) : 0;
+      const excludedMinor = excludedInput ? parsePence(excludedInput) : 0;
 
       const res = await fetch("/api/v1/staff/earn/preview", {
         method: "POST",
@@ -376,20 +386,24 @@ export default function StaffPage() {
           locationId: selectedLocationId,
           amountMinor,
           tipMinor,
+          excludedMinor,
         }),
       });
       const json = await res.json();
       if (res.ok) {
         setPreviewPoints(json.data.pointsToAward);
+        setPreviewBoost(json.data.boostPercent > 100 ? `${json.data.boostLabel ?? "Bonus"} x${json.data.boostPercent / 100}` : null);
       } else {
         setPreviewPoints(null);
+        setPreviewBoost(null);
       }
     } catch {
       setPreviewPoints(null);
+      setPreviewBoost(null);
     } finally {
       setPreviewLoading(false);
     }
-  }, [activeMember, spendInput, tipInput, selectedLocationId]);
+  }, [activeMember, spendInput, tipInput, excludedInput, selectedLocationId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -401,12 +415,17 @@ export default function StaffPage() {
   // Submit Earn
   const handleConfirmEarn = async () => {
     if (!activeMember || !selectedLocationId) return;
+    if (isOffline()) {
+      setErrorMsg(OFFLINE_MESSAGE);
+      return;
+    }
 
     setLoading(true);
     setErrorMsg(null);
     try {
       const amountMinor = spendInput ? parsePence(spendInput) : 0;
       const tipMinor = tipInput ? parsePence(tipInput) : 0;
+      const excludedMinor = excludedInput ? parsePence(excludedInput) : 0;
       const idempotencyKey = crypto.randomUUID();
 
       const res = await fetch("/api/v1/staff/earn", {
@@ -420,6 +439,7 @@ export default function StaffPage() {
           locationId: selectedLocationId,
           amountMinor,
           tipMinor,
+          excludedMinor,
           managerOverrideReason: managerOverride ? overrideReason || "Staff override" : undefined,
         }),
       });
@@ -441,10 +461,11 @@ export default function StaffPage() {
       setActiveMember(null);
       setSpendInput("");
       setTipInput("");
+      setExcludedInput("");
       setManagerOverride(false);
       setOverrideReason("");
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error processing earn");
+      setErrorMsg(networkAwareMessage(err, "Error processing earn"));
     } finally {
       setLoading(false);
     }
@@ -493,6 +514,10 @@ export default function StaffPage() {
   // Confirm Redemption
   const handleConfirmRedemption = async () => {
     if (!redeemCodeInput.trim() || !selectedLocationId) return;
+    if (isOffline()) {
+      setErrorMsg(OFFLINE_MESSAGE);
+      return;
+    }
 
     setLoading(true);
     setErrorMsg(null);
@@ -520,7 +545,7 @@ export default function StaffPage() {
       setRedeemCodeInput("");
       setRedeemValidation(null);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error confirming redemption");
+      setErrorMsg(networkAwareMessage(err, "Error confirming redemption"));
     } finally {
       setLoading(false);
     }
@@ -1021,6 +1046,21 @@ export default function StaffPage() {
                   />
                 </div>
 
+                <div>
+                  <label htmlFor="excluded-amount" className="text-sm text-zinc-600 block mb-1">
+                    Part that doesn&rsquo;t earn points, if any <span className="text-zinc-500">(gift cards, discounted items)</span>
+                  </label>
+                  <Input
+                    id="excluded-amount"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={excludedInput}
+                    onChange={(e) => setExcludedInput(e.target.value)}
+                    className="text-xs rounded-xl bg-slate-50 border-slate-200"
+                  />
+                </div>
+
                 {/* Points Preview Indicator */}
                 {previewLoading ? (
                   <div className="flex items-center space-x-2 text-xs text-slate-500 py-1.5 px-3 bg-slate-50 rounded-xl">
@@ -1028,12 +1068,13 @@ export default function StaffPage() {
                     <span>Working out points...</span>
                   </div>
                 ) : previewPoints !== null ? (
-                  <div className="pop-in rounded-2xl bg-marigold/25 p-3.5 flex items-center justify-between text-evergreen-deep">
+                  <div className="pop-in rounded-2xl bg-marigold/25 p-3.5 flex flex-wrap items-center justify-between text-evergreen-deep">
                     <span className="flex items-center text-sm font-semibold">
                       <Sparkles className="h-4 w-4 mr-1.5 text-evergreen" />
                       They&rsquo;ll get
                     </span>
                     <span className="font-display text-xl font-bold tabular-nums">+{previewPoints} points</span>
+                    {previewBoost && <span className="block w-full text-xs font-semibold text-evergreen">{previewBoost}</span>}
                   </div>
                 ) : null}
 

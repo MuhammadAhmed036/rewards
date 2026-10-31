@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { guardApiRequest } from "@/server/auth/route-guard";
-import { listCampaigns, sendCampaign } from "@/server/services/campaigns";
+import { cancelCampaign, listCampaigns, sendCampaign } from "@/server/services/campaigns";
 
 const ROLES = ["owner", "manager", "marketing"] as const;
 
@@ -27,5 +27,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ data: await sendCampaign(guard.ctx, await request.json()) }, { status: 201 });
   } catch (err) {
     return failure("CAMPAIGN_SEND_FAILED", err, "Couldn't send the offer");
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const guard = await guardApiRequest(request, { allowedRoles: [...ROLES], requireTenant: true });
+  if ("response" in guard) return guard.response;
+  try {
+    const id = z.string().uuid().parse(request.nextUrl.searchParams.get("id"));
+    return NextResponse.json({ data: await cancelCampaign(guard.ctx, id) });
+  } catch (err) {
+    return failure("CAMPAIGN_CANCEL_FAILED", err, "Couldn't cancel the offer");
   }
 }

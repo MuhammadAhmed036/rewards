@@ -4,6 +4,7 @@ export type UserRole =
   | "manager"
   | "staff"
   | "marketing"
+  | "support_agent"
   | "customer";
 
 export interface RequestContext {
@@ -119,6 +120,8 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Action[]> = {
     // Marketing staff send offers but can't change points (FR-090, role table)
     "campaign.manage",
   ],
+  // Looks, never changes: no actions that move points, change settings or send anything (section 4)
+  support_agent: ["member.read", "analytics.view", "support.read"],
   customer: [
     "customer.profile",
     "customer.redeem",

@@ -9,6 +9,7 @@ function Unsubscribe() {
   const params = useSearchParams();
   const m = params.get("m") || "";
   const t = params.get("t") || "";
+  const c = params.get("c") || undefined;
   const kind = params.get("kind") === "offers" ? "offers" : "card";
   const [state, setState] = useState<{ on: boolean; businessName: string } | null>(null);
   const [error, setError] = useState<string | null>(m && t ? null : "This link is incomplete.");
@@ -22,7 +23,7 @@ function Unsubscribe() {
       const res = await fetch("/api/v1/public/card-emails", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ m, t, on, kind }),
+        body: JSON.stringify({ m, t, on, kind, c }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message);

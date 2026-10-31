@@ -1,4 +1,8 @@
 import { db } from "../db";
+import { emitEvent } from "./events";
+import { NOTE_RETENTION_MONTHS } from "./member-notes";
+import { memberNotes } from "../db/schema";
+import { inArray } from "drizzle-orm";
 import {
   users,
   memberships,
@@ -100,7 +104,7 @@ export async function updateMarketingConsent(
     source?: string;
   }
 ) {
-  return await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     const [membership] = await tx
       .select()
       .from(memberships)
@@ -133,6 +137,12 @@ export async function updateMarketingConsent(
 
     return updated;
   });
+  await emitEvent(result.tenantId, input.granted ? "consent.granted" : "consent.withdrawn", {
+    membershipId: result.id,
+    purpose: "marketing_email",
+    source: input.source || "me_privacy_centre",
+  });
+  return result;
 }
 
 export async function exportUserDataJson(userId: string) {
@@ -194,12 +204,23 @@ export async function exportUserDataJson(userId: string) {
       .where(eq(consentRecords.membershipId, m.id))
       .orderBy(desc(consentRecords.createdAt));
 
+    // Private notes a shop wrote about this person are personal data too (right of access)
+    const notes = await db
+      .select({ body: memberNotes.body, writtenAt: memberNotes.createdAt })
+      .from(memberNotes)
+      .where(eq(memberNotes.membershipId, m.id))
+      .orderBy(desc(memberNotes.createdAt));
+
     (exportData.memberships as Array<unknown>).push({
       ...m,
       transactionHistory: history,
       consentRecords: consents,
+      notesKeptByShop: notes,
     });
   }
+
+  const tenantIds = await db.select({ id: memberships.tenantId }).from(memberships).where(eq(memberships.userId, userId));
+  for (const t of new Set(tenantIds.map((r) => r.id))) await emitEvent(t, "data_export.created", { scope: "customer_access_request" });
 
   return exportData;
 }
@@ -230,6 +251,12 @@ export async function deleteAndAnonymiseAccount(userId: string) {
         deletedAt: new Date(),
       })
       .where(eq(users.id, userId));
+
+    // Private notes shops wrote about them go too
+    const theirCards = await tx.select({ id: memberships.id }).from(memberships).where(eq(memberships.userId, userId));
+    if (theirCards.length > 0) {
+      await tx.delete(memberNotes).where(inArray(memberNotes.membershipId, theirCards.map((c) => c.id)));
+    }
 
     // Update memberships to deleted and revoke marketing opt-in
     await tx
@@ -281,6 +308,12 @@ export async function runRetentionCleanup() {
     .where(lt(auditEvents.createdAt, twentyFourMonthsAgo))
     .returning({ id: auditEvents.id });
 
+  // 3b. Retention: private customer notes older than the retention period
+  const deletedNotes = await db
+    .delete(memberNotes)
+    .where(lt(memberNotes.createdAt, new Date(now - NOTE_RETENTION_MONTHS * 30 * 24 * 60 * 60 * 1000)))
+    .returning({ id: memberNotes.id });
+
   // 4. Expired sign-in sessions (idle timeout passed, or staff/admin absolute limit reached)
   const deletedSessionsCount = await purgeExpiredSessions();
 
@@ -288,6 +321,7 @@ export async function runRetentionCleanup() {
     deletedClicksCount: deletedClicks.length,
     deletedFeedbackCount: deletedFeedback.length,
     deletedAuditCount: deletedAudit.length,
+    deletedNotesCount: deletedNotes.length,
     deletedSessionsCount,
   };
 }

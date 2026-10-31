@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { emitEvent } from "./events";
 import { rewards, rewardLocations, programmes, tenants, products, redemptions } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
 import { logAuditEvent } from "./audit";
@@ -71,7 +72,7 @@ export async function createReward(ctx: RequestContext, input: CreateRewardInput
 
   if (!prog) throw new Error("Programme not found for tenant");
 
-  return await db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const [newReward] = await tx
       .insert(rewards)
       .values({
@@ -114,6 +115,8 @@ export async function createReward(ctx: RequestContext, input: CreateRewardInput
 
     return newReward;
   });
+  await emitEvent(ctx.tenantId, "reward.created", { rewardId: created.id, title: created.title, costPoints: created.costPoints });
+  return created;
 }
 
 export async function updateReward(
@@ -167,6 +170,7 @@ export async function updateReward(
     targetId: updated.id,
     metadata: { version: nextVersion, changes: input },
   });
+  await emitEvent(ctx.tenantId, "reward.updated", { rewardId: updated.id, version: nextVersion });
 
   return updated;
 }

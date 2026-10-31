@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireRecentAuth } from "@/server/auth/reauth";
 import { guardApiRequest } from "@/server/auth/route-guard";
 import {
   listStaffMembers,
@@ -51,6 +52,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = addStaffSchema.parse(body);
 
+    // Handing someone a ready-made password is a sensitive step
+    if (validated.temporaryPassword) {
+      const denied = await requireRecentAuth(request);
+      if (denied) return denied;
+    }
+
     const newStaff = await addStaffMember(guard.ctx, validated);
     return NextResponse.json({ data: newStaff });
   } catch (err) {
@@ -87,6 +94,12 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     const validated = updateStaffSchema.parse(body);
+
+    // Changing who can do what, removing access, or setting a password needs a recent confirmation
+    if (validated.newPassword || validated.role || validated.status) {
+      const denied = await requireRecentAuth(request);
+      if (denied) return denied;
+    }
 
     if (validated.newPassword) {
       return NextResponse.json({ data: await resetStaffPassword(guard.ctx, validated.staffMemberId, validated.newPassword) });

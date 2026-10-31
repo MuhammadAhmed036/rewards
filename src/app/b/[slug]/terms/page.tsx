@@ -7,12 +7,13 @@ import { programmes, rewards, ruleVersions, tenants } from "@/server/db/schema";
 import { describeRule, ruleConfigSchema } from "@/lib/points";
 import { currencySymbol } from "@/lib/money";
 import { LegalPage } from "@/components/legal/LegalPage";
+import { LANGS, LOCALES, isLang, langFromLocale, t, type Lang } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 async function load(slug: string) {
   const [tenant] = await db
-    .select({ id: tenants.id, name: tenants.name, status: tenants.status, currency: tenants.currency })
+    .select({ id: tenants.id, name: tenants.name, status: tenants.status, currency: tenants.currency, locale: tenants.locale })
     .from(tenants)
     .where(eq(tenants.slug, slug))
     .limit(1);
@@ -45,11 +46,18 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
 }
 
 /** The terms customers accept when joining a shop's programme, built from its live rules (FR-051). */
-export default async function ProgrammeTermsPage(props: { params: Promise<{ slug: string }> }) {
+export default async function ProgrammeTermsPage(props: { params: Promise<{ slug: string }>; searchParams?: Promise<{ lang?: string }> }) {
   const { slug } = await props.params;
   const data = await load(slug);
   if (!data) notFound();
   const { tenant, prog, unit, config, list, symbol } = data;
+
+  // The shop's own extra terms can be translated; everything else on this page stays in English
+  const translations = (prog.termsTranslations ?? {}) as Record<string, string>;
+  const wanted = (await props.searchParams)?.lang;
+  const lang: Lang = isLang(wanted) ? wanted : langFromLocale(tenant.locale);
+  const translated = lang !== "en" ? translations[lang] : undefined;
+  const available = LANGS.filter((l) => l === "en" || translations[l]);
 
   return (
     <LegalPage title={`${tenant.name} loyalty card terms`} meta={`Version ${prog.termsVersion}`}>
@@ -118,10 +126,24 @@ export default async function ProgrammeTermsPage(props: { params: Promise<{ slug
         {tenant.name} may suspend a card that&rsquo;s being misused, for example to claim {unit} for purchases that didn&rsquo;t happen.
       </p>
 
-      {prog.termsText && prog.termsText !== "Terms and conditions of the loyalty programme. Points have no cash value." && (
+      {((prog.termsText && prog.termsText !== "Terms and conditions of the loyalty programme. Points have no cash value.") || translated) && (
         <>
           <h2>Extra terms from {tenant.name}</h2>
-          <p className="whitespace-pre-wrap">{prog.termsText}</p>
+          {available.length > 1 && (
+            <p className="text-sm">
+              {t(lang, "terms_read_in")}:{" "}
+              {available.map((l, i) => (
+                <span key={l}>
+                  {i > 0 && " | "}
+                  {l === lang ? <strong>{LOCALES[l].label}</strong> : <Link href={`/b/${slug}/terms?lang=${l}`}>{LOCALES[l].label}</Link>}
+                </span>
+              ))}
+            </p>
+          )}
+          <p className="whitespace-pre-wrap" dir={translated ? LOCALES[lang].dir : "ltr"} lang={translated ? lang : "en"}>
+            {translated ?? prog.termsText}
+          </p>
+          {translated && <p className="text-sm text-zinc-500">{t(lang, "terms_translated_note")}</p>}
         </>
       )}
 

@@ -13,10 +13,12 @@ import {
   locations,
 } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
-import { calculatePoints, RuleConfig } from "@/lib/points";
+import { calculatePoints, earnBlockedReason, ruleConfigSchema, ruleForLocation, RuleConfig } from "@/lib/points";
 import { hashRedemptionCode, generateRedemptionCode } from "../qr";
 import { logAuditEvent } from "./audit";
 import { notifyRedemption, notifyRewardsUnlocked } from "./notifications";
+import { grantReferralBonuses } from "./loyalty-jobs";
+import { emitEvent } from "./events";
 import { sentry } from "@/lib/sentry";
 import { eq, and, sql, desc, gte, lt } from "drizzle-orm";
 
@@ -25,6 +27,8 @@ export interface EarnParams {
   locationId: string;
   amountMinor?: number;
   tipMinor?: number;
+  /** Part of the bill that doesn't qualify for points (gift cards, discounted or excluded items). */
+  excludedMinor?: number;
   idempotencyKey: string;
   managerOverrideReason?: string;
 }
@@ -37,6 +41,11 @@ export interface EarnResult {
   isDuplicate: boolean;
 }
 
+// What counts as unusual earning activity worth the owner's attention
+const FLAG_NEAR_CAP_RATIO = 0.9; // an award at or above 90% of the per-purchase limit
+const FLAG_WINDOW_MINUTES = 10;
+const FLAG_EARNS_PER_WINDOW = 15; // more than this many awards by one person in the window
+
 /** Points can only be given or spent at one of this business's open locations. */
 async function assertOpenLocation(executor: DbExecutor, tenantId: string, locationId: string) {
   const [location] = await executor
@@ -48,15 +57,43 @@ async function assertOpenLocation(executor: DbExecutor, tenantId: string, locati
   if (location.status !== "active") throw new Error("LOCATION_CLOSED: This location is closed. Pick another one.");
 }
 
+/** Midnight just gone in the business's own time zone, so "today" means today where the shop is. */
+export async function startOfTenantDay(executor: DbExecutor, tenantId: string): Promise<Date> {
+  const [row] = await executor.execute<{ start: Date }>(
+    sql`select (date_trunc('day', now() at time zone coalesce(t.timezone, 'Europe/London')) at time zone coalesce(t.timezone, 'Europe/London')) as start from tenants t where t.id = ${tenantId}`
+  );
+  return new Date(row.start);
+}
+
+/** Points a member earned from purchases in the tier qualification window (0 when the shop has no levels). */
+export async function earnedInTierWindow(executor: DbExecutor, tenantId: string, membershipId: string, rule: RuleConfig): Promise<number> {
+  if (!rule.tiers?.enabled || rule.tiers.levels.length === 0) return 0;
+  const since = new Date();
+  since.setMonth(since.getMonth() - rule.tiers.qualificationMonths);
+  const [row] = await executor
+    .select({ total: sql<number>`COALESCE(SUM(points_delta), 0)::int` })
+    .from(ledgerEntries)
+    .where(
+      and(
+        eq(ledgerEntries.tenantId, tenantId),
+        eq(ledgerEntries.membershipId, membershipId),
+        eq(ledgerEntries.type, "earn"),
+        sql`${ledgerEntries.reasonCode} is distinct from 'bonus'`,
+        gte(ledgerEntries.occurredAt, since)
+      )
+    );
+  return row?.total ?? 0;
+}
+
 export async function previewEarn(
   ctx: RequestContext,
-  params: { membershipId: string; locationId: string; amountMinor?: number; tipMinor?: number }
+  params: { membershipId: string; locationId: string; amountMinor?: number; tipMinor?: number; excludedMinor?: number }
 ) {
   assertCan(ctx, "ledger.earn", { locationId: params.locationId });
   if (!ctx.tenantId) throw new Error("tenantId required");
 
   const [tenant] = await db
-    .select({ id: tenants.id, status: tenants.status })
+    .select({ id: tenants.id, status: tenants.status, timezone: tenants.timezone })
     .from(tenants)
     .where(eq(tenants.id, ctx.tenantId))
     .limit(1);
@@ -85,11 +122,12 @@ export async function previewEarn(
     .where(eq(ruleVersions.id, prog.currentRuleVersionId))
     .limit(1);
 
-  const rule = ruleRow.config as RuleConfig;
+  const rule = ruleConfigSchema.parse(ruleRow.config);
+  const blocked = earnBlockedReason(rule, params.locationId, new Date(), tenant.timezone || "Europe/London");
+  if (blocked) throw new Error(`NOT_ELIGIBLE: ${blocked}`);
 
   // Compute points earned today by member
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = await startOfTenantDay(db, ctx.tenantId);
 
   const [todayEarns] = await db
     .select({
@@ -108,8 +146,11 @@ export async function previewEarn(
   const pointsCalc = calculatePoints({
     amountMinor: params.amountMinor,
     tipMinor: params.tipMinor,
+    excludedMinor: params.excludedMinor,
     alreadyEarnedTodayInTenantTz: todayEarns?.total || 0,
-    rule,
+    rule: ruleForLocation(rule, params.locationId),
+    at: new Date(),
+    earnedInTierWindow: await earnedInTierWindow(db, ctx.tenantId, params.membershipId, rule),
   });
 
   const [balanceRow] = await db
@@ -127,6 +168,8 @@ export async function previewEarn(
     projectedBalance: currentBalance + pointsCalc.points,
     cappedByTransaction: pointsCalc.cappedByTransaction,
     cappedByDailyLimit: pointsCalc.cappedByDailyLimit,
+    boostPercent: pointsCalc.boostPercent ?? 100,
+    boostLabel: pointsCalc.boostLabel ?? null,
   };
 }
 
@@ -137,7 +180,7 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
   const result = await db.transaction(async (tx) => {
     // 0. Verify tenant is active (Section 19: Suspended tenant cannot earn/redeem)
     const [tenant] = await tx
-      .select({ id: tenants.id, status: tenants.status })
+      .select({ id: tenants.id, status: tenants.status, timezone: tenants.timezone })
       .from(tenants)
       .where(eq(tenants.id, ctx.tenantId!))
       .limit(1);
@@ -195,6 +238,11 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
       throw new Error(`MEMBERSHIP_SUSPENDED: Membership is ${membership.status}`);
     }
 
+    // Nobody can give points to their own card, whatever their role
+    if (membership.userId === ctx.userId) {
+      throw new Error("SELF_AWARD: You can't add points to your own loyalty card.");
+    }
+
     // 3. Load Programme & Rule
     const [prog] = await tx
       .select()
@@ -216,7 +264,11 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
       .where(eq(ruleVersions.id, prog.currentRuleVersionId))
       .limit(1);
 
-    const rule = ruleRow.config as RuleConfig;
+    const rule = ruleConfigSchema.parse(ruleRow.config);
+
+    // 3b. Where and when points can be earned (FR-022)
+    const blocked = earnBlockedReason(rule, params.locationId, new Date(), tenant.timezone || "Europe/London");
+    if (blocked) throw new Error(`NOT_ELIGIBLE: ${blocked}`);
 
     // 4. Duplicate visit guard: check last earn time
     const [lastEarn] = await tx
@@ -256,8 +308,7 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
     }
 
     // 6. Calculate points
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDay = await startOfTenantDay(tx, ctx.tenantId!);
 
     const [todayEarns] = await tx
       .select({
@@ -276,8 +327,11 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
     const pointsCalc = calculatePoints({
       amountMinor: params.amountMinor,
       tipMinor: params.tipMinor,
+      excludedMinor: params.excludedMinor,
       alreadyEarnedTodayInTenantTz: todayEarns?.total || 0,
-      rule,
+      rule: ruleForLocation(rule, params.locationId),
+      at: new Date(),
+      earnedInTierWindow: await earnedInTierWindow(tx, ctx.tenantId!, params.membershipId, rule),
     });
 
     if (pointsCalc.points <= 0) {
@@ -315,6 +369,40 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
       })
       .where(eq(membershipBalances.membershipId, params.membershipId));
 
+    // Quietly flag unusual activity for the owner to review; the award itself still goes through
+    const reasons: string[] = [];
+    const rule2 = ruleForLocation(rule, params.locationId);
+    if (pointsCalc.cappedByTransaction || pointsCalc.points >= Math.ceil(rule2.caps.maxPointsPerTransaction * FLAG_NEAR_CAP_RATIO)) {
+      reasons.push(`Large award: ${pointsCalc.points} (limit per purchase is ${rule2.caps.maxPointsPerTransaction})`);
+    }
+    const [recent] = await tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(ledgerEntries)
+      .where(
+        and(
+          eq(ledgerEntries.tenantId, ctx.tenantId!),
+          eq(ledgerEntries.actorUserId, ctx.userId),
+          eq(ledgerEntries.type, "earn"),
+          gte(ledgerEntries.occurredAt, new Date(Date.now() - FLAG_WINDOW_MINUTES * 60_000))
+        )
+      );
+    if ((recent?.n ?? 0) > FLAG_EARNS_PER_WINDOW) {
+      reasons.push(`Fast: ${recent.n} awards by the same person in ${FLAG_WINDOW_MINUTES} minutes`);
+    }
+    if (reasons.length > 0) {
+      await logAuditEvent(
+        ctx,
+        {
+          action: "ledger.flagged",
+          targetType: "ledger_entry",
+          targetId: entry.id,
+          reason: reasons.join("; "),
+          metadata: { memberNumber: membership.memberNumber, points: pointsCalc.points, locationId: params.locationId, reasons },
+        },
+        tx
+      );
+    }
+
     if (params.managerOverrideReason) {
       await logAuditEvent(
         ctx,
@@ -337,9 +425,33 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
     };
   });
 
+  if (!result.isDuplicate) {
+    await emitEvent(ctx.tenantId, "points.earned", {
+      membershipId: params.membershipId,
+      points: result.pointsDelta,
+      newBalance: result.newBalance,
+      locationId: params.locationId,
+      ledgerEntryId: result.entryId,
+    });
+  }
+
   // Email the customer if this visit took them past a reward (never blocks or undoes the points)
   if (!result.isDuplicate && result.pointsDelta > 0) {
     await notifyRewardsUnlocked(params.membershipId, ctx.tenantId!, result.newBalance - result.pointsDelta, result.newBalance);
+  }
+  // A friend's first recorded purchase is what pays the referral bonus to both of them
+  if (!result.isDuplicate) {
+    const [purchases] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(ledgerEntries)
+      .where(
+        and(
+          eq(ledgerEntries.membershipId, params.membershipId),
+          eq(ledgerEntries.type, "earn"),
+          sql`${ledgerEntries.reasonCode} is distinct from 'bonus'`
+        )
+      );
+    if (purchases?.n === 1) await grantReferralBonuses(ctx.tenantId!, params.membershipId);
   }
   return result;
 }
@@ -680,6 +792,8 @@ export async function confirmRedemption(
     };
   });
 
+  await emitEvent(ctx.tenantId, "points.redeemed", { membershipId: result.membershipId, points: result.pointsDeducted, newBalance: result.newBalance });
+  await emitEvent(ctx.tenantId, "reward.redeemed", { membershipId: result.membershipId, redemptionId: result.redemptionId, reward: result.rewardTitle });
   await notifyRedemption(result.membershipId, result.rewardTitle, result.pointsDeducted, result.newBalance);
   return result;
 }
@@ -918,6 +1032,7 @@ export async function redeemForMember(
   });
 
   if (!result.isDuplicate) {
+    await emitEvent(ctx.tenantId, "points.redeemed", { membershipId: params.membershipId, points: result.pointsDeducted, newBalance: result.newBalance, item: result.title });
     await notifyRedemption(params.membershipId, result.title, result.pointsDeducted, result.newBalance);
   }
   return result;
@@ -955,6 +1070,13 @@ export async function adjustBalance(
       .for("update");
 
     if (!lockedBalance) throw new Error("Customer not found for this business");
+
+    const [ownCard] = await tx
+      .select({ userId: memberships.userId })
+      .from(memberships)
+      .where(eq(memberships.id, params.membershipId))
+      .limit(1);
+    if (ownCard?.userId === ctx.userId) throw new Error("SELF_AWARD: You can't change points on your own loyalty card.");
 
     const newBalance = lockedBalance.balance + params.pointsDelta;
     if (newBalance < 0) {
@@ -1009,6 +1131,12 @@ export async function adjustBalance(
     };
   });
 
+  await emitEvent(ctx.tenantId, "points.adjusted", {
+    membershipId: params.membershipId,
+    points: params.pointsDelta,
+    newBalance: result.newBalance,
+    reason: params.reasonCode,
+  });
   if (params.pointsDelta > 0) {
     await notifyRewardsUnlocked(params.membershipId, ctx.tenantId!, result.newBalance - params.pointsDelta, result.newBalance);
   }
@@ -1027,7 +1155,7 @@ export async function reverseTransaction(
   assertCan(ctx, "ledger.reverse");
   if (!ctx.tenantId) throw new Error("tenantId required");
 
-  return await db.transaction(async (tx) => {
+  const reversed = await db.transaction(async (tx) => {
     const [original] = await tx
       .select()
       .from(ledgerEntries)
@@ -1118,8 +1246,16 @@ export async function reverseTransaction(
     return {
       reversalEntryId: reversalEntry.id,
       newBalance,
+      membershipId: original.membershipId,
     };
   });
+  await emitEvent(ctx.tenantId, "points.reversed", {
+    membershipId: reversed.membershipId,
+    ledgerEntryId: params.ledgerEntryId,
+    newBalance: reversed.newBalance,
+    reason: params.reasonCode,
+  });
+  return reversed;
 }
 
 // ==========================================
@@ -1192,7 +1328,8 @@ export async function expirePendingRedemptions(executor: DbExecutor = db) {
         lt(redemptions.expiresAt, now)
       )
     )
-    .returning({ id: redemptions.id });
+    .returning({ id: redemptions.id, tenantId: redemptions.tenantId });
 
+  for (const e of expired) await emitEvent(e.tenantId, "reward.expired", { redemptionId: e.id });
   return { expiredCount: expired.length };
 }

@@ -1,0 +1,2 @@
+ALTER TABLE "memberships" ADD COLUMN "referred_by_membership_id" uuid;--> statement-breakpoint
+ALTER TABLE "memberships" ADD CONSTRAINT "memberships_referred_by_membership_id_memberships_id_fk" FOREIGN KEY ("referred_by_membership_id") REFERENCES "public"."memberships"("id") ON DELETE set null ON UPDATE no action;

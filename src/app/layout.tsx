@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import "./globals.css";
+import { SecurityDialogs } from "@/components/auth/SecurityDialogs";
+import { OfflineBanner } from "@/components/OfflineBanner";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
@@ -37,6 +39,8 @@ export default function RootLayout({
         className={`antialiased overflow-x-hidden w-full max-w-full bg-paper text-zinc-900`}
       >
         {children}
+        <SecurityDialogs />
+        <OfflineBanner />
       </body>
     </html>
   );

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireRecentAuth } from "@/server/auth/reauth";
 import { guardApiRequest } from "@/server/auth/route-guard";
 import { db } from "@/server/db";
 import { ledgerEntries, memberships, users } from "@/server/db/schema";
@@ -55,6 +56,8 @@ export async function POST(request: NextRequest) {
     requireTenant: true,
   });
   if ("response" in guard) return guard.response;
+  const denied = await requireRecentAuth(request);
+  if (denied) return denied;
 
   try {
     const body = await request.json();

@@ -27,6 +27,10 @@ export const users = pgTable(
     image: text("image"),
     isPlatformAdmin: boolean("is_platform_admin").default(false).notNull(),
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+    // Sign-in asks for a code emailed to this address after the password (FR-008). Opt-in.
+    mfaEmailEnabled: boolean("mfa_email_enabled").default(false).notNull(),
+    // Works for the platform's support team: can look at a business only while its owner has allowed it (FR, section 4)
+    isSupportAgent: boolean("is_support_agent").default(false).notNull(),
     // Optional, for birthday treats; no year is stored (data minimisation)
     birthMonth: integer("birth_month"),
     birthDay: integer("birth_day"),
@@ -47,6 +51,8 @@ export const sessions = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     token: text("token").notNull().unique(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    // Last time this session re-confirmed its password or an emailed code, for sensitive actions
+    reauthedAt: timestamp("reauthed_at", { withTimezone: true }),
     ipAddress: varchar("ip_address", { length: 45 }),
     userAgent: text("user_agent"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -88,6 +94,14 @@ export const tenants = pgTable(
     brandPrimaryHex: varchar("brand_primary_hex", { length: 16 }).default("#000000"),
     logoUrl: text("logo_url"),
     plan: varchar("plan", { length: 32 }).default("free").notNull(), // free, pro
+    // trialing, active, past_due, canceled. Overdue never deletes loyalty records (FR-113)
+    billingStatus: varchar("billing_status", { length: 24 }).default("active").notNull(),
+    trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+    pastDueSince: timestamp("past_due_since", { withTimezone: true }),
+    // FR-014: the shop's own web address (shop.example.com), proved with a DNS record before it is used
+    customDomain: varchar("custom_domain", { length: 255 }).unique(),
+    customDomainToken: varchar("custom_domain_token", { length: 64 }),
+    customDomainVerifiedAt: timestamp("custom_domain_verified_at", { withTimezone: true }),
     features: jsonb("features").default({}).notNull(),
     limits: jsonb("limits").default({}).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -195,6 +209,8 @@ export const memberships = pgTable(
     status: varchar("status", { length: 32 }).default("active").notNull(), // active, suspended, deleted
     joinedAt: timestamp("joined_at", { withTimezone: true }).defaultNow().notNull(),
     joinedLocationId: uuid("joined_location_id").references(() => locations.id),
+    // The friend who invited this customer (their member number was the referral code)
+    referredByMembershipId: uuid("referred_by_membership_id").references((): AnyPgColumn => memberships.id, { onDelete: "set null" }),
     marketingOptIn: boolean("marketing_opt_in").default(false).notNull(),
     // Service emails about this card (welcome, reward unlocked, receipts); customers can switch them off
     emailNotifications: boolean("email_notifications").default(true).notNull(),
@@ -203,6 +219,24 @@ export const memberships = pgTable(
     uniqueIndex("memberships_tenant_user_idx").on(table.tenantId, table.userId),
     index("memberships_tenant_member_number_idx").on(table.tenantId, table.memberNumber),
     index("memberships_public_id_idx").on(table.publicId),
+  ]
+);
+
+/** Emails a business has barred from joining its programme (FR-083). Per business, not platform-wide. */
+export const blockedEmails = pgTable(
+  "blocked_emails",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    email: varchar("email", { length: 255 }).notNull(),
+    reason: text("reason").notNull(),
+    blockedBy: uuid("blocked_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("blocked_emails_tenant_email_idx").on(table.tenantId, table.email),
   ]
 );
 
@@ -262,6 +296,8 @@ export const programmes = pgTable(
     currentRuleVersionId: uuid("current_rule_version_id"),
     termsVersion: varchar("terms_version", { length: 32 }).default("1.0").notNull(),
     termsText: text("terms_text"),
+    // Terms in other languages, keyed by language code: { "es": "...", "ur": "..." } (localisation)
+    termsTranslations: jsonb("terms_translations").default({}).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -540,6 +576,10 @@ export const campaigns = pgTable(
     audience: jsonb("audience").default({}).notNull(),
     status: varchar("status", { length: 32 }).default("sent").notNull(),
     recipientCount: integer("recipient_count").default(0).notNull(),
+    // draft -> scheduled -> sending -> sent, or cancelled; "sent" with no scheduledAt means it went out at once
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    // A ceiling on how many people one offer may reach (a simple budget)
+    maxRecipients: integer("max_recipients"),
     createdBy: uuid("created_by").references(() => users.id),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -696,6 +736,35 @@ export const emailOutbox = pgTable(
   ]
 );
 
+/** Things that happen to an email after it is sent: a click, a bounce, a complaint, an opt-out (FR-094). */
+export const emailEvents = pgTable(
+  "email_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    outboxId: uuid("outbox_id").references(() => emailOutbox.id, { onDelete: "set null" }),
+    campaignId: uuid("campaign_id").references(() => campaigns.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 24 }).notNull(), // click, bounce, complaint, optout
+    detail: text("detail"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("email_events_campaign_type_idx").on(table.campaignId, table.type),
+    index("email_events_tenant_created_idx").on(table.tenantId, table.createdAt),
+  ]
+);
+
+/** Addresses that can't be reached (or complained); offers are never sent to them again (FR-093). */
+export const emailSuppressions = pgTable(
+  "email_suppressions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    email: varchar("email", { length: 255 }).notNull().unique(),
+    reason: varchar("reason", { length: 32 }).notNull(), // bounce, complaint
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  }
+);
+
 export const idempotencyKeys = pgTable(
   "idempotency_keys",
   {
@@ -709,4 +778,176 @@ export const idempotencyKeys = pgTable(
   (table) => [
     primaryKey({ columns: [table.tenantId, table.key, table.scope] }),
   ]
+);
+
+// ==========================================
+// 9. Events, integrations, notes, support, billing
+// ==========================================
+
+/** Things that happened in a business, named as in the spec (Appendix B). Feeds webhooks and the events API. */
+export const domainEvents = pgTable(
+  "domain_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 64 }).notNull(), // e.g. points.earned
+    payload: jsonb("payload").default({}).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("domain_events_tenant_created_idx").on(table.tenantId, table.createdAt)]
+);
+
+/** Where a business wants to be told about events (FR-121). The signing secret is kept encrypted. */
+export const webhookEndpoints = pgTable(
+  "webhook_endpoints",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    secretEncrypted: text("secret_encrypted").notNull(),
+    events: jsonb("events").default([]).notNull(), // empty means every event
+    active: boolean("active").default(true).notNull(),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("webhook_endpoints_tenant_idx").on(table.tenantId)]
+);
+
+export const webhookDeliveries = pgTable(
+  "webhook_deliveries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    endpointId: uuid("endpoint_id")
+      .notNull()
+      .references(() => webhookEndpoints.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => domainEvents.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 16 }).default("queued").notNull(), // queued, sent, failed, dead
+    attempts: integer("attempts").default(0).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).defaultNow().notNull(),
+    lastStatusCode: integer("last_status_code"),
+    lastError: text("last_error"),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("webhook_deliveries_due_idx").on(table.status, table.nextAttemptAt),
+    index("webhook_deliveries_endpoint_idx").on(table.endpointId, table.createdAt),
+  ]
+);
+
+/** Keys a business's own systems (a till, a POS) use to talk to the API (FR-124). Only a hash is kept. */
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 80 }).notNull(),
+    prefix: varchar("prefix", { length: 16 }).notNull(), // first characters, to recognise the key in a list
+    keyHash: varchar("key_hash", { length: 64 }).notNull().unique(),
+    scopes: jsonb("scopes").default([]).notNull(), // earn:write, events:read
+    createdBy: uuid("created_by").references(() => users.id),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("api_keys_tenant_idx").on(table.tenantId)]
+);
+
+/** A purchase reported by a till or POS, so the same sale can never earn twice (FR-040, UC-17). */
+export const externalTransactions = pgTable(
+  "external_transactions",
+  {
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    source: varchar("source", { length: 80 }).notNull(), // the key's name
+    externalRef: varchar("external_ref", { length: 120 }).notNull(),
+    ledgerEntryId: uuid("ledger_entry_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.source, table.externalRef] })]
+);
+
+/** Private notes a business keeps about a customer (FR-086). Deleted after the retention period. */
+export const memberNotes = pgTable(
+  "member_notes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    membershipId: uuid("membership_id")
+      .notNull()
+      .references(() => memberships.id, { onDelete: "cascade" }),
+    authorUserId: uuid("author_user_id").references(() => users.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("member_notes_membership_idx").on(table.tenantId, table.membershipId, table.createdAt)]
+);
+
+/** A business owner letting the platform's support team look at their account for a limited time. */
+export const supportGrants = pgTable(
+  "support_grants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    reason: text("reason").notNull(),
+    grantedBy: uuid("granted_by").references(() => users.id),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("support_grants_tenant_idx").on(table.tenantId, table.expiresAt)]
+);
+
+/** Invoices for a business's plan (FR-112). Payment is recorded by the platform admin. */
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    number: varchar("number", { length: 32 }).notNull().unique(),
+    description: varchar("description", { length: 255 }).notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    currency: varchar("currency", { length: 8 }).default("GBP").notNull(),
+    status: varchar("status", { length: 16 }).default("open").notNull(), // open, paid, void
+    issuedAt: timestamp("issued_at", { withTimezone: true }).defaultNow().notNull(),
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => users.id),
+  },
+  (table) => [index("invoices_tenant_idx").on(table.tenantId, table.issuedAt)]
+);
+
+/** One-time use of a rotating QR code, so a photographed code can't be replayed (FR-039). */
+export const qrTokenUses = pgTable(
+  "qr_token_uses",
+  {
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    membershipId: uuid("membership_id")
+      .notNull()
+      .references(() => memberships.id, { onDelete: "cascade" }),
+    windowStart: integer("window_start").notNull(), // the 30-second slot number (time / 30 s)
+    usedAt: timestamp("used_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.membershipId, table.windowStart] })]
 );

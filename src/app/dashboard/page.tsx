@@ -18,6 +18,16 @@ import { currencySymbol } from "@/lib/money";
 import { EarningRulesEditor } from "@/components/dashboard/EarningRulesEditor";
 import { LocationsManager } from "@/components/dashboard/LocationsManager";
 import { BusinessSettings } from "@/components/dashboard/BusinessSettings";
+import { SecuritySettings } from "@/components/auth/SecuritySettings";
+import { InsightsPanel } from "@/components/dashboard/InsightsPanel";
+import { IntegrationsSettings } from "@/components/dashboard/IntegrationsSettings";
+import { MemberImport } from "@/components/dashboard/MemberImport";
+import { LiveQrSettings } from "@/components/dashboard/LiveQrSettings";
+import { SupportAccessSettings } from "@/components/dashboard/SupportAccessSettings";
+import { BillingBanner, BillingSettings } from "@/components/dashboard/BillingSettings";
+import { DomainSettings } from "@/components/dashboard/DomainSettings";
+import { TermsEditor } from "@/components/dashboard/TermsEditor";
+import { ensureRecentAuth } from "@/lib/security-client";
 import { SupportReports } from "@/components/dashboard/SupportReports";
 import { CampaignsManager } from "@/components/dashboard/CampaignsManager";
 import {
@@ -216,6 +226,34 @@ export default function OwnerDashboardPage() {
   const [manageReason, setManageReason] = useState("");
   const [manageMessage, setManageMessage] = useState<string | null>(null);
   const [manageBusy, setManageBusy] = useState(false);
+  // Private notes about the customer being managed (owners and managers only)
+  const [notes, setNotes] = useState<Array<{ id: string; body: string; createdAt: string; authorName: string | null }>>([]);
+  const [noteText, setNoteText] = useState("");
+  const loadNotes = useCallback(async (membershipId: string) => {
+    const res = await fetch(`/api/v1/owner/members/${membershipId}/notes`, { cache: "no-store" });
+    if (res.ok) setNotes((await res.json()).data);
+  }, []);
+  const saveNote = async () => {
+    if (!managingMember || !noteText.trim()) return;
+    const res = await fetch(`/api/v1/owner/members/${managingMember.id}/notes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: noteText }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return setManageMessage(json.error?.message || "Couldn't save the note.");
+    setNoteText("");
+    loadNotes(managingMember.id);
+  };
+  const removeNote = async (id: string) => {
+    if (!managingMember) return;
+    await fetch(`/api/v1/owner/members/${managingMember.id}/notes?id=${id}`, { method: "DELETE" });
+    loadNotes(managingMember.id);
+  };
+  useEffect(() => {
+    if (managingMember) loadNotes(managingMember.id);
+    else setNotes([]);
+  }, [managingMember, loadNotes]);
   const runMemberAction = async (action: "suspend" | "reactivate" | "new-qr") => {
     if (!managingMember) return;
     setManageBusy(true);
@@ -247,6 +285,51 @@ export default function OwnerDashboardPage() {
     }
   };
 
+  // Emails this business has barred from joining
+  const [blockedList, setBlockedList] = useState<Array<{ id: string; email: string; reason: string; createdAt: string }>>([]);
+  const [blockEmailInput, setBlockEmailInput] = useState("");
+  const [blockReasonInput, setBlockReasonInput] = useState("");
+  const [blockMessage, setBlockMessage] = useState<string | null>(null);
+  const loadBlocked = useCallback(async () => {
+    const res = await fetch("/api/v1/owner/blocked", { cache: "no-store" });
+    if (res.ok) setBlockedList((await res.json()).data);
+  }, []);
+  const blockAnEmail = async (email: string, reason: string, fromCard = false) => {
+    setBlockMessage(null);
+    const res = await fetch("/api/v1/owner/blocked", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, reason }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const text = json.error?.message || "Couldn't block that email.";
+      if (fromCard) setManageMessage(text);
+      else setBlockMessage(text);
+      return;
+    }
+    const text = `${email} is blocked. ${json.data.cardSuspended ? "Their card here is suspended too." : "They can't join your programme."}`;
+    if (fromCard) {
+      setManageMessage(text);
+      setManageReason("");
+      if (managingMember) setMembers((list) => list.map((m) => (m.id === managingMember.id ? { ...m, status: json.data.cardSuspended ? "suspended" : m.status } : m)));
+    } else {
+      setBlockMessage(text);
+      setBlockEmailInput("");
+      setBlockReasonInput("");
+    }
+    loadBlocked();
+  };
+  const unblockAnEmail = async (id: string) => {
+    const res = await fetch(`/api/v1/owner/blocked?id=${id}`, { method: "DELETE" });
+    if (res.ok) loadBlocked();
+  };
+  useEffect(() => {
+    if (activeTab === "members") loadBlocked();
+  }, [activeTab, loadBlocked]);
+
+  // Awards the system marked as unusual (very large, or many in a few minutes)
+  const [flagged, setFlagged] = useState<Array<{ id: string; reason: string | null; createdAt: string; actorName: string | null; actorEmail: string | null; metadata: { memberNumber?: string; points?: number } }>>([]);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProductName, setNewProductName] = useState("");
   const [newProductCategory, setNewProductCategory] = useState("General");
@@ -400,6 +483,8 @@ export default function OwnerDashboardPage() {
         const json = await res.json();
         setLedger(json.data || []);
       }
+      const flaggedRes = await fetch("/api/v1/owner/audit?flagged=1");
+      if (flaggedRes.ok) setFlagged((await flaggedRes.json()).data.slice(0, 10));
     } catch (e) {
       console.error(e);
     }
@@ -623,6 +708,7 @@ export default function OwnerDashboardPage() {
       return;
     }
     const pointsDelta = adjustDirection === "add" ? amount : -amount;
+    if (!(await ensureRecentAuth())) return;
     setLoading(true);
     setAdjustError(null);
     try {
@@ -655,6 +741,7 @@ export default function OwnerDashboardPage() {
   // Submit Transaction Reversal
   const handleConfirmReverse = async () => {
     if (!reversingTx || !reverseNote) return;
+    if (!(await ensureRecentAuth())) return;
     setLoading(true);
     try {
       const res = await fetch("/api/v1/owner/ledger", {
@@ -683,6 +770,7 @@ export default function OwnerDashboardPage() {
   // Add Team Member
   const handleAddStaff = async () => {
     if (!newStaffEmail || !newStaffName) return;
+    if (newStaffPassword.trim() && !(await ensureRecentAuth())) return;
     setLoading(true);
     try {
       const res = await fetch("/api/v1/owner/team", {
@@ -801,6 +889,7 @@ export default function OwnerDashboardPage() {
   // Revoke Staff Member
   const handleRevokeStaff = async (staffMemberId: string) => {
     if (!confirm("Are you sure you want to revoke this staff member? Active sessions will be immediately invalidated.")) return;
+    if (!(await ensureRecentAuth())) return;
     try {
       const res = await fetch("/api/v1/owner/team", {
         method: "PATCH",
@@ -990,6 +1079,7 @@ export default function OwnerDashboardPage() {
 
         {/* Main */}
         <main className="flex-1 min-w-0 px-4 py-6 sm:px-8 sm:py-8 max-w-6xl">
+          <BillingBanner />
           {!emailVerified && (
             <div className="mb-6 rounded-2xl bg-marigold/25 border border-marigold/60 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
               <p className="text-sm text-zinc-900">
@@ -1268,6 +1358,8 @@ export default function OwnerDashboardPage() {
                   </ul>
                 )}
               </section>
+
+              <InsightsPanel range={range} unit={business?.programmeType === "stamps" ? "stamps" : "points"} />
             </div>
           )}
 
@@ -1304,6 +1396,13 @@ export default function OwnerDashboardPage() {
                 <p className="text-zinc-600 mt-1">Your business name, card colour, currency and time zone.</p>
               </div>
               <BusinessSettings value={business} onSaved={(b) => setBusiness((prev) => (prev ? { ...prev, ...b } : prev))} />
+              <SecuritySettings />
+              <LiveQrSettings />
+              <TermsEditor />
+              <DomainSettings />
+              <BillingSettings />
+              <SupportAccessSettings />
+              <IntegrationsSettings />
             </div>
           )}
 
@@ -1969,6 +2068,62 @@ export default function OwnerDashboardPage() {
                   </table>
                 </div>
               </div>
+
+              <MemberImport onDone={loadMembers} unit={business?.programmeType === "stamps" ? "stamps" : "points"} />
+
+              <details className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs">
+                <summary className="cursor-pointer font-semibold text-zinc-900">
+                  Blocked emails{blockedList.length > 0 ? ` (${blockedList.length})` : ""}
+                </summary>
+                <p className="text-sm text-zinc-600 mt-2">These emails can&rsquo;t join your programme. You can also block someone from their card above.</p>
+                <form
+                  className="mt-4 flex flex-col sm:flex-row gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    blockAnEmail(blockEmailInput, blockReasonInput);
+                  }}
+                >
+                  <input
+                    type="email"
+                    required
+                    value={blockEmailInput}
+                    onChange={(e) => setBlockEmailInput(e.target.value)}
+                    placeholder="email@example.com"
+                    aria-label="Email to block"
+                    className="min-h-[44px] flex-1 rounded-xl border border-zinc-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+                  />
+                  <input
+                    required
+                    value={blockReasonInput}
+                    onChange={(e) => setBlockReasonInput(e.target.value)}
+                    maxLength={300}
+                    placeholder="Why?"
+                    aria-label="Reason for blocking"
+                    className="min-h-[44px] flex-1 rounded-xl border border-zinc-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+                  />
+                  <button type="submit" className="press min-h-[44px] px-5 rounded-full bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 cursor-pointer">
+                    Block
+                  </button>
+                </form>
+                {blockMessage && <p className="pop-in mt-3 rounded-2xl bg-mist text-evergreen-deep text-sm px-4 py-3">{blockMessage}</p>}
+                {blockedList.length === 0 ? (
+                  <p className="mt-4 text-sm text-zinc-500">No blocked emails.</p>
+                ) : (
+                  <ul className="mt-4 divide-y divide-zinc-100">
+                    {blockedList.map((b) => (
+                      <li key={b.id} className="py-3 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-zinc-900 break-all">{b.email}</p>
+                          <p className="text-xs text-zinc-500">{b.reason}</p>
+                        </div>
+                        <button onClick={() => unblockAnEmail(b.id)} className="text-sm font-semibold text-evergreen hover:underline cursor-pointer shrink-0">
+                          Unblock
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </details>
             </div>
           )}
 
@@ -1998,6 +2153,22 @@ export default function OwnerDashboardPage() {
                   </Button>
                 </div>
               </div>
+
+              {flagged.length > 0 && (
+                <div className="rounded-3xl border border-marigold/60 bg-marigold/15 p-5">
+                  <p className="font-semibold text-zinc-900">Worth a look</p>
+                  <p className="text-sm text-zinc-700 mt-0.5">These awards went through, but were unusually large or fast. If something looks wrong, reverse it below.</p>
+                  <ul className="mt-3 divide-y divide-marigold/40">
+                    {flagged.map((f) => (
+                      <li key={f.id} className="py-2 text-sm text-zinc-800">
+                        <span className="font-semibold">{f.actorName || f.actorEmail || "Staff"}</span> gave {f.metadata?.points ?? "?"} to #{f.metadata?.memberNumber ?? "?"}
+                        <span className="text-zinc-600">: {f.reason}</span>
+                        <span className="block text-xs text-zinc-500">{new Date(f.createdAt).toLocaleString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
@@ -2179,6 +2350,7 @@ export default function OwnerDashboardPage() {
                     className="w-full max-w-sm space-y-3 rounded-3xl bg-white p-6 shadow-xl"
                     onSubmit={async (e) => {
                       e.preventDefault();
+                      if (!(await ensureRecentAuth())) return;
                       setResetBusy(true);
                       setResetError(null);
                       const res = await fetch("/api/v1/owner/team", {
@@ -2197,7 +2369,7 @@ export default function OwnerDashboardPage() {
                     }}
                   >
                     <h3 className="font-display text-xl font-bold text-evergreen-deep">Set a new password</h3>
-                    <p className="text-sm text-zinc-600">For {resetTarget.email}. They'll be signed out everywhere and use this to sign in again.</p>
+                    <p className="text-sm text-zinc-600">For {resetTarget.email}. They&rsquo;ll be signed out everywhere and use this to sign in again.</p>
                     <Input
                       type="text"
                       required
@@ -2329,6 +2501,10 @@ export default function OwnerDashboardPage() {
                   </div>
                   <a
                     href="/api/v1/owner/reports/export?type=ledger"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      if (await ensureRecentAuth()) window.location.href = "/api/v1/owner/reports/export?type=ledger";
+                    }}
                     className="inline-flex w-full items-center justify-center font-bold px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs shadow-sm transition-colors"
                   >
                     <FileDown className="h-4 w-4 mr-2" />
@@ -2348,6 +2524,10 @@ export default function OwnerDashboardPage() {
                   </div>
                   <a
                     href="/api/v1/owner/reports/export?type=members"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      if (await ensureRecentAuth()) window.location.href = "/api/v1/owner/reports/export?type=members";
+                    }}
                     className="inline-flex w-full items-center justify-center font-bold px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 text-xs border border-slate-300 transition-colors"
                   >
                     <FileDown className="h-4 w-4 mr-2" />
@@ -2367,6 +2547,10 @@ export default function OwnerDashboardPage() {
                   </div>
                   <a
                     href="/api/v1/owner/reports/export?type=redemptions"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      if (await ensureRecentAuth()) window.location.href = "/api/v1/owner/reports/export?type=redemptions";
+                    }}
                     className="inline-flex w-full items-center justify-center font-bold px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 text-xs border border-slate-300 transition-colors"
                   >
                     <FileDown className="h-4 w-4 mr-2" />
@@ -3066,6 +3250,48 @@ export default function OwnerDashboardPage() {
                     </button>
                   </>
                 )}
+              </div>
+              <div className="rounded-2xl border border-zinc-200 p-4">
+                <p className="font-semibold text-zinc-900">Block this email</p>
+                <p className="text-sm text-zinc-600 mt-0.5">Stops this email joining your programme again, and suspends this card. Use the reason box above.</p>
+                <button
+                  onClick={() => blockAnEmail(managingMember.email, manageReason, true)}
+                  disabled={manageBusy || !manageReason.trim()}
+                  className="press mt-3 min-h-[40px] px-4 rounded-full border border-rose-300 text-rose-700 text-sm font-semibold hover:bg-rose-50 cursor-pointer disabled:opacity-50"
+                >
+                  Block {managingMember.email}
+                </button>
+              </div>
+              <div className="rounded-2xl border border-zinc-200 p-4">
+                <p className="font-semibold text-zinc-900">Private notes</p>
+                <p className="text-sm text-zinc-600 mt-0.5">Only you and your managers can see these. They&rsquo;re deleted after 2 years, or if the customer deletes their account.</p>
+                <ul className="mt-3 space-y-2">
+                  {notes.map((n) => (
+                    <li key={n.id} className="rounded-xl bg-zinc-50 px-3 py-2 text-sm text-zinc-800">
+                      <p className="whitespace-pre-wrap">{n.body}</p>
+                      <p className="mt-1 flex items-center justify-between text-xs text-zinc-500">
+                        <span>
+                          {n.authorName || "Team"}, {new Date(n.createdAt).toLocaleDateString("en-GB")}
+                        </span>
+                        <button onClick={() => removeNote(n.id)} className="font-semibold text-rose-700 hover:underline cursor-pointer">
+                          Delete
+                        </button>
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+                <textarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  maxLength={1000}
+                  rows={2}
+                  placeholder="e.g. Prefers oat milk. Allergic to nuts."
+                  aria-label="New note"
+                  className="mt-3 w-full rounded-xl border border-zinc-300 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+                />
+                <button onClick={saveNote} disabled={!noteText.trim()} className="press mt-2 min-h-[40px] px-4 rounded-full border border-zinc-300 text-sm font-semibold text-zinc-800 hover:border-evergreen cursor-pointer disabled:opacity-50">
+                  Save note
+                </button>
               </div>
               {manageMessage && <p className="pop-in rounded-2xl bg-mist text-evergreen-deep text-sm px-4 py-3">{manageMessage}</p>}
             </div>

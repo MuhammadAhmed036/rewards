@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { assertGrowthAllowed } from "./billing";
 import {
   tenants,
   locations,
@@ -252,6 +253,7 @@ export async function createLocation(
 ) {
   assertCan(ctx, "location.manage");
   if (!ctx.tenantId) throw new Error("tenantId required");
+  await assertGrowthAllowed(ctx.tenantId, "Adding locations");
 
   // Check tier limit: maxLocations (A18 / FR-011)
   const [tenant] = await db

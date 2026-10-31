@@ -71,6 +71,48 @@
       "when": 1793257404005,
       "tag": "0009_birthdays",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793436516649,
+      "tag": "0010_blocked_emails",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793436968901,
+      "tag": "0011_step_up_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793437654146,
+      "tag": "0012_referrals",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793437891204,
+      "tag": "0013_campaign_schedule",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793437988951,
+      "tag": "0014_email_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793438604968,
+      "tag": "0015_platform_features",
+      "breakpoints": true
     }
   ]
 }

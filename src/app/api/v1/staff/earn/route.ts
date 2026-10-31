@@ -10,6 +10,7 @@ const earnSchema = z.object({
   locationId: z.string().uuid(),
   amountMinor: z.number().int().min(0).optional(),
   tipMinor: z.number().int().min(0).optional(),
+  excludedMinor: z.number().int().min(0).optional(),
   managerOverrideReason: z.string().optional(),
 });
 

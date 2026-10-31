@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { guardApiRequest } from "@/server/auth/route-guard";
 import { db } from "@/server/db";
 import { auditEvents, users } from "@/server/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const guard = await guardApiRequest(request, {
@@ -27,7 +27,13 @@ export async function GET(request: NextRequest) {
     })
     .from(auditEvents)
     .leftJoin(users, eq(auditEvents.actorUserId, users.id))
-    .where(eq(auditEvents.tenantId, ctx.tenantId!))
+    .where(
+      and(
+        eq(auditEvents.tenantId, ctx.tenantId!),
+        // ?flagged=1 shows only activity the system marked as unusual
+        request.nextUrl.searchParams.get("flagged") === "1" ? eq(auditEvents.action, "ledger.flagged") : undefined
+      )
+    )
     .orderBy(desc(auditEvents.createdAt))
     .limit(100);
 

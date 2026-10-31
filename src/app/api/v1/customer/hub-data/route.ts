@@ -9,11 +9,13 @@ import {
   users,
   ruleVersions,
 } from "@/server/db/schema";
-import { describeRule, ruleConfigSchema } from "@/lib/points";
+import { describeRule, ruleConfigSchema, activeMultiplier, tierFor, type RuleConfig } from "@/lib/points";
+import { earnedInTierWindow } from "@/server/services/ledger";
 import { currencySymbol } from "@/lib/money";
 import { getVisibleLinks } from "@/server/services/links";
 import { getRewards } from "@/server/services/rewards";
-import { generateMemberQrToken, generateQrDataUrl } from "@/server/qr";
+import { generateLiveQrToken, generateMemberQrToken, generateQrDataUrl } from "@/server/qr";
+import { tenantUsesLiveQr } from "@/server/services/member";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { logoRefSql, resolveLogoUrl } from "@/server/services/business-logo";
 import { getMemberStampCards } from "@/server/services/stamp-cards";
@@ -67,6 +69,7 @@ export async function GET(request: NextRequest) {
   // How customers earn, in plain words, so the rule is visible to them (FR-051)
   let earningRule: string | null = null;
   let expiryRule: string | null = null;
+  let parsedRule: RuleConfig | null = null;
   if (progRow?.currentRuleVersionId) {
     const [rule] = await db
       .select({ config: ruleVersions.config })
@@ -75,6 +78,7 @@ export async function GET(request: NextRequest) {
       .limit(1);
     if (rule) {
       const parsed = ruleConfigSchema.parse(rule.config);
+      parsedRule = parsed;
       if (parsed.expiry.enabled) {
         expiryRule = `${progRow.type === "stamps" ? "Stamps" : "Points"} expire after ${parsed.expiry.months} months without a visit`;
       }
@@ -95,6 +99,17 @@ export async function GET(request: NextRequest) {
         termsText: progRow.termsText,
         earningRule,
         expiryRule,
+        // What customers can see about boosts, levels and inviting friends (FR-051)
+        activeBoost: (() => {
+          if (!parsedRule) return null;
+          const boost = activeMultiplier(parsedRule);
+          if (!boost.label) return null;
+          const running = parsedRule.multipliers.find((m) => m.label === boost.label && m.percent === boost.percent);
+          return { label: boost.label, percent: boost.percent, endsAt: running?.endsAt ?? null };
+        })(),
+        tierLevels: parsedRule?.tiers.enabled ? parsedRule.tiers.levels : [],
+        tierMonths: parsedRule?.tiers.qualificationMonths ?? 12,
+        referralPoints: parsedRule?.bonuses.referralPoints ?? 0,
       }
     : undefined;
 
@@ -145,7 +160,9 @@ export async function GET(request: NextRequest) {
 
         currentBalance = bal?.balance || 0;
 
-        const qrToken = generateMemberQrToken(membership.publicId, membership.qrVersion);
+        // A business that uses live codes shows one that changes every 30 seconds
+        const rotatingQr = await tenantUsesLiveQr(tenant.id);
+        const qrToken = rotatingQr ? generateLiveQrToken(membership.publicId, membership.qrVersion) : generateMemberQrToken(membership.publicId, membership.qrVersion);
         const qrDataUrl = await generateQrDataUrl(qrToken);
 
         // Recent history
@@ -162,6 +179,19 @@ export async function GET(request: NextRequest) {
           .orderBy(desc(ledgerEntries.occurredAt))
           .limit(10);
 
+        let memberTier: { name: string | null; earnPercent: number; next: string | null; pointsToNext: number; earnedInWindow: number } | null = null;
+        if (parsedRule?.tiers.enabled) {
+          const earned = await earnedInTierWindow(db, tenant.id, membership.id, parsedRule);
+          const t = tierFor(parsedRule, earned);
+          memberTier = {
+            name: t.current?.name ?? null,
+            earnPercent: t.current?.earnPercent ?? 100,
+            next: t.next?.name ?? null,
+            pointsToNext: t.pointsToNext,
+            earnedInWindow: earned,
+          };
+        }
+
         memberData = {
           membershipId: membership.id,
           memberNumber: membership.memberNumber,
@@ -170,8 +200,12 @@ export async function GET(request: NextRequest) {
           lifetimeEarned: bal?.lifetimeEarned || 0,
           qrToken,
           qrDataUrl,
+          rotatingQr,
           recentHistory,
           stampCards: await getMemberStampCards(tenant.id, membership.id),
+          // Level and invite code, only when the shop uses them
+          tier: memberTier,
+          referralCode: membership.memberNumber,
         };
       }
     }

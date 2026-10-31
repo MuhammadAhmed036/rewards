@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireRecentAuth } from "@/server/auth/reauth";
 import { guardApiRequest } from "@/server/auth/route-guard";
 import { db } from "@/server/db";
 import {
@@ -18,6 +19,8 @@ export async function GET(request: NextRequest) {
     requireTenant: true,
   });
   if ("response" in guard) return guard.response;
+  const denied = await requireRecentAuth(request);
+  if (denied) return denied;
 
   const { ctx } = guard;
   const searchParams = request.nextUrl.searchParams;
@@ -150,6 +153,9 @@ export async function GET(request: NextRequest) {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
+      // When it was made and which column layout it uses, so a saved file can always be understood later
+      "X-Generated-At": new Date().toISOString(),
+      "X-Export-Schema-Version": "1",
     },
   });
 }

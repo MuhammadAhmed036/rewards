@@ -8,14 +8,16 @@ const bodySchema = z.object({
   t: z.string().min(16).max(64),
   on: z.boolean(),
   kind: z.enum(["card", "offers"]).default("card"),
+  // The offer the link came from, so its opt-outs can be counted
+  c: z.string().uuid().optional(),
 });
 
 /** The "Stop these emails" link: works without signing in because the link itself is signed. */
 export async function POST(request: NextRequest) {
   try {
-    const { m, t, on, kind } = bodySchema.parse(await request.json());
+    const { m, t, on, kind, c } = bodySchema.parse(await request.json());
     // Offers can only be switched off by link; saying yes again happens from the customer's account
-    const data = kind === "offers" ? await stopOffersByLink(m, t) : await setCardEmailsByLink(m, t, on);
+    const data = kind === "offers" ? await stopOffersByLink(m, t, c) : await setCardEmailsByLink(m, t, on);
     return NextResponse.json({ data: { ...data, kind } });
   } catch (err) {
     const message = err instanceof z.ZodError ? "This link is incomplete." : err instanceof Error ? err.message : "Couldn't change your email settings.";
