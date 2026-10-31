@@ -5,6 +5,7 @@ import {
   addStaffMember,
   updateStaffMember,
   resendStaffInvitation,
+  resetStaffPassword,
 } from "@/server/services/staff";
 import { z } from "zod";
 
@@ -72,6 +73,8 @@ const updateStaffSchema = z.object({
   locationIds: z.array(z.string().uuid()).optional(),
   // Send the invite email again to someone who hasn't accepted yet
   resendInvite: z.boolean().optional(),
+  // Owner sets a new password for someone who forgot theirs
+  newPassword: z.string().min(8, "Use at least 8 characters for the new password.").max(128).optional(),
 });
 
 export async function PATCH(request: NextRequest) {
@@ -85,6 +88,9 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const validated = updateStaffSchema.parse(body);
 
+    if (validated.newPassword) {
+      return NextResponse.json({ data: await resetStaffPassword(guard.ctx, validated.staffMemberId, validated.newPassword) });
+    }
     if (validated.resendInvite) {
       return NextResponse.json({ data: await resendStaffInvitation(guard.ctx, validated.staffMemberId) });
     }

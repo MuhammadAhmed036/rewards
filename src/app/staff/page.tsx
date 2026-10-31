@@ -772,8 +772,9 @@ export default function StaffPage() {
             )}
             <button
               onClick={async () => {
-                await fetch("/api/v1/auth/logout", { method: "POST" });
-                window.location.href = "/login";
+                const res = await fetch("/api/v1/auth/logout", { method: "POST" });
+                const json = await res.json().catch(() => ({}));
+                window.location.href = json.redirectTo || "/login";
               }}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 px-3 py-1.5 rounded-full hover:bg-zinc-100 transition-colors cursor-pointer"
             >

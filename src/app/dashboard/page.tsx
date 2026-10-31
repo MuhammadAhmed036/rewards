@@ -276,6 +276,10 @@ export default function OwnerDashboardPage() {
   // Optional: by default the person gets an invite email and chooses their own password
   const [newStaffPassword, setNewStaffPassword] = useState("");
   const [teamNotice, setTeamNotice] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<{ id: string; email: string } | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
   const [newStaffRole, setNewStaffRole] = useState<"manager" | "staff" | "marketing">("staff");
 
   // Promotional Campaign QR state
@@ -939,8 +943,9 @@ export default function OwnerDashboardPage() {
           </Link>
           <button
             onClick={async () => {
-              await fetch("/api/v1/auth/logout", { method: "POST" });
-              window.location.href = "/login";
+              const res = await fetch("/api/v1/auth/logout", { method: "POST" });
+              const json = await res.json().catch(() => ({}));
+              window.location.href = json.redirectTo || "/login";
             }}
             className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 px-3 py-2 rounded-full transition-colors cursor-pointer"
           >
@@ -2168,6 +2173,53 @@ export default function OwnerDashboardPage() {
                 </Button>
               </div>
 
+              {resetTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                  <form
+                    className="w-full max-w-sm space-y-3 rounded-3xl bg-white p-6 shadow-xl"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      setResetBusy(true);
+                      setResetError(null);
+                      const res = await fetch("/api/v1/owner/team", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ staffMemberId: resetTarget.id, newPassword: resetPassword }),
+                      });
+                      const json = await res.json().catch(() => ({}));
+                      setResetBusy(false);
+                      if (!res.ok) {
+                        setResetError(json.error?.message || "Couldn't change the password.");
+                        return;
+                      }
+                      setTeamNotice(`New password set for ${resetTarget.email}. Give it to them and ask them to sign in.`);
+                      setResetTarget(null);
+                    }}
+                  >
+                    <h3 className="font-display text-xl font-bold text-evergreen-deep">Set a new password</h3>
+                    <p className="text-sm text-zinc-600">For {resetTarget.email}. They'll be signed out everywhere and use this to sign in again.</p>
+                    <Input
+                      type="text"
+                      required
+                      minLength={8}
+                      placeholder="At least 8 characters"
+                      value={resetPassword}
+                      onChange={(e) => setResetPassword(e.target.value)}
+                      className="bg-white border-zinc-300 text-sm text-zinc-900"
+                    />
+                    {resetError && <p className="text-sm text-rose-700">{resetError}</p>}
+                    <div className="flex gap-2.5 pt-1">
+                      <Button type="button" variant="outline" className="flex-1" onClick={() => setResetTarget(null)}>
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={resetBusy} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white">
+                        {resetBusy ? "Saving..." : "Set password"}
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
               <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-xs">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -2218,6 +2270,20 @@ export default function OwnerDashboardPage() {
                               }}
                             >
                               Send again
+                            </Button>
+                          )}
+                          {s.role !== "owner" && (s.status === "active" || s.status === "invited") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs h-7 py-0 mr-2"
+                              onClick={() => {
+                                setResetTarget({ id: s.id, email: s.email });
+                                setResetPassword("");
+                                setResetError(null);
+                              }}
+                            >
+                              Reset password
                             </Button>
                           )}
                           {s.role !== "owner" && (s.status === "active" || s.status === "invited") && (
@@ -2559,7 +2625,7 @@ export default function OwnerDashboardPage() {
                   onChange={(e) => setNewStaffPassword(e.target.value)}
                   className="mt-2 bg-white border-zinc-300 text-sm text-zinc-900"
                 />
-                <p className="text-xs text-zinc-500 mt-1">Ask them to change it with &ldquo;Forgot password?&rdquo; after their first sign-in.</p>
+                <p className="text-xs text-zinc-500 mt-1">If they forget it later, you can set a new one from the Staff tab.</p>
               </details>
 
               <div className="flex gap-2.5 pt-3">

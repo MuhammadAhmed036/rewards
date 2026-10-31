@@ -1,8 +1,8 @@
 import { db } from "../db";
-import { staffMembers, users, staffLocationScopes, locations, tenants, staffInvitations } from "../db/schema";
+import { staffMembers, users, staffLocationScopes, locations, tenants, staffInvitations, memberships } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
 import { invalidateUserSessions, hashPassword } from "../auth";
-import { eq, and, count, inArray, gt, isNull } from "drizzle-orm";
+import { eq, and, count, inArray, gt, isNull, ne } from "drizzle-orm";
 import crypto from "crypto";
 import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/url";
@@ -179,10 +179,60 @@ export async function resendStaffInvitation(ctx: RequestContext, staffMemberId: 
     .where(and(eq(staffMembers.id, staffMemberId), eq(staffMembers.tenantId, ctx.tenantId)))
     .limit(1);
   if (!row) throw new Error("Staff member not found");
-  if (row.status !== "invited") throw new Error("They've already accepted. They can sign in, or use Forgot password.");
+  if (row.status !== "invited") throw new Error("They've already accepted. They can sign in, or you can set a new password for them from the Staff tab.");
   await sendStaffInvite(ctx.tenantId, row.email, row.role, row.businessName);
   await logAuditEvent(ctx, { action: "staff.invite_resent", targetType: "staff_member", targetId: staffMemberId });
   return { sent: true };
+}
+
+/**
+ * Owner sets a new password for a team member who forgot theirs, then hands it over in person.
+ * Only for people who work for this business alone: a login shared with another business,
+ * a customer card or a platform admin account isn't the owner's to change.
+ */
+export async function resetStaffPassword(ctx: RequestContext, staffMemberId: string, newPassword: string) {
+  assertCan(ctx, "staff.manage");
+  if (!ctx.tenantId) throw new Error("tenantId required");
+  if (newPassword.length < 8) throw new Error("Use at least 8 characters for the new password.");
+
+  const [row] = await db
+    .select({
+      userId: staffMembers.userId,
+      role: staffMembers.role,
+      status: staffMembers.status,
+      isPlatformAdmin: users.isPlatformAdmin,
+      email: users.email,
+    })
+    .from(staffMembers)
+    .innerJoin(users, eq(users.id, staffMembers.userId))
+    .where(and(eq(staffMembers.id, staffMemberId), eq(staffMembers.tenantId, ctx.tenantId)))
+    .limit(1);
+  if (!row) throw new Error("Staff member not found");
+  if (row.role === "owner") throw new Error("An owner's password can't be reset from here.");
+  if (row.status === "revoked") throw new Error("This person no longer has access. Restore their access first.");
+  if (row.userId === ctx.userId) throw new Error("Use Forgot password to change your own password.");
+
+  const [otherStaff] = await db
+    .select({ id: staffMembers.id })
+    .from(staffMembers)
+    .where(and(eq(staffMembers.userId, row.userId), ne(staffMembers.tenantId, ctx.tenantId)))
+    .limit(1);
+  const [card] = await db.select({ id: memberships.id }).from(memberships).where(eq(memberships.userId, row.userId)).limit(1);
+  if (row.isPlatformAdmin || otherStaff || card) {
+    throw new Error("This login is also used outside your business, so you can't change its password. They can use Forgot password instead.");
+  }
+
+  await db
+    .update(users)
+    .set({ passwordHash: await hashPassword(newPassword), emailVerifiedAt: new Date() })
+    .where(eq(users.id, row.userId));
+  // Anyone signed in with the old password is signed out
+  await invalidateUserSessions(row.userId);
+  if (row.status === "invited") {
+    await db.update(staffMembers).set({ status: "active", acceptedAt: new Date() }).where(eq(staffMembers.id, staffMemberId));
+  }
+  await logAuditEvent(ctx, { action: "staff.password_reset", targetType: "staff_member", targetId: staffMemberId });
+  return { email: row.email };
 }
 
 async function findInvitation(token: string) {
