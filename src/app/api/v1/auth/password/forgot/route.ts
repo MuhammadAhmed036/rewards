@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requestPasswordReset } from "@/server/services/password-reset";
+import { requestPasswordReset, PasswordResetError } from "@/server/services/password-reset";
 
 const bodySchema = z.object({ email: z.string().email("Enter a valid email address") });
 
-// Always answers the same way, so it can't reveal which emails have accounts.
 export async function POST(request: NextRequest) {
   try {
     const { email } = bodySchema.parse(await request.json());
@@ -20,7 +19,14 @@ export async function POST(request: NextRequest) {
         { status: 429 }
       );
     }
+    if (err instanceof PasswordResetError) {
+      const status = err.code === "NO_ACCOUNT" ? 404 : err.code === "STAFF_ACCOUNT" ? 403 : 502;
+      return NextResponse.json({ error: { code: err.code, message: err.message } }, { status });
+    }
     console.error("Password reset request failed:", err);
-    return NextResponse.json({ data: { sent: true } });
+    return NextResponse.json(
+      { error: { code: "INTERNAL", message: "Something went wrong. Please try again." } },
+      { status: 500 }
+    );
   }
 }

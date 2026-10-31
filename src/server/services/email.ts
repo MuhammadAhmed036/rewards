@@ -74,15 +74,20 @@ function buttonEmail(title: string, body: string, button: string, url: string, f
   `;
 }
 
-/** Queue an email and try to send it straight away; the outbox retries anything that fails. */
+/**
+ * Queue an email and send it straight away. `sent` says whether it actually went out;
+ * if not, the outbox keeps it and retries later.
+ */
 export async function sendEmailNow(options: QueueEmailOptions) {
   const entry = await queueEmail(options);
+  let sent = false;
   try {
-    await processOutbox(1, { ids: [entry.id] });
+    const result = await processOutbox(1, { ids: [entry.id] });
+    sent = result.sent > 0;
   } catch (err) {
-    logger.warn({ err }, "Email queued; immediate send failed and will be retried");
+    logger.error({ err }, "Immediate email send crashed; queued for retry");
   }
-  return entry;
+  return { ...entry, sent };
 }
 
 export function renderEmailTemplate(
@@ -356,10 +361,11 @@ You're getting this because you said yes to offers from ${businessName}.${payloa
  * Creates SMTP transport targeting local Mailpit or configured SMTP server
  */
 export function getMailTransporter() {
-  const host =
-    !env.SMTP_HOST || env.SMTP_HOST === "localhost"
-      ? "127.0.0.1"
-      : env.SMTP_HOST;
+  const smtpHost = env.SMTP_HOST?.trim();
+  const host = !smtpHost || smtpHost === "localhost" ? "127.0.0.1" : smtpHost;
+  const smtpUser = env.SMTP_USER?.trim();
+  // Gmail shows app passwords as "abcd efgh ijkl mnop"; the spaces are not part of the password
+  const smtpPass = (env.SMTP_PASS ?? "").replace(/\s+/g, "");
 
   const port = env.SMTP_PORT || 1025;
   // If port is 465, secure is true by default; for 587 or 25, STARTTLS (secure = false)
@@ -369,11 +375,11 @@ export function getMailTransporter() {
     host,
     port,
     secure: isSecure,
-    ignoreTLS: !env.SMTP_USER && host === "127.0.0.1",
-    auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS ?? "" } : undefined,
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 15000,
+    ignoreTLS: !smtpUser && host === "127.0.0.1",
+    auth: smtpUser ? { user: smtpUser, pass: smtpPass } : undefined,
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 10000,
   });
 }
 
@@ -423,8 +429,8 @@ export async function processOutbox(
     try {
       const fromEmail =
         env.EMAIL_FROM_TRANSACTIONAL && !env.EMAIL_FROM_TRANSACTIONAL.includes("example.com")
-          ? env.EMAIL_FROM_TRANSACTIONAL
-          : env.SMTP_USER || "no-reply@rewards-program-xi.vercel.app";
+          ? env.EMAIL_FROM_TRANSACTIONAL.trim()
+          : env.SMTP_USER?.trim() || "no-reply@rewards-program-xi.vercel.app";
 
       await transporter.sendMail({
         from: fromEmail,

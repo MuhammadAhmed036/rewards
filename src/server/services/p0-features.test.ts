@@ -7,7 +7,7 @@ import { registerOwnerAndTenant, createLocation, updateLocation } from "./tenant
 import { joinProgramme, revokeMemberQr } from "./member";
 import { addStaffMember, updateStaffMember } from "./staff";
 import { requestPasswordReset, resetPassword } from "./password-reset";
-import { createEmailVerificationToken, verifyEmailToken } from "./verification";
+import { createEmailVerificationToken, verifyEmailToken, hashLinkToken } from "./verification";
 import { setProgrammeStatus, publishRuleVersion, getProgramme } from "./programme";
 import { adjustBalance, earn, redeemForMember } from "./ledger";
 import { createReward, getRewards } from "./rewards";
@@ -46,9 +46,15 @@ describe("Password reset", () => {
     const email = s.user.email;
     await createSession(s.user.id, "staff");
 
-    await requestPasswordReset(email);
-    const token = await tokenFromLatestEmail(email, "password_reset");
-    expect(token).toHaveLength(64);
+    // A shop owner is a staff account, so the forgot form refuses it
+    await expect(requestPasswordReset(email)).rejects.toThrow(/staff account/);
+
+    const token = "a".repeat(64);
+    await db.insert(verifications).values({
+      identifier: `reset:${email}`,
+      value: hashLinkToken(token),
+      expiresAt: new Date(Date.now() + 60_000),
+    });
     const stored = await db.select().from(verifications).where(eq(verifications.identifier, `reset:${email}`));
     expect(stored).toHaveLength(1);
     expect(stored[0].value).not.toBe(token);
@@ -59,8 +65,8 @@ describe("Password reset", () => {
     await expect(resetPassword(token, "AnotherPass789!")).rejects.toThrow(/expired or was already used/);
   });
 
-  it("answers the same way for an email with no account", async () => {
-    await expect(requestPasswordReset(`nobody-${Date.now()}@p0.test`)).resolves.toBeUndefined();
+  it("asks an unregistered email to register first", async () => {
+    await expect(requestPasswordReset(`nobody-${Date.now()}@p0.test`)).rejects.toThrow(/register first/);
   });
 });
 

@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <AuthShell title="Check your email" intro={<>If <strong>{email}</strong> has an account, we&rsquo;ve sent a link to choose a new password. It works for 30 minutes.</>}>
+      <AuthShell title="Check your email" intro={<>We&rsquo;ve sent a link to <strong>{email}</strong> to choose a new password. It works for 30 minutes.</>}>
         <p className="text-sm text-zinc-600">Nothing there? Check your spam folder, or try again in a few minutes.</p>
         <Link href="/login" className={`${primaryButtonClass} mt-6 inline-flex items-center justify-center`}>
           Back to sign in
@@ -55,7 +55,19 @@ export default function ForgotPasswordPage() {
             className={`${fieldClass} mt-1`}
           />
         </label>
-        {error && <p className="text-sm text-rose-700">{error}</p>}
+        {error && (
+          <p className="text-sm text-rose-700">
+            {error}
+            {error.includes("register") && (
+              <>
+                {" "}
+                <Link href="/login" className="font-semibold underline">
+                  Create an account
+                </Link>
+              </>
+            )}
+          </p>
+        )}
         <button type="submit" disabled={busy} className={primaryButtonClass}>
           {busy ? "Sending..." : "Send reset link"}
         </button>

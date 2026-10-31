@@ -1,6 +1,6 @@
 import { db } from "../db";
-import { users, verifications } from "../db/schema";
-import { and, eq, gt } from "drizzle-orm";
+import { users, verifications, memberships, staffMembers } from "../db/schema";
+import { and, eq, gt, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/url";
@@ -15,9 +15,19 @@ const resetKey = (email: string) => `reset:${email.toLowerCase().trim()}`;
 
 export const MIN_PASSWORD_LENGTH = 8;
 
+/** Thrown so the forgot-password form can tell the person exactly what to do next. */
+export class PasswordResetError extends Error {
+  constructor(readonly code: "NO_ACCOUNT" | "STAFF_ACCOUNT" | "EMAIL_FAILED", message: string) {
+    super(message);
+    this.name = "PasswordResetError";
+  }
+}
+
 /**
- * Emails a 30-minute, single-use reset link. The caller always gets the same answer whether or
- * not the email has an account, so the form can't be used to find out who is registered.
+ * Emails a 30-minute, single-use reset link to a registered customer.
+ * - No account for the email -> asks them to register first.
+ * - Staff-only account (works for a business, no loyalty card) -> not reset here.
+ * - The email is sent straight away; if it can't be sent the person is told, not left waiting.
  */
 export async function requestPasswordReset(email: string) {
   const normalizedEmail = email.toLowerCase().trim();
@@ -29,8 +39,31 @@ export async function requestPasswordReset(email: string) {
     .where(eq(users.email, normalizedEmail))
     .limit(1);
   if (!user || user.deletedAt) {
-    logger.warn({ email: normalizedEmail }, "Password reset requested for an unknown or unregistered email");
-    return;
+    logger.warn({ email: normalizedEmail }, "Password reset requested for an unregistered email");
+    throw new PasswordResetError(
+      "NO_ACCOUNT",
+      "No account found with this email. Please register first."
+    );
+  }
+
+  const [card] = await db
+    .select({ id: memberships.id })
+    .from(memberships)
+    .where(and(eq(memberships.userId, user.id), eq(memberships.status, "active")))
+    .limit(1);
+  if (!card) {
+    const [staff] = await db
+      .select({ id: staffMembers.id })
+      .from(staffMembers)
+      .where(and(eq(staffMembers.userId, user.id), inArray(staffMembers.status, ["active", "invited"])))
+      .limit(1);
+    if (staff) {
+      logger.warn({ email: normalizedEmail }, "Password reset requested for a staff account");
+      throw new PasswordResetError(
+        "STAFF_ACCOUNT",
+        "This email belongs to a staff account, not a customer. Ask your business owner to help with your password."
+      );
+    }
   }
 
   const token = crypto.randomBytes(32).toString("hex");
@@ -42,12 +75,15 @@ export async function requestPasswordReset(email: string) {
   });
 
   const baseUrl = getBaseUrl();
-  await sendEmailNow({
+  const { sent } = await sendEmailNow({
     toEmail: normalizedEmail,
     template: "password_reset",
     payload: { url: `${baseUrl}/reset-password?token=${token}` },
     kind: "transactional",
   });
+  if (!sent) {
+    throw new PasswordResetError("EMAIL_FAILED", "We couldn't send the email right now. Please try again in a minute.");
+  }
 }
 
 /** Sets the new password, uses up the link, and signs the account out everywhere. */
