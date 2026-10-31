@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# k6 load-test data: test accounts and passwords made by k6/setup-data.ts. Regenerate it, never commit it.
+/k6/data.json

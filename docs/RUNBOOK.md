@@ -52,20 +52,26 @@ The local database seed script (`pnpm db:seed`) provisions the following account
 - **Review Links**: Configured for Google, Instagram, and Facebook using anti-gating compliance.
 
 ## 4. Scheduled Maintenance Crons
-Protected by `Authorization: Bearer ${CRON_SECRET}`:
+Protected by `Authorization: Bearer ${CRON_SECRET}`. These are the times in `vercel.json` (Vercel's free plan allows one run a day per job):
 
-| Endpoint | Frequency | Function |
+| Endpoint | Runs | Function |
 | :--- | :--- | :--- |
-| `/api/cron/expire-redemptions` | Every 5 mins | Expires pending redemptions whose 10-min TTL has elapsed. |
-| `/api/cron/send-outbox` | Every 1 min | Dispatches queued transactional emails via SMTP. |
-| `/api/cron/reconcile-balances` | Daily (03:00 UTC) | Verifies `SUM(points_delta)` against cached `balance` for all members. |
-| `/api/cron/retention` | Monthly | Hard-deletes anonymised records past UK statutory retention window. |
+| `/api/cron/expire-redemptions` | daily 02:00 UTC | Expires pending redemption codes past their 10-minute life. |
+| `/api/cron/retention` | daily 03:00 UTC | Deletes data past its retention period (old clicks, feedback, audit, private notes, sessions). |
+| `/api/cron/reconcile-balances` | daily 04:00 UTC | Checks every balance against its ledger. |
+| `/api/cron/send-outbox` | daily 05:00 UTC | Sends due scheduled offers, retries failed emails and webhooks. |
+| `/api/cron/loyalty-daily` | daily 06:00 UTC | Birthday bonuses, expiry warnings and expiry, inactivity emails, billing status. |
+
+Because the free plan runs these once a day, the app also does the urgent parts itself: a failed email is retried the next time any email is sent, a scheduled offer goes out when the offers list is opened or an email is sent, and webhooks are tried straight after the event. A paid plan (or any external scheduler calling these URLs with the secret) can run them every minute.
+
+Send a test email and see the real SMTP error: `POST /api/cron/test-email?to=you@example.com` with the secret.
 
 ## 5. Backup & Restore Procedures
 - **Automated Neon / Postgres Backups**:
   - Point-in-time recovery (PITR) is enabled with 30-day retention on managed database branches.
   - Manual dump command: `docker exec -t loyalty-postgres pg_dump -U loyalty_app -d loyalty_db -F c -b -v -f /tmp/backup.dump`
   - Restore test command: `docker exec -t loyalty-postgres pg_restore -U loyalty_app -d loyalty_db -v /tmp/backup.dump`
+  - **Prove it works**: `bash scripts/backup-restore-test.sh` backs up, restores into a scratch database, compares every table, checks the ledger totals and that the append-only trigger and row-level security came back, then cleans up. Run it before launch and every quarter. For production, do the same on a Neon *branch* created from a point in time.
 
 ## 6. Production Deployment Runbook (Vercel + Neon)
 1. Provision PostgreSQL 16 database on Neon with connection pooling enabled.
