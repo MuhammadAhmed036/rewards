@@ -35,7 +35,30 @@ const UK_SAMPLE_NAMES = [
   "Daisy Watson", "Sebastian Kelly", "Harper Brooks", "Mason Sanders", "Willow Price"
 ];
 
+/**
+ * This script switches off the ledger's protection and rewrites demo data, with well-known passwords.
+ * It must never run against a real database, so it refuses unless the database is on this machine.
+ */
+function assertSafeToSeed() {
+  const url = process.env.DATABASE_URL || "";
+  let host = "";
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    host = "";
+  }
+  const local = ["localhost", "127.0.0.1", "::1", "[::1]", "db", "postgres"].includes(host);
+  if (process.env.NODE_ENV === "production" || !local) {
+    if (process.env.ALLOW_DESTRUCTIVE_SEED !== "yes-wipe-this-database") {
+      console.error(`Refusing to seed: the database host is "${host || "unknown"}", which is not this machine.`);
+      console.error("Seeding wipes data and creates accounts with a public password. Use `pnpm admin:create` for a real admin account.");
+      process.exit(1);
+    }
+  }
+}
+
 async function seed() {
+  assertSafeToSeed();
   console.log("🌱 Starting UK Loyalty Platform Seed Script (Section 18)...");
 
   // Disable ledger immutability trigger temporarily to allow clean re-runs

@@ -14,7 +14,7 @@ const supportReportSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = supportReportSchema.parse(body);
 
     // A report tied to a card must come from that card's owner, and for that card's shop

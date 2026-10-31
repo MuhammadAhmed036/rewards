@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = addStaffSchema.parse(body);
 
     // Handing someone a ready-made password is a sensitive step
@@ -92,7 +92,7 @@ export async function PATCH(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = updateStaffSchema.parse(body);
 
     // Changing who can do what, removing access, or setting a password needs a recent confirmation

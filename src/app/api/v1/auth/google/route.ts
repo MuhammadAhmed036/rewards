@@ -6,18 +6,28 @@ import { joinProgramme } from "@/server/services/member";
 import { createSession, sessionKindForUser } from "@/server/auth";
 import { setSessionCookie } from "@/server/auth/session-response";
 import { eq } from "drizzle-orm";
+import { OAUTH_NONCE_COOKIE, createOAuthState, safeReturnTo } from "@/server/auth/oauth-state";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const returnTo = searchParams.get("returnTo") || "/dashboard";
+  // Only a path on this site is ever used as the place to land afterwards
+  const returnTo = safeReturnTo(searchParams.get("returnTo"));
   const role = searchParams.get("role") || (returnTo === "/me" ? "customer" : "owner");
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const appUrl = getBaseUrl(request);
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${appUrl}/api/v1/auth/google/callback`;
 
-  if (!clientId || clientId.startsWith("dev_mock") || clientId.startsWith("mock-")) {
-    // Seamless one-click demo login for customers and owners when Google Cloud OAuth credentials are not set
+  const notConfigured = !clientId || clientId.startsWith("dev_mock") || clientId.startsWith("mock-");
+  if (notConfigured && process.env.NODE_ENV === "production") {
+    // The one-click demo sign-in below signs ANYONE in with no password. It must never exist on a live site:
+    // a missing or placeholder Google key there means "Google sign-in isn't set up", nothing more.
+    console.error("Google sign-in requested but GOOGLE_CLIENT_ID is missing or a placeholder.");
+    return NextResponse.redirect(new URL("/login?error=Google sign-in is not available", appUrl));
+  }
+
+  if (notConfigured) {
+    // Development only: seamless one-click demo login for customers and owners when Google Cloud OAuth credentials are not set
     try {
       if (role === "customer" || returnTo.startsWith("/b/") || returnTo === "/me") {
         const demoEmail = "google.customer@loyalty.demo";
@@ -56,16 +66,6 @@ export async function GET(request: NextRequest) {
         const response = NextResponse.redirect(new URL(returnTo, appUrl));
         setSessionCookie(response, session);
         return response;
-      } else {
-        // Business owner demo login fallback
-        const demoOwnerEmail = "barber-owner@platform.local";
-        const [ownerUser] = await db.select().from(users).where(eq(users.email, demoOwnerEmail)).limit(1);
-        if (ownerUser) {
-          const session = await createSession(ownerUser.id, await sessionKindForUser(ownerUser.id));
-          const response = NextResponse.redirect(new URL("/dashboard", appUrl));
-          setSessionCookie(response, session);
-          return response;
-        }
       }
     } catch (e) {
       console.error("Mock Google auth error:", e);
@@ -76,8 +76,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const stateObj = { returnTo, role, ts: Date.now() };
-  const state = Buffer.from(JSON.stringify(stateObj)).toString("base64url");
+  const { state, nonce } = createOAuthState({ returnTo, role });
 
   const googleAuthUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   googleAuthUrl.searchParams.set("client_id", clientId);
@@ -88,6 +87,15 @@ export async function GET(request: NextRequest) {
   googleAuthUrl.searchParams.set("access_type", "offline");
   googleAuthUrl.searchParams.set("prompt", "select_account");
 
-  return NextResponse.redirect(googleAuthUrl.toString());
+  const response = NextResponse.redirect(googleAuthUrl.toString());
+  // Ties this sign-in to this browser: the callback only accepts a state whose nonce matches this cookie
+  response.cookies.set(OAUTH_NONCE_COOKIE, nonce, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/api",
+    maxAge: 600,
+  });
+  return response;
 }
 

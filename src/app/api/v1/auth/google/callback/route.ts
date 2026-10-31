@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import crypto from "crypto";
 
 import { getBaseUrl } from "@/lib/url";
+import { OAUTH_NONCE_COOKIE, readOAuthState, safeReturnTo } from "@/server/auth/oauth-state";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -19,17 +20,15 @@ export async function GET(request: NextRequest) {
 
   const appUrl = getBaseUrl(request);
 
-  let returnTo = "/dashboard";
-  let targetRole: "owner" | "customer" | "staff" = "owner";
-  if (stateRaw) {
-    try {
-      const decoded = JSON.parse(Buffer.from(stateRaw, "base64url").toString("utf-8"));
-      if (decoded.returnTo) returnTo = decoded.returnTo;
-      if (decoded.role) targetRole = decoded.role;
-    } catch {
-      // fallback to default
-    }
+  // The state must be one we signed, started in this same browser, and recent. Anything else is refused.
+  const verified = readOAuthState(stateRaw, request.cookies.get(OAUTH_NONCE_COOKIE)?.value);
+  if (!verified) {
+    const refused = NextResponse.redirect(new URL("/login?error=" + encodeURIComponent("That sign-in link has expired. Please try again."), appUrl));
+    refused.cookies.delete({ name: OAUTH_NONCE_COOKIE, path: "/api" });
+    return refused;
   }
+  let returnTo = safeReturnTo(verified.returnTo);
+  const targetRole: "owner" | "customer" | "staff" = verified.role;
 
   if (targetRole === "customer" && returnTo === "/dashboard") {
     returnTo = "/me";
@@ -71,6 +70,11 @@ export async function GET(request: NextRequest) {
     const googleUser = await userInfoRes.json();
     if (!userInfoRes.ok || !googleUser.email) {
       throw new Error("Failed to fetch Google user profile");
+    }
+    // Only an email Google itself has verified may be matched to (or create) an account here; otherwise
+    // someone could sign in as another person by claiming their address on an unverified Google profile
+    if (googleUser.verified_email !== true) {
+      throw new Error("Your Google email address isn't verified, so we can't sign you in with it.");
     }
 
     const email = googleUser.email.toLowerCase().trim();

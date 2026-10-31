@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   const denied = await requireRecentAuth(request);
   if (denied) return denied;
   try {
-    return NextResponse.json({ data: await createWebhook(guard.ctx, createSchema.parse(await request.json())) }, { status: 201 });
+    return NextResponse.json({ data: await createWebhook(guard.ctx, createSchema.parse(await request.json().catch(() => ({})))) }, { status: 201 });
   } catch (err) {
     return failure("WEBHOOK_CREATE_FAILED", err, "Couldn't add that webhook");
   }
@@ -45,7 +45,7 @@ export async function PATCH(request: NextRequest) {
   const guard = await guardApiRequest(request, guardOptions);
   if ("response" in guard) return guard.response;
   try {
-    const body = patchSchema.parse(await request.json());
+    const body = patchSchema.parse(await request.json().catch(() => ({})));
     if (body.action === "test") return NextResponse.json({ data: await sendTestEvent(guard.ctx) });
     if (body.action === "active") return NextResponse.json({ data: await setWebhookActive(guard.ctx, body.id, body.active) });
     const denied = await requireRecentAuth(request);

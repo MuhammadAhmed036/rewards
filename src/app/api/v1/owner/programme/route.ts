@@ -29,7 +29,7 @@ export async function PUT(request: NextRequest) {
   const guard = await guardApiRequest(request, { allowedRoles: ["owner"], requireTenant: true });
   if ("response" in guard) return guard.response;
   try {
-    const version = await publishRuleVersion(guard.ctx, await request.json());
+    const version = await publishRuleVersion(guard.ctx, await request.json().catch(() => ({})));
     return NextResponse.json({ data: version });
   } catch (err) {
     return failure("RULE_PUBLISH_FAILED", err, "Couldn't save the new rules");
@@ -43,7 +43,7 @@ export async function PATCH(request: NextRequest) {
   const guard = await guardApiRequest(request, { allowedRoles: ["owner"], requireTenant: true });
   if ("response" in guard) return guard.response;
   try {
-    const { status } = statusSchema.parse(await request.json());
+    const { status } = statusSchema.parse(await request.json().catch(() => ({})));
     return NextResponse.json({ data: await setProgrammeStatus(guard.ctx, status) });
   } catch (err) {
     return failure("PROGRAMME_STATUS_FAILED", err, "Couldn't change the programme status");

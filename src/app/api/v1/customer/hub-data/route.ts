@@ -23,7 +23,7 @@ import { getSessionContext } from "@/server/auth";
 import { readSessionCookie } from "@/server/auth/session-response";
 import { isBusinessAccount } from "@/server/auth/portal-access";
 
-export async function GET(request: NextRequest) {
+async function computeHub(request: NextRequest) {
   const slug = request.nextUrl.searchParams.get("slug");
   if (!slug) {
     return NextResponse.json({ error: "slug query parameter is required" }, { status: 400 });
@@ -228,3 +228,26 @@ export async function GET(request: NextRequest) {
   });
 }
 
+// A shop's public page is requested far more often than anything else, and for someone who isn't signed in
+// the answer is the same for everyone. Keeping it for a few seconds lets a burst of visitors (or a flood of
+// requests) cost the database one lookup instead of thousands. Signed-in customers always get a fresh one.
+const anonymousCache = new Map<string, { at: number; body: unknown; status: number }>();
+const CACHE_MS = 5000;
+const CACHE_MAX = 500;
+
+export async function GET(request: NextRequest) {
+  const slug = request.nextUrl.searchParams.get("slug");
+  const signedIn = Boolean(readSessionCookie(request)) || request.headers.has("authorization");
+  if (!slug || signedIn || slug.length > 64) return computeHub(request);
+
+  const hit = anonymousCache.get(slug);
+  if (hit && Date.now() - hit.at < CACHE_MS) return NextResponse.json(hit.body, { status: hit.status });
+
+  const res = await computeHub(request);
+  // Only remember good answers, so a made-up address can't fill the cache with errors
+  if (res.status === 200) {
+    if (anonymousCache.size >= CACHE_MAX) anonymousCache.delete(anonymousCache.keys().next().value as string);
+    anonymousCache.set(slug, { at: Date.now(), body: await res.clone().json(), status: 200 });
+  }
+  return res;
+}

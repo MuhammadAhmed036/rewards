@@ -34,7 +34,7 @@ const sendSchema = z.object({
 /** Customer sends a message to the shop. */
 export async function POST(request: NextRequest) {
   try {
-    const body = sendSchema.parse(await request.json());
+    const body = sendSchema.parse(await request.json().catch(() => ({})));
     const owned = await requireOwnMembership(request, body.membershipId);
     if ("response" in owned) return owned.response;
 

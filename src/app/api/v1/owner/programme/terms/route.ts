@@ -21,7 +21,7 @@ export async function PUT(request: NextRequest) {
   const guard = await guardApiRequest(request, guardOptions);
   if ("response" in guard) return guard.response;
   try {
-    return NextResponse.json({ data: await updateProgrammeTerms(guard.ctx, bodySchema.parse(await request.json())) });
+    return NextResponse.json({ data: await updateProgrammeTerms(guard.ctx, bodySchema.parse(await request.json().catch(() => ({})))) });
   } catch (err) {
     const message = err instanceof z.ZodError ? err.errors[0]?.message ?? "Check the text." : err instanceof Error ? err.message : "Couldn't save your terms";
     return NextResponse.json({ error: { code: "TERMS_SAVE_FAILED", message } }, { status: 400 });

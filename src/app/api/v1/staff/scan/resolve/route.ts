@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   try {
     await checkScanResolveRateLimit(guard.ctx.userId);
 
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = resolveSchema.parse(body);
 
     const summary = validated.token

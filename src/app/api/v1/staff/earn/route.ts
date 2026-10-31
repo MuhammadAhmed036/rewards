@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   try {
     await checkEarnRateLimit(guard.ctx.userId);
 
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = earnSchema.parse(body);
 
     const result = await earn(guard.ctx, {

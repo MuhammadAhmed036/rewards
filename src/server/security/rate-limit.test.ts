@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+  checkRateLimit,
   checkLoginRateLimit,
   checkEmailOtpRateLimit,
   checkJoinRateLimit,
@@ -73,3 +74,20 @@ describe("Rate Limiting Engine (FR-042, PRS Section 8)", () => {
   });
 });
 
+
+describe("A rate-limit service that refuses commands", () => {
+  it("is not mistaken for 'first request': the in-memory limiter takes over and still limits", async () => {
+    const { vi } = await import("vitest");
+    vi.stubEnv("NODE_ENV", "development"); // tests normally skip Upstash
+    // Upstash answers 200 with an error entry when the token is read-only
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () => new Response(JSON.stringify([{ error: "NOPERM this user has no permissions" }, { error: "NOPERM" }, { result: -2 }]), { status: 200 })
+    );
+    const key = `refused-${Date.now()}`;
+    const results = [];
+    for (let i = 0; i < 5; i++) results.push((await checkRateLimit(key, 3, 60)).success);
+    expect(results).toEqual([true, true, true, false, false]);
+    spy.mockRestore();
+    vi.unstubAllEnvs();
+  });
+});

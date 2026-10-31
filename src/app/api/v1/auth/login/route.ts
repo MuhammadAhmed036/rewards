@@ -6,7 +6,7 @@ import { completeSignIn } from "@/server/auth/sign-in";
 import { issueEmailCode, CodeError } from "@/server/services/email-codes";
 import crypto from "crypto";
 import { checkPortalAccess } from "@/server/auth/portal-access";
-import { checkLoginRateLimit, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
+import { checkAuthIpRateLimit, checkLoginRateLimit, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -16,9 +16,12 @@ function maskEmail(email: string) {
   return `${name.slice(0, 1)}***@${domain}`;
 }
 
+// A valid-looking password hash that matches nothing, used only to keep sign-in timing the same for unknown emails
+const DUMMY_HASH = `${"0".repeat(32)}:${"0".repeat(128)}`;
+
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
+  password: z.string().min(1, "Password is required").max(256, "Password is too long"),
   // Which sign-in form was used; each one only lets in the matching kind of account
   portal: z.enum(["customer", "staff", "owner", "admin"]).optional(),
   tenantSlug: z.string().min(1).optional(),
@@ -26,7 +29,7 @@ const loginSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = loginSchema.safeParse(body);
 
     if (!validated.success) {
@@ -37,6 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     const email = validated.data.email.toLowerCase().trim();
+    await checkAuthIpRateLimit(request, "login");
     await checkLoginRateLimit(email);
 
     const [user] = await db
@@ -46,6 +50,8 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (!user || !user.passwordHash) {
+      // Do the same amount of work as for a real account, so the time taken doesn't reveal which emails exist
+      await verifyPassword(validated.data.password, DUMMY_HASH).catch(() => false);
       return NextResponse.json(
         { error: { code: "INVALID_CREDENTIALS", message: "Invalid email or password" } },
         { status: 401 }

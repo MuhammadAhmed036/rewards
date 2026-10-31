@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   const guard = await guardApiRequest(request, guardOptions);
   if ("response" in guard) return guard.response;
   try {
-    const body = blockSchema.parse(await request.json());
+    const body = blockSchema.parse(await request.json().catch(() => ({})));
     return NextResponse.json({ data: await blockEmail(guard.ctx, body) });
   } catch (err) {
     return failure("BLOCK_FAILED", err, "Couldn't block that email");

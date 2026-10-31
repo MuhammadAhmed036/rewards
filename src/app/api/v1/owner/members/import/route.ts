@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   const guard = await guardApiRequest(request, guardOptions);
   if ("response" in guard) return guard.response;
   try {
-    const body = bodySchema.parse(await request.json());
+    const body = bodySchema.parse(await request.json().catch(() => ({})));
     if (!body.commit) return NextResponse.json({ data: await previewImport(guard.ctx, body.csv) });
     // Adding many customers at once is a sensitive step
     const denied = await requireRecentAuth(request);

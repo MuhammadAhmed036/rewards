@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
-    const validated = createRewardSchema.parse(await request.json());
+    const validated = createRewardSchema.parse(await request.json().catch(() => ({})));
     const reward = await createReward(guard.ctx, validated);
     return NextResponse.json({ data: reward }, { status: 201 });
   } catch (err) {
@@ -56,7 +56,7 @@ export async function PATCH(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
-    const { id, ...updates } = updateRewardBodySchema.parse(await request.json());
+    const { id, ...updates } = updateRewardBodySchema.parse(await request.json().catch(() => ({})));
     const updated = await updateReward(guard.ctx, id, updates);
     return NextResponse.json({ data: updated });
   } catch (err) {

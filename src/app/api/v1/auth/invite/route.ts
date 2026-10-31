@@ -23,7 +23,7 @@ const acceptSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const body = acceptSchema.parse(await request.json());
+    const body = acceptSchema.parse(await request.json().catch(() => ({})));
     return NextResponse.json({ data: await acceptStaffInvitation(body.token, body) });
   } catch (err) {
     const message = err instanceof z.ZodError ? "This invite link is incomplete." : err instanceof Error ? err.message : "Couldn't accept the invite";

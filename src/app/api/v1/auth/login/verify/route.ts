@@ -5,7 +5,7 @@ import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { completeSignIn } from "@/server/auth/sign-in";
 import { verifyEmailCode, CodeError } from "@/server/services/email-codes";
-import { RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
+import { checkAuthIpRateLimit, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 
 const bodySchema = z.object({
   challenge: z.string().regex(/^[0-9a-f-]{36}\.[0-9a-f-]{36}$/i, "Start the sign-in again."),
@@ -15,7 +15,8 @@ const bodySchema = z.object({
 /** Second step of a sign-in that uses an emailed code. */
 export async function POST(request: NextRequest) {
   try {
-    const { challenge, code } = bodySchema.parse(await request.json());
+    await checkAuthIpRateLimit(request, "login-code");
+    const { challenge, code } = bodySchema.parse(await request.json().catch(() => ({})));
     const [userId, challengeId] = challenge.split(".");
     await verifyEmailCode({ userId, purpose: "login", code, challengeId });
 

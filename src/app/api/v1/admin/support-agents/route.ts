@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
   const guard = await guardApiRequest(request, { allowedRoles: ["platform_admin"] });
   if ("response" in guard) return guard.response;
   try {
-    const { email, enabled } = z.object({ email: z.string().email(), enabled: z.boolean() }).parse(await request.json());
+    const { email, enabled } = z.object({ email: z.string().email(), enabled: z.boolean() }).parse(await request.json().catch(() => ({})));
     return NextResponse.json({ data: await setSupportAgent(guard.ctx, email, enabled) });
   } catch (err) {
     const message = err instanceof z.ZodError ? err.errors[0]?.message ?? "Check the email." : err instanceof Error ? err.message : "Couldn't change that.";

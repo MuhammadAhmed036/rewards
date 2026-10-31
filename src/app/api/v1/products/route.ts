@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
 
     // Check if storewide discount payload
     if (body.action === "storewide_discount") {

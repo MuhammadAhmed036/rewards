@@ -19,7 +19,7 @@ const bodySchema = z
 export async function POST(request: NextRequest) {
   try {
     const key = await authenticateApiKey(request, "earn:write");
-    const body = bodySchema.parse(await request.json());
+    const body = bodySchema.parse(await request.json().catch(() => ({})));
     const result = await earnFromExternalSale(key, body);
     return NextResponse.json({ data: { pointsAwarded: result.pointsDelta, newBalance: result.newBalance, duplicate: result.isDuplicate } });
   } catch (err) {

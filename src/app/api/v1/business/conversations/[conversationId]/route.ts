@@ -36,7 +36,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!z.string().uuid().safeParse(conversationId).success) return fail(new Error("Conversation not found"), "");
 
   try {
-    const { body } = replySchema.parse(await request.json());
+    const { body } = replySchema.parse(await request.json().catch(() => ({})));
     await replyAsBusiness(guard.ctx, conversationId, body);
     return NextResponse.json({ data: await getBusinessConversation(guard.ctx, conversationId) });
   } catch (err) {

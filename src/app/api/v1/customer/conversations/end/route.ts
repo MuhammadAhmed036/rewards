@@ -11,7 +11,7 @@ const endSchema = z.object({
 /** Only the customer can end their chat; the business keeps a read-only copy. */
 export async function POST(request: NextRequest) {
   try {
-    const body = endSchema.parse(await request.json());
+    const body = endSchema.parse(await request.json().catch(() => ({})));
     const owned = await requireOwnMembership(request, body.membershipId);
     if ("response" in owned) return owned.response;
 

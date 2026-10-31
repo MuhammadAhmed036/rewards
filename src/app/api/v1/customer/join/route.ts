@@ -12,7 +12,7 @@ import { z } from "zod";
 const joinSchema = z.object({
   tenantSlug: z.string().min(1, "Tenant slug is required"),
   email: z.string().email("Valid email required"),
-  password: z.string().min(6, "Password must be at least 6 characters").optional(),
+  password: z.string().min(6, "Password must be at least 6 characters").max(256, "Password is too long").optional(),
   name: z.string().optional(),
   marketingOptIn: z.boolean().optional(),
   locationPublicId: z.string().optional(),
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const clientIp = getClientIp(request);
     await checkJoinRateLimit(clientIp);
 
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = joinSchema.parse(body);
 
     // One email is one kind of account: business emails can't become customer cards,

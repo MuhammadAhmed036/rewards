@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
-    const body = stampSchema.parse(await request.json());
+    const body = stampSchema.parse(await request.json().catch(() => ({})));
     const tenantId = guard.ctx.tenantId!;
 
     const [member] = await db

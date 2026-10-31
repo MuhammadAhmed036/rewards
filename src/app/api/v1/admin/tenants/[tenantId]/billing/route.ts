@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ tena
   const guard = await guardApiRequest(request, { allowedRoles: ["platform_admin"] });
   if ("response" in guard) return guard.response;
   try {
-    const body = bodySchema.parse(await request.json());
+    const body = bodySchema.parse(await request.json().catch(() => ({})));
     const { ctx } = guard;
     switch (body.action) {
       case "plan":

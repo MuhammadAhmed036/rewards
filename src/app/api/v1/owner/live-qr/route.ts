@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   const guard = await guardApiRequest(request, guardOptions);
   if ("response" in guard) return guard.response;
   try {
-    const { enabled } = z.object({ enabled: z.boolean() }).parse(await request.json());
+    const { enabled } = z.object({ enabled: z.boolean() }).parse(await request.json().catch(() => ({})));
     return NextResponse.json({ data: await setLiveQr(guard.ctx, enabled) });
   } catch (err) {
     return NextResponse.json({ error: { code: "LIVE_QR_FAILED", message: err instanceof Error ? err.message : "Couldn't change that." } }, { status: 400 });

@@ -40,7 +40,7 @@ const claimSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = claimSchema.parse(body);
 
     const owned = await requireOwnMembership(request, validated.membershipId, validated.tenantId);

@@ -11,7 +11,7 @@ const claimSchema = z.object({
 /** Customer claims a full stamp card; staff then hand the reward over at the till. */
 export async function POST(request: NextRequest) {
   try {
-    const body = claimSchema.parse(await request.json());
+    const body = claimSchema.parse(await request.json().catch(() => ({})));
 
     const owned = await requireOwnMembership(request, body.membershipId);
     if ("response" in owned) return owned.response;

@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { feedbackMessages } from "../db/schema";
+import { feedbackMessages, tenants, locations } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
 import { eq, and, desc } from "drizzle-orm";
 import { logAuditEvent } from "./audit";
@@ -20,6 +20,14 @@ export async function submitFeedback(input: SubmitFeedbackInput) {
 
   if (trimmedMessage.length > 2000) {
     throw new Error("Feedback message cannot exceed 2000 characters");
+  }
+
+  // The business and location named must be real and belong together, so a message can't be filed against another business's place
+  const [tenant] = await db.select({ status: tenants.status }).from(tenants).where(eq(tenants.id, input.tenantId)).limit(1);
+  if (!tenant || tenant.status !== "active") throw new Error("That business can't receive feedback.");
+  if (input.locationId) {
+    const [loc] = await db.select({ id: locations.id }).from(locations).where(and(eq(locations.id, input.locationId), eq(locations.tenantId, input.tenantId))).limit(1);
+    if (!loc) throw new Error("That location isn't part of this business.");
   }
 
   const [newMessage] = await db

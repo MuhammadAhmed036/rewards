@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   const guard = await guardApiRequest(request, guardOptions);
   if ("response" in guard) return guard.response;
   try {
-    const body = bodySchema.parse(await request.json());
+    const body = bodySchema.parse(await request.json().catch(() => ({})));
     if (body.action === "set") {
       // Pointing the shop's public address somewhere is a sensitive change
       const denied = await requireRecentAuth(request);

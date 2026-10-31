@@ -49,7 +49,7 @@ export async function PATCH(
   if ("response" in guard) return guard.response;
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = updateSchema.parse(body);
 
     const updated = await updateTenantByAdmin(guard.ctx, params.tenantId, validated);
@@ -84,7 +84,7 @@ export async function DELETE(
   if ("response" in guard) return guard.response;
 
   try {
-    const validated = purgeSchema.parse(await request.json());
+    const validated = purgeSchema.parse(await request.json().catch(() => ({})));
     const result = await purgeTenantByAdmin(guard.ctx, params.tenantId, validated);
     return NextResponse.json({ data: result });
   } catch (err) {

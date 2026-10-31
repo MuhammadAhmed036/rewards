@@ -33,7 +33,7 @@ export async function PUT(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = linksUpdateSchema.parse(body);
 
     const updated = await updateBusinessLinks(guard.ctx, validated);

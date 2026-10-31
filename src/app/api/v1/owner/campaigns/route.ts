@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   const guard = await guardApiRequest(request, { allowedRoles: [...ROLES], requireTenant: true });
   if ("response" in guard) return guard.response;
   try {
-    return NextResponse.json({ data: await sendCampaign(guard.ctx, await request.json()) }, { status: 201 });
+    return NextResponse.json({ data: await sendCampaign(guard.ctx, await request.json().catch(() => ({}))) }, { status: 201 });
   } catch (err) {
     return failure("CAMPAIGN_SEND_FAILED", err, "Couldn't send the offer");
   }

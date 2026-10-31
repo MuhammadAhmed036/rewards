@@ -89,7 +89,7 @@ export async function POST(
   if (denied) return denied;
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = adjustSchema.parse(body);
 
     const idempotencyKey =
@@ -135,7 +135,7 @@ export async function PATCH(
   if ("response" in guard) return guard.response;
 
   try {
-    const { status, reason } = statusUpdateSchema.parse(await request.json());
+    const { status, reason } = statusUpdateSchema.parse(await request.json().catch(() => ({})));
     if (status === "suspended" && !reason) throw new Error("Say why you're suspending this card");
     const updated =
       status === "suspended"

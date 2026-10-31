@@ -17,6 +17,9 @@ import { ledgerEntries, membershipBalances } from "../db/schema";
 import { eq, sql } from "drizzle-orm";
 import crypto from "crypto";
 
+/** The database driver wraps the real error (newer drizzle shows "Failed query" and keeps the cause). */
+const databaseMessageMatches = (re: RegExp) => (e: unknown) => re.test(`${(e as Error).message} ${((e as { cause?: Error }).cause?.message) ?? ""}`);
+
 describe("Ledger, Earn, Redeem & Concurrency Engine (M4)", () => {
   it("enforces earn idempotency: duplicate key produces identical response and single ledger entry", async () => {
     const slug = `cafe-earn-${Date.now()}`;
@@ -306,14 +309,14 @@ describe("Ledger, Earn, Redeem & Concurrency Engine (M4)", () => {
       db.execute(
         sql`UPDATE ledger_entries SET points_delta = 999 WHERE id = ${earned.entryId}`
       )
-    ).rejects.toThrow(/ledger_entries is append-only/);
+    ).rejects.toSatisfy(databaseMessageMatches(/ledger_entries is append-only/));
 
     // Attempt direct DELETE on ledger_entries -> must be rejected by PostgreSQL trigger
     await expect(
       db.execute(
         sql`DELETE FROM ledger_entries WHERE id = ${earned.entryId}`
       )
-    ).rejects.toThrow(/ledger_entries is append-only/);
+    ).rejects.toSatisfy(databaseMessageMatches(/ledger_entries is append-only/));
   });
 
   it("passes reconciliation check: sum of points_delta strictly equals membership_balances", async () => {

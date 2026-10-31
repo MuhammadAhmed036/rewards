@@ -122,7 +122,7 @@ export default function PlatformAdminPage() {
   const [addPlan, setAddPlan] = useState<"free" | "pro">("free");
   const [addOwnerName, setAddOwnerName] = useState("");
   const [addOwnerEmail, setAddOwnerEmail] = useState("");
-  const [addPassword, setAddPassword] = useState("Password123!");
+  const [addPassword, setAddPassword] = useState("");
   const [addLocationName, setAddLocationName] = useState("Main Branch");
   const [addBrandColor, setAddBrandColor] = useState("#495e57");
   const [addLoading, setAddLoading] = useState(false);
@@ -197,7 +197,7 @@ export default function PlatformAdminPage() {
     setAddSlug("");
     setAddOwnerName("");
     setAddOwnerEmail("");
-    setAddPassword("Password123!");
+    setAddPassword("");
     setAddLocationName("Main Branch");
     setAddBrandColor("#495e57");
     setAddError("");
@@ -1245,7 +1245,7 @@ export default function PlatformAdminPage() {
                     </label>
                     <Input
                       type="text"
-                      placeholder="Password123!"
+                      placeholder="At least 8 characters"
                       value={addPassword}
                       onChange={(e) => setAddPassword(e.target.value)}
                       className="bg-slate-950 border-slate-700 text-slate-200"

@@ -19,6 +19,7 @@ interface RateLimitBucket {
 
 // In-memory sliding/fixed window bucket map for ultra-fast fallback & testing
 const localBuckets = new Map<string, RateLimitBucket>();
+let upstashWarned = false;
 
 // Cleanup old buckets periodically (prevent memory leak)
 if (typeof setInterval !== "undefined") {
@@ -70,7 +71,17 @@ export async function checkRateLimit(
 
       if (res.ok) {
         const json = await res.json();
-        const currentCount = Number(json[0]?.result ?? 1);
+        // Upstash answers 200 even when it refuses a command (for example a read-only token), with an "error"
+        // entry. That is NOT a first request: ignore it and use the in-memory limiter instead of never limiting.
+        const counted = typeof json?.[0]?.result === "number";
+        if (!counted) {
+          if (!upstashWarned) {
+            upstashWarned = true;
+            console.error("Rate limiting: Upstash refused the command (" + String(json?.[0]?.error ?? "unexpected answer") + "). Using the in-memory limiter. Check that UPSTASH_REDIS_REST_TOKEN is not a read-only token.");
+          }
+          throw new Error("upstash-refused");
+        }
+        const currentCount = Number(json[0].result);
         const ttl = Number(json[2]?.result ?? windowSeconds);
 
         return {
@@ -148,6 +159,16 @@ export async function checkEmailOtpRateLimit(email: string) {
     600,
     "RATE_LIMITED: Too many verification emails requested. Please wait before requesting another."
   );
+}
+
+/**
+ * A per-connection ceiling on the routes people use to guess passwords or flood inboxes, on top of the
+ * per-email limits: otherwise one machine could try thousands of different emails, each just under its own limit.
+ */
+export async function checkAuthIpRateLimit(request: Request, bucket: "login" | "login-code" | "forgot" | "signup" | "reset") {
+  const limits = { login: [40, 60], "login-code": [30, 600], forgot: [10, 600], signup: [8, 3600], reset: [20, 3600] } as const;
+  const [max, window] = limits[bucket];
+  return await assertRateLimit(`auth-ip:${bucket}:${getClientIp(request)}`, max, window, "RATE_LIMITED: Too many attempts from this connection. Please wait a few minutes and try again.");
 }
 
 export async function checkJoinRateLimit(ip: string) {

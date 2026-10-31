@@ -6,7 +6,7 @@ const bodySchema = z.object({ token: z.string().min(10, "This link is incomplete
 
 export async function POST(request: NextRequest) {
   try {
-    const { token } = bodySchema.parse(await request.json());
+    const { token } = bodySchema.parse(await request.json().catch(() => ({})));
     const result = await verifyEmailToken(token);
     return NextResponse.json({ data: { verified: true, email: result.email } });
   } catch (err) {

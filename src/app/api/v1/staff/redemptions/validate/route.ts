@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     await checkRedemptionValidateRateLimit(guard.ctx.userId);
 
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = validateSchema.parse(body);
 
     const result = await validateRedemptionCode(guard.ctx, validated.code);

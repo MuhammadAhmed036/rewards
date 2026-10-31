@@ -26,7 +26,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ memb
   const guard = await guardApiRequest(request, guardOptions);
   if ("response" in guard) return guard.response;
   try {
-    const { body } = z.object({ body: z.string() }).parse(await request.json());
+    const { body } = z.object({ body: z.string() }).parse(await request.json().catch(() => ({})));
     return NextResponse.json({ data: await addNote(guard.ctx, membershipId, body) }, { status: 201 });
   } catch (err) {
     return failure("NOTE_ADD_FAILED", err, "Couldn't save the note");

@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   const guard = await guardApiRequest(request, { allowedRoles: ["owner", "manager"], requireTenant: true });
   if ("response" in guard) return guard.response;
   try {
-    const { name, addressLine } = createSchema.parse(await request.json());
+    const { name, addressLine } = createSchema.parse(await request.json().catch(() => ({})));
     const location = await createLocation(guard.ctx, { name, address: addressLine ? { line: addressLine } : {} });
     return NextResponse.json({ data: location }, { status: 201 });
   } catch (err) {
@@ -59,7 +59,7 @@ export async function PATCH(request: NextRequest) {
   const guard = await guardApiRequest(request, { allowedRoles: ["owner", "manager"], requireTenant: true });
   if ("response" in guard) return guard.response;
   try {
-    const { id, ...changes } = updateSchema.parse(await request.json());
+    const { id, ...changes } = updateSchema.parse(await request.json().catch(() => ({})));
     return NextResponse.json({ data: await updateLocation(guard.ctx, id, changes) });
   } catch (err) {
     return failure("LOCATION_UPDATE_FAILED", err, "Couldn't update the location");

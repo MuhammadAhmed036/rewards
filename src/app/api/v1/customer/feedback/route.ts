@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { submitFeedback } from "@/server/services/feedback";
 import { checkFeedbackRateLimit, getClientIp, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { z } from "zod";
+import { requireOwnMembership } from "@/server/auth/customer-membership";
 
 const feedbackSchema = z.object({
   tenantId: z.string().uuid("Tenant ID required"),
@@ -13,8 +14,14 @@ const feedbackSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = feedbackSchema.parse(body);
+
+    // Feedback can be sent without signing in, but it can't be sent *as* a named customer unless that is who is signed in
+    if (validated.membershipId) {
+      const owned = await requireOwnMembership(request, validated.membershipId, validated.tenantId);
+      if ("response" in owned) return owned.response;
+    }
 
     const clientIp = getClientIp(request);
     const rateLimitIdentifier = validated.membershipId || clientIp;

@@ -14,7 +14,7 @@ export async function PATCH(
   if ("response" in guard) return guard.response;
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const partialSchema = productInputSchema.partial();
     const validated = partialSchema.parse(body);
 

@@ -207,7 +207,7 @@ export async function runImport(ctx: RequestContext, csv: string, options: { con
       await emitEvent(tenantId, "membership.created", { membershipId, source: "import" });
     } catch (err) {
       // One bad row (for example a rare clash) must not stop the rest
-      failures.push({ row: r.row, email: r.email, problem: err instanceof Error && /unique|duplicate/i.test(err.message) ? "Could not be added (clash with an existing record)" : "Could not be added" });
+      failures.push({ row: r.row, email: r.email, problem: err instanceof Error && /unique|duplicate/i.test(`${err.message} ${(err as { cause?: Error }).cause?.message ?? ""}`) ? "Could not be added (clash with an existing record)" : "Could not be added" });
     }
   }
 

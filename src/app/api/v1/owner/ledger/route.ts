@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   if (denied) return denied;
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = reverseSchema.parse(body);
 
     const idempotencyKey =

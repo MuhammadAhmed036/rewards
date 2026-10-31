@@ -100,7 +100,33 @@ export async function sendEmailNow(options: QueueEmailOptions) {
   return { ...entry, sent };
 }
 
+const escapeHtml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+/** Text a shop owner or customer typed is made harmless for the HTML version; the links we build ourselves are left alone. */
+function escapePayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    out[key] = typeof value === "string" && !/url$/i.test(key) ? escapeHtml(value) : value;
+  }
+  return out;
+}
+
+/**
+ * Builds the subject, plain text and HTML of an email. The plain text and subject use the words as typed; the
+ * HTML version escapes them first, so a business named `<a href=...>` can't put its own links or markup
+ * into an email we send to its customers.
+ */
 export function renderEmailTemplate(
+  template: EmailTemplate,
+  payload: Record<string, unknown>
+): { subject: string; html: string; text: string } {
+  const plain = renderEmailRaw(template, payload);
+  // Offers escape their own text while building the page, so they are not escaped twice
+  if (template === "campaign") return plain;
+  return { ...plain, html: renderEmailRaw(template, escapePayload(payload)).html };
+}
+
+function renderEmailRaw(
   template: EmailTemplate,
   payload: Record<string, unknown>
 ): { subject: string; html: string; text: string } {

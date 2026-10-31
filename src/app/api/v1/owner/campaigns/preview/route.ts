@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   const guard = await guardApiRequest(request, { allowedRoles: ["owner", "manager", "marketing"], requireTenant: true });
   if ("response" in guard) return guard.response;
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     return NextResponse.json({ data: await previewAudience(guard.ctx, body.audience) });
   } catch (err) {
     return NextResponse.json(

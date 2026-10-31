@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requestPasswordReset, PasswordResetError } from "@/server/services/password-reset";
+import { checkAuthIpRateLimit } from "@/server/security/rate-limit";
 
 const bodySchema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -9,7 +10,8 @@ const bodySchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, role } = bodySchema.parse(await request.json());
+    await checkAuthIpRateLimit(request, "forgot");
+    const { email, role } = bodySchema.parse(await request.json().catch(() => ({})));
     await requestPasswordReset(email, role);
     return NextResponse.json({ data: { sent: true } });
   } catch (err) {

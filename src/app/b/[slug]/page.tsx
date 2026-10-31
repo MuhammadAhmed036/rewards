@@ -3,7 +3,7 @@
 import React, { useState, useEffect, use, useCallback } from "react";
 import { loginRequest } from "@/lib/security-client";
 import { isOffline, OFFLINE_MESSAGE } from "@/lib/use-online";
-import { LANGS, LOCALES, isLang, langFromLocale, t as translate, type Lang, type MessageKey } from "@/lib/i18n";
+import { langFromLocale, t as translate, type Lang, type MessageKey } from "@/lib/i18n";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -132,22 +132,7 @@ export default function BusinessHubPage(props: {
   // A friend's invite link carries their code: ?ref=ABCD1234
   const [refCode, setRefCode] = useState("");
   const [inviteCopied, setInviteCopied] = useState(false);
-  // The customer's language: their own choice if they made one, otherwise the business's locale
-  const [chosenLang, setChosenLang] = useState<Lang | null>(null);
-  useEffect(() => {
-    const saved = window.localStorage.getItem("lp_lang");
-    if (isLang(saved)) setChosenLang(saved);
-  }, []);
-  // The layout stays left to right: most of the page (staff and owner sign-in, shop names, reward titles) is
-  // not translated, and flipping it would scramble punctuation and alignment. Translated text still reads
-  // correctly right to left inside it. Only the long terms page switches direction.
-  const shownLocale = hubData?.tenant.locale;
-  useEffect(() => {
-    document.documentElement.lang = chosenLang ?? langFromLocale(shownLocale);
-    return () => {
-      document.documentElement.lang = "en";
-    };
-  }, [chosenLang, shownLocale]);
+  // Text follows the shop's own language setting (English unless the shop chose otherwise)
   // A live QR code changes every 30 seconds, so keep the card's copy fresh while it is open
   const liveQr = hubData?.member?.rotatingQr;
   useEffect(() => {
@@ -667,7 +652,7 @@ export default function BusinessHubPage(props: {
   const member = hubData.member;
   const isStamps = hubData.programme.type === "stamps";
   const unitWord: "points" | "stamps" = isStamps ? "stamps" : "points";
-  const lang: Lang = chosenLang ?? langFromLocale(hubData.tenant.locale);
+  const lang: Lang = langFromLocale(hubData.tenant.locale);
   const tr = (key: MessageKey, vars?: Record<string, string | number>) => translate(lang, key, vars);
   const unitText = tr(unitWord);
 
@@ -712,29 +697,6 @@ export default function BusinessHubPage(props: {
 
             {/* Header Right Actions / Role Switcher */}
             <div className={`flex items-center gap-2.5 ${member ? "shrink-0" : "flex-col sm:flex-row items-stretch w-full sm:w-auto"}`}>
-              {activePortalRole === "customer" && (
-              <label className="flex items-center gap-1.5 text-xs text-slate-600">
-                <span className="sr-only">{tr("language")}</span>
-                <select
-                  value={lang}
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    if (isLang(next)) {
-                      setChosenLang(next);
-                      window.localStorage.setItem("lp_lang", next);
-                    }
-                  }}
-                  aria-label={tr("language")}
-                  className="min-h-[40px] rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-evergreen"
-                >
-                  {LANGS.map((l) => (
-                    <option key={l} value={l}>
-                      {LOCALES[l].label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              )}
               {/* Role switcher: only for visitors who are not signed in to their card */}
               {!member && (
               <div className="flex bg-white p-1 border border-slate-200 rounded-full text-sm font-semibold w-full sm:w-auto overflow-x-auto">
@@ -1698,31 +1660,6 @@ export default function BusinessHubPage(props: {
                   </div>
                 </div>
 
-                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 text-xs text-zinc-600 leading-relaxed">
-                  <span className="font-semibold text-zinc-900">Demo Staff Logins:</span> Use{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStaffEmail("coffee-staff@platform.local");
-                      setStaffPassword("Password123!");
-                    }}
-                    className="font-mono text-zinc-900 font-semibold underline hover:text-black cursor-pointer"
-                  >
-                    coffee-staff@platform.local
-                  </button>{" "}
-                  or{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStaffEmail("barber-staff@platform.local");
-                      setStaffPassword("Password123!");
-                    }}
-                    className="font-mono text-zinc-900 font-semibold underline hover:text-black cursor-pointer"
-                  >
-                    barber-staff@platform.local
-                  </button>
-                </div>
-
                 <Button
                   type="submit"
                   variant="default"
@@ -1785,31 +1722,6 @@ export default function BusinessHubPage(props: {
                       className="pl-10 text-xs rounded-xl bg-zinc-50/70 border-zinc-200 focus:bg-white focus:ring-1 focus:ring-zinc-900 font-medium text-zinc-900"
                     />
                   </div>
-                </div>
-
-                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200 text-xs text-zinc-600 leading-relaxed">
-                  <span className="font-semibold text-zinc-900">Demo Owner Logins:</span> Use{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOwnerEmail("coffee-owner@platform.local");
-                      setOwnerPassword("Password123!");
-                    }}
-                    className="font-mono text-zinc-900 font-semibold underline hover:text-black cursor-pointer"
-                  >
-                    coffee-owner@platform.local
-                  </button>{" "}
-                  or{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOwnerEmail("barber-owner@platform.local");
-                      setOwnerPassword("Password123!");
-                    }}
-                    className="font-mono text-zinc-900 font-semibold underline hover:text-black cursor-pointer"
-                  >
-                    barber-owner@platform.local
-                  </button>
                 </div>
 
                 <Button

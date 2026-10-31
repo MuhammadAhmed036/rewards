@@ -33,9 +33,6 @@ const LOCALES = [
   ["en-PK", "English (Pakistan)"],
   ["en-IN", "English (India)"],
   ["en-AE", "English (UAE)"],
-  ["es-ES", "Español (España)"],
-  ["es-MX", "Español (México)"],
-  ["ur-PK", "اردو (پاکستان)"],
 ] as const;
 
 const ZONES = [

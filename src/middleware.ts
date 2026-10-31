@@ -8,6 +8,7 @@ import {
   sessionCookieOptions,
 } from "@/lib/session-cookie";
 import { cleanHost, hostOf, isPlatformHost, slugFromSubdomain } from "@/lib/branded-host";
+import { checkRequest } from "@/lib/request-guard";
 
 /**
  * A shop's own address (ahmed-coffee.example.com, or a domain it owns and has verified) opens that shop's page.
@@ -44,6 +45,21 @@ async function brandedHomeRewrite(request: NextRequest): Promise<NextResponse | 
  * Staff and admin cookies are never extended here — their limits are enforced server-side.
  */
 export async function middleware(request: NextRequest) {
+  // Oversized bodies and cross-site form posts are turned away before any route runs
+  const verdict = checkRequest({
+    method: request.method,
+    pathname: request.nextUrl.pathname,
+    contentLength: request.headers.get("content-length"),
+    origin: request.headers.get("origin"),
+    secFetchSite: request.headers.get("sec-fetch-site"),
+    host: request.headers.get("x-forwarded-host") || request.headers.get("host") || "",
+    hasCookie: request.cookies.has(SESSION_COOKIE_NAME),
+    hasAuthorization: request.headers.has("authorization"),
+  });
+  if (!verdict.ok) {
+    return NextResponse.json({ error: { code: verdict.code, message: verdict.message } }, { status: verdict.status });
+  }
+
   const branded = await brandedHomeRewrite(request);
   if (branded) return branded;
 

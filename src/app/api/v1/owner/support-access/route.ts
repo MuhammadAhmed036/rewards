@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   const guard = await guardApiRequest(request, guardOptions);
   if ("response" in guard) return guard.response;
   try {
-    const body = z.object({ hours: z.number().int(), reason: z.string() }).parse(await request.json());
+    const body = z.object({ hours: z.number().int(), reason: z.string() }).parse(await request.json().catch(() => ({})));
     return NextResponse.json({ data: await grantSupportAccess(guard.ctx, body) }, { status: 201 });
   } catch (err) {
     return failure("SUPPORT_GRANT_FAILED", err, "Couldn't allow support access");

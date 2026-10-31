@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     crypto.randomUUID();
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = confirmSchema.parse(body);
 
     const result = await confirmRedemption(guard.ctx, {

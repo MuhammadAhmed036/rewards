@@ -54,8 +54,8 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Super Admin Sign In inputs
-  const [adminEmail, setAdminEmail] = useState("admin@platform.local");
-  const [adminPassword, setAdminPassword] = useState("Password123!");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
 
   // Sign Up inputs (Business Owner only)
   const [signupName, setSignupName] = useState("");
@@ -467,25 +467,6 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                   </p>
                 </div>
 
-                {/* 1-Click Super Admin Quick Demo */}
-                <button
-                  type="button"
-                  onClick={() => handleAdminLogin("admin@platform.local", "Password123!")}
-                  className="w-full flex items-center justify-between p-3 rounded-xl bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 transition-all text-left cursor-pointer group shadow-2xs"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <ShieldCheck className="w-4 h-4 text-zinc-900 shrink-0 stroke-[1.8]" />
-                    <div>
-                      <p className="font-semibold text-sm text-zinc-900">Demo admin account</p>
-                      <p className="text-xs text-zinc-500 font-mono">admin@platform.local</p>
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-semibold text-zinc-800 group-hover:translate-x-0.5 transition-transform flex items-center gap-0.5">
-                    <span>Sign In</span>
-                    <ArrowRight className="w-3 h-3 text-zinc-500" />
-                  </span>
-                </button>
-
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
@@ -503,7 +484,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                         type="email"
                         value={adminEmail}
                         onChange={(e) => setAdminEmail(e.target.value)}
-                        placeholder="admin@platform.local"
+                        placeholder="name@company.com"
                         required
                         className="w-full pl-9 pr-3 py-2.5 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-evergreen focus:bg-white transition-all font-medium text-zinc-900"
                       />

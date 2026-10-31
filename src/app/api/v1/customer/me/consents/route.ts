@@ -16,7 +16,7 @@ export async function PATCH(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const validated = consentSchema.parse(body);
 
     const updated =

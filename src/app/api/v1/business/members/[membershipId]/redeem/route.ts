@@ -30,7 +30,7 @@ export async function POST(
   if ("response" in guard) return guard.response;
 
   try {
-    const body = bodySchema.parse(await request.json());
+    const body = bodySchema.parse(await request.json().catch(() => ({})));
     const idempotencyKey = request.headers.get("idempotency-key") || crypto.randomUUID();
     const result = await redeemForMember(guard.ctx, { ...body, membershipId, idempotencyKey });
     return NextResponse.json({ data: result });

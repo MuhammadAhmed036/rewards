@@ -8,16 +8,17 @@ import { validateLogoDataUrl } from "@/server/services/business-logo";
 import { queueEmail, processOutbox } from "@/server/services/email";
 import { createEmailVerificationToken } from "@/server/services/verification";
 import { env } from "@/lib/env";
+import { checkAuthIpRateLimit, RateLimitError, rateLimitResponse } from "@/server/security/rate-limit";
 import { getBaseUrl } from "@/lib/url";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 const signupSchema = z.object({
   role: z.enum(["owner", "customer"]).default("owner"),
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Valid email required"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  businessName: z.string().optional(),
+  name: z.string().min(1, "Name is required").max(120),
+  email: z.string().email("Valid email required").max(255),
+  password: z.string().min(8, "Password must be at least 8 characters").max(256, "Password is too long"),
+  businessName: z.string().max(200).optional(),
   category: z.string().optional(),
   requestedStaffCount: z.number().int().min(1).max(100).optional(),
   requestedManagerCount: z.number().int().min(0).max(50).optional(),
@@ -27,7 +28,8 @@ const signupSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    await checkAuthIpRateLimit(request, "signup");
+    const body = await request.json().catch(() => ({}));
     const validated = signupSchema.parse(body);
     const normalizedEmail = validated.email.toLowerCase().trim();
 
@@ -152,6 +154,7 @@ export async function POST(request: NextRequest) {
       return response;
     }
   } catch (err: unknown) {
+    if (err instanceof RateLimitError) return rateLimitResponse(err);
     console.error("Signup error:", err);
     return NextResponse.json(
       {

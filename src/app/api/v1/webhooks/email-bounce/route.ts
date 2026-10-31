@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   const denied = guardCronRequest(request);
   if (denied) return denied;
   try {
-    const { email, type } = bodySchema.parse(await request.json());
+    const { email, type } = bodySchema.parse(await request.json().catch(() => ({})));
     return NextResponse.json({ data: await recordProviderReport(email, type) });
   } catch (err) {
     const message = err instanceof z.ZodError ? "Send {\"email\": \"...\", \"type\": \"bounce\" | \"complaint\"}." : "Could not record that report.";

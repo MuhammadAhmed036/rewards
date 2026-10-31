@@ -68,7 +68,7 @@ export async function PATCH(request: NextRequest) {
   if ("response" in guard) return guard.response;
 
   try {
-    const input = profileSchema.parse(await request.json());
+    const input = profileSchema.parse(await request.json().catch(() => ({})));
     const changes: { name?: string; birthMonth?: number | null; birthDay?: number | null } = {};
     if (input.name !== undefined) changes.name = input.name;
     if (input.birthMonth !== undefined) {

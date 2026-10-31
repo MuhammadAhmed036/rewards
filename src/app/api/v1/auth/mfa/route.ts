@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   const { ctx } = guard;
 
   try {
-    const body = bodySchema.parse(await request.json());
+    const body = bodySchema.parse(await request.json().catch(() => ({})));
     const [user] = await db.select().from(users).where(eq(users.id, ctx.userId)).limit(1);
     if (!user) return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Sign in again." } }, { status: 401 });
 

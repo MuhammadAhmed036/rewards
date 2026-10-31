@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   const denied = await requireRecentAuth(request);
   if (denied) return denied;
   try {
-    return NextResponse.json({ data: await createApiKey(guard.ctx, createSchema.parse(await request.json())) }, { status: 201 });
+    return NextResponse.json({ data: await createApiKey(guard.ctx, createSchema.parse(await request.json().catch(() => ({})))) }, { status: 201 });
   } catch (err) {
     return failure("KEY_CREATE_FAILED", err, "Couldn't make that key");
   }
