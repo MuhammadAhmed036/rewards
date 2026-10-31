@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AuthShell, fieldClass, primaryButtonClass } from "@/components/auth/AuthShell";
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordForm() {
+  const roleParam = useSearchParams().get("role");
+  const role = roleParam === "owner" || roleParam === "staff" ? roleParam : "customer";
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -18,7 +21,7 @@ export default function ForgotPasswordPage() {
       const res = await fetch("/api/v1/auth/password/forgot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, role }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error?.message || "Couldn't send the email. Try again.");
@@ -58,7 +61,7 @@ export default function ForgotPasswordPage() {
         {error && (
           <p className="text-sm text-rose-700">
             {error}
-            {error.includes("register") && (
+            {error.includes("register") && role === "customer" && (
               <>
                 {" "}
                 <Link href="/login" className="font-semibold underline">
@@ -79,5 +82,13 @@ export default function ForgotPasswordPage() {
         </p>
       </form>
     </AuthShell>
+  );
+}
+
+export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ForgotPasswordForm />
+    </Suspense>
   );
 }

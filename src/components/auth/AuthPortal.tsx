@@ -513,7 +513,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       <label className="text-xs font-semibold text-zinc-700">
                       Password
                     </label>
-                      <Link href="/forgot-password" className="text-xs font-semibold text-evergreen hover:underline">
+                      <Link href="/forgot-password?role=owner" className="text-xs font-semibold text-evergreen hover:underline">
                         Forgot password?
                       </Link>
                     </div>

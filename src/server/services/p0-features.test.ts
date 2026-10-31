@@ -7,7 +7,7 @@ import { registerOwnerAndTenant, createLocation, updateLocation } from "./tenant
 import { joinProgramme, revokeMemberQr } from "./member";
 import { addStaffMember, updateStaffMember } from "./staff";
 import { requestPasswordReset, resetPassword } from "./password-reset";
-import { createEmailVerificationToken, verifyEmailToken, hashLinkToken } from "./verification";
+import { createEmailVerificationToken, verifyEmailToken } from "./verification";
 import { setProgrammeStatus, publishRuleVersion, getProgramme } from "./programme";
 import { adjustBalance, earn, redeemForMember } from "./ledger";
 import { createReward, getRewards } from "./rewards";
@@ -46,15 +46,11 @@ describe("Password reset", () => {
     const email = s.user.email;
     await createSession(s.user.id, "staff");
 
-    // A shop owner is a staff account, so the forgot form refuses it
-    await expect(requestPasswordReset(email)).rejects.toThrow(/staff account/);
-
-    const token = "a".repeat(64);
-    await db.insert(verifications).values({
-      identifier: `reset:${email}`,
-      value: hashLinkToken(token),
-      expiresAt: new Date(Date.now() + 60_000),
-    });
+    // The customer form refuses a shop owner's login; the owner form creates the link
+    await expect(requestPasswordReset(email)).rejects.toThrow(/shop team account/);
+    await requestPasswordReset(email, "owner").catch(() => undefined); // no mail server in tests
+    const token = await tokenFromLatestEmail(email, "password_reset");
+    expect(token).toHaveLength(64);
     const stored = await db.select().from(verifications).where(eq(verifications.identifier, `reset:${email}`));
     expect(stored).toHaveLength(1);
     expect(stored[0].value).not.toBe(token);
@@ -67,6 +63,7 @@ describe("Password reset", () => {
 
   it("asks an unregistered email to register first", async () => {
     await expect(requestPasswordReset(`nobody-${Date.now()}@p0.test`)).rejects.toThrow(/register first/);
+    await expect(requestPasswordReset(`nobody-${Date.now()}@p0.test`, "owner")).rejects.toThrow(/No shop owner/);
   });
 });
 

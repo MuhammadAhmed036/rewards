@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requestPasswordReset, PasswordResetError } from "@/server/services/password-reset";
 
-const bodySchema = z.object({ email: z.string().email("Enter a valid email address") });
+const bodySchema = z.object({
+  email: z.string().email("Enter a valid email address"),
+  role: z.enum(["customer", "staff", "owner"]).default("customer"),
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const { email } = bodySchema.parse(await request.json());
-    await requestPasswordReset(email);
+    const { email, role } = bodySchema.parse(await request.json());
+    await requestPasswordReset(email, role);
     return NextResponse.json({ data: { sent: true } });
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -20,7 +23,7 @@ export async function POST(request: NextRequest) {
       );
     }
     if (err instanceof PasswordResetError) {
-      const status = err.code === "NO_ACCOUNT" ? 404 : err.code === "STAFF_ACCOUNT" ? 403 : 502;
+      const status = err.code === "NO_ACCOUNT" ? 404 : err.code === "WRONG_ACCOUNT_TYPE" ? 403 : 502;
       return NextResponse.json({ error: { code: err.code, message: err.message } }, { status });
     }
     console.error("Password reset request failed:", err);

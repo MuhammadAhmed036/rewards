@@ -1496,7 +1496,7 @@ export default function BusinessHubPage(props: {
                               <label className="text-xs font-semibold text-zinc-800">
                               Password
                             </label>
-                              <Link href="/forgot-password" className="text-xs font-semibold text-evergreen hover:underline">
+                              <Link href="/forgot-password?role=customer" className="text-xs font-semibold text-evergreen hover:underline">
                                 Forgot password?
                               </Link>
                             </div>
@@ -1562,7 +1562,7 @@ export default function BusinessHubPage(props: {
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <label className="text-xs font-semibold text-zinc-800">Staff Password</label>
-                    <Link href="/forgot-password" className="text-xs font-semibold text-evergreen hover:underline">
+                    <Link href="/forgot-password?role=staff" className="text-xs font-semibold text-evergreen hover:underline">
                       Forgot password?
                     </Link>
                   </div>
@@ -1651,7 +1651,7 @@ export default function BusinessHubPage(props: {
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-1">
                     <label className="text-xs font-semibold text-zinc-800">Password</label>
-                    <Link href="/forgot-password" className="text-xs font-semibold text-evergreen hover:underline">
+                    <Link href="/forgot-password?role=owner" className="text-xs font-semibold text-evergreen hover:underline">
                       Forgot password?
                     </Link>
                   </div>
