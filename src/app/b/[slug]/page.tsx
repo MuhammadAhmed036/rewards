@@ -138,15 +138,14 @@ export default function BusinessHubPage(props: {
     const saved = window.localStorage.getItem("lp_lang");
     if (isLang(saved)) setChosenLang(saved);
   }, []);
-  // The page reads right to left for languages that do (Urdu)
+  // The layout stays left to right: most of the page (staff and owner sign-in, shop names, reward titles) is
+  // not translated, and flipping it would scramble punctuation and alignment. Translated text still reads
+  // correctly right to left inside it. Only the long terms page switches direction.
   const shownLocale = hubData?.tenant.locale;
   useEffect(() => {
-    const l = chosenLang ?? langFromLocale(shownLocale);
-    document.documentElement.lang = l;
-    document.documentElement.dir = LOCALES[l].dir;
+    document.documentElement.lang = chosenLang ?? langFromLocale(shownLocale);
     return () => {
       document.documentElement.lang = "en";
-      document.documentElement.dir = "ltr";
     };
   }, [chosenLang, shownLocale]);
   // A live QR code changes every 30 seconds, so keep the card's copy fresh while it is open
@@ -713,6 +712,7 @@ export default function BusinessHubPage(props: {
 
             {/* Header Right Actions / Role Switcher */}
             <div className={`flex items-center gap-2.5 ${member ? "shrink-0" : "flex-col sm:flex-row items-stretch w-full sm:w-auto"}`}>
+              {activePortalRole === "customer" && (
               <label className="flex items-center gap-1.5 text-xs text-slate-600">
                 <span className="sr-only">{tr("language")}</span>
                 <select
@@ -734,6 +734,7 @@ export default function BusinessHubPage(props: {
                   ))}
                 </select>
               </label>
+              )}
               {/* Role switcher: only for visitors who are not signed in to their card */}
               {!member && (
               <div className="flex bg-white p-1 border border-slate-200 rounded-full text-sm font-semibold w-full sm:w-auto overflow-x-auto">
