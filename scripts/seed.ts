@@ -116,7 +116,7 @@ async function seed() {
       locale: "en-GB",
       brandPrimaryHex: "#0f172a",
       plan: "pro",
-      features: { customBranding: true, multiLocation: true, exportReports: true },
+      features: { customBranding: true, multiLocation: true, exportReports: true, unlisted: true },
       limits: { maxMembers: 10000, maxStaff: 50, maxLocations: 10 },
     })
     .returning();
@@ -504,7 +504,7 @@ async function seed() {
       locale: "en-GB",
       brandPrimaryHex: "#78350f",
       plan: "pro",
-      features: { customBranding: true },
+      features: { customBranding: true, unlisted: true },
       limits: { maxMembers: 10000, maxStaff: 50, maxLocations: 5 },
     })
     .returning();

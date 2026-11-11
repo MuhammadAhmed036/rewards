@@ -37,6 +37,7 @@ import { PointsMenu } from "@/components/rewards/PointsMenu";
 import { formatMoney } from "@/lib/money";
 import { HouseholdCard } from "@/components/loyalty/HouseholdCard";
 import { MemberCard3D } from "@/components/loyalty/MemberCard3D";
+import { ShopCardPreview3D } from "@/components/loyalty/ShopCardPreview3D";
 import { ReportProblem } from "@/components/loyalty/ReportProblem";
 
 interface HubPayload {
@@ -676,7 +677,7 @@ export default function BusinessHubPage(props: {
 
   if (!hubData) return null;
 
-  const brandColor = hubData.tenant.brandPrimaryHex || "#495e57";
+  const brandColor = hubData.tenant.brandPrimaryHex || "#0056f9";
   const member = hubData.member;
   const isStamps = hubData.programme.type === "stamps";
   const unitWord: "points" | "stamps" = isStamps ? "stamps" : "points";
@@ -921,7 +922,7 @@ export default function BusinessHubPage(props: {
                     <div className="space-y-2">
                       <Button
                         onClick={() => handleClaimPromoQr()}
-                        className="w-full bg-zinc-950 hover:bg-zinc-800 text-white font-semibold rounded-xl py-3 text-xs shadow-xs cursor-pointer transition-colors"
+                        className="w-full bg-evergreen hover:bg-evergreen-deep text-white font-semibold rounded-xl py-3 text-xs shadow-xs cursor-pointer transition-colors"
                       >
                         Claim Offer to My Pass →
                       </Button>
@@ -1366,10 +1367,15 @@ export default function BusinessHubPage(props: {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                   {/* Left Column: Store Value Proposition & Teaser Rewards (6 cols) */}
                   <div className="lg:col-span-6 space-y-6">
+                    <div className="pt-2 pb-1">
+                      <ShopCardPreview3D
+                        name={hubData.tenant.name}
+                        logoUrl={hubData.tenant.logoUrl}
+                        brandColor={hubData.tenant.brandPrimaryHex}
+                        stamps={Boolean(isStamps)}
+                      />
+                    </div>
                     <div className="bg-white rounded-2xl border border-zinc-200/90 p-6 sm:p-8 shadow-xs relative overflow-hidden">
-                      <div className="w-10 h-10 rounded-xl bg-zinc-100 border border-zinc-200/60 text-zinc-900 flex items-center justify-center mb-4 shadow-2xs">
-                        <Sparkles className="h-5 w-5 stroke-[1.8]" />
-                      </div>
 
                       <h2 className="text-2xl sm:text-3xl font-bold text-zinc-950 tracking-tight leading-tight">
                         Join {hubData.tenant.name} and get rewarded
@@ -1504,7 +1510,7 @@ export default function BusinessHubPage(props: {
                             <label className="text-xs font-semibold text-zinc-800 block mb-1">
                               {tr("email_address")} <span className="text-rose-500">*</span>
                             </label>
-                            <Input
+                            <Input aria-label="Email address"
                               type="email"
                               required
                               placeholder="name@example.com"
@@ -1518,7 +1524,7 @@ export default function BusinessHubPage(props: {
                             <label className="text-xs font-semibold text-zinc-800 block mb-1">
                               {tr("name_optional")}
                             </label>
-                            <Input
+                            <Input aria-label="First & Last Name"
                               type="text"
                               placeholder="First & Last Name"
                               value={joinName}
@@ -1531,7 +1537,7 @@ export default function BusinessHubPage(props: {
                             <label className="text-xs font-semibold text-zinc-800 block mb-1">
                               {tr("password_create_optional")}
                             </label>
-                            <Input
+                            <Input aria-label="Password"
                               type="password"
                               placeholder="Min 6 characters to sign in anytime"
                               value={joinPassword}
@@ -1579,7 +1585,7 @@ export default function BusinessHubPage(props: {
                             type="submit"
                             variant="default"
                             size="lg"
-                            className="w-full font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
+                            className="w-full font-semibold text-xs bg-evergreen hover:bg-evergreen-deep text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
                             disabled={joining || !joinEmail}
                           >
                             {joining ? tr("creating_card") : tr("get_my_card")}
@@ -1592,7 +1598,7 @@ export default function BusinessHubPage(props: {
                             <label className="text-xs font-semibold text-zinc-800 block mb-1">
                               Email Address
                             </label>
-                            <Input
+                            <Input aria-label="Email address"
                               type="email"
                               required
                               placeholder="customer@example.com"
@@ -1611,7 +1617,7 @@ export default function BusinessHubPage(props: {
                                 {tr("forgot_password")}
                               </Link>
                             </div>
-                            <Input
+                            <Input aria-label="Password"
                               type="password"
                               required
                               placeholder="••••••••"
@@ -1625,7 +1631,7 @@ export default function BusinessHubPage(props: {
                             type="submit"
                             variant="default"
                             size="lg"
-                            className="w-full font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
+                            className="w-full font-semibold text-xs bg-evergreen hover:bg-evergreen-deep text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
                             disabled={customerLoggingIn || !customerLoginEmail || !customerLoginPassword}
                           >
                             {customerLoggingIn ? tr("signing_in") : tr("signin_view_pass")}
@@ -1650,7 +1656,7 @@ export default function BusinessHubPage(props: {
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-zinc-950 tracking-tight">Frontline Staff Scanner</h2>
                 <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto leading-relaxed">
-                  Enter your staff credentials provisioned by {hubData.tenant.name} to launch the scanner terminal.
+                  Sign in with the email and password {hubData.tenant.name} gave you to open the scanner.
                 </p>
               </div>
 
@@ -1659,7 +1665,7 @@ export default function BusinessHubPage(props: {
                   <label className="text-xs font-semibold text-zinc-800 block mb-1">Staff Email Address</label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3 stroke-[1.8]" />
-                    <Input
+                    <Input aria-label="Email address"
                       type="email"
                       required
                       placeholder="staff@store.com"
@@ -1679,7 +1685,7 @@ export default function BusinessHubPage(props: {
                   </div>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3 stroke-[1.8]" />
-                    <Input
+                    <Input aria-label="Password"
                       type="password"
                       required
                       placeholder="••••••••"
@@ -1694,7 +1700,7 @@ export default function BusinessHubPage(props: {
                   type="submit"
                   variant="default"
                   size="lg"
-                  className="w-full font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
+                  className="w-full font-semibold text-xs bg-evergreen hover:bg-evergreen-deep text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
                   disabled={staffLoggingIn || !staffEmail || !staffPassword}
                 >
                   {staffLoggingIn ? "Authenticating Staff..." : "Launch Staff Terminal →"}
@@ -1714,7 +1720,7 @@ export default function BusinessHubPage(props: {
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold text-zinc-950 tracking-tight">Store Owner Dashboard</h2>
                 <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto leading-relaxed">
-                  Access store analytics, product catalog, discounts, staff RBAC credentials, and customer ledger.
+                  See your customers, rewards, staff and points in one place.
                 </p>
               </div>
 
@@ -1723,7 +1729,7 @@ export default function BusinessHubPage(props: {
                   <label className="text-xs font-semibold text-zinc-800 block mb-1">Owner Email Address</label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3 stroke-[1.8]" />
-                    <Input
+                    <Input aria-label="Email address"
                       type="email"
                       required
                       placeholder="owner@store.com"
@@ -1743,7 +1749,7 @@ export default function BusinessHubPage(props: {
                   </div>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-zinc-400 absolute left-3.5 top-3 stroke-[1.8]" />
-                    <Input
+                    <Input aria-label="Password"
                       type="password"
                       required
                       placeholder="••••••••"
@@ -1758,7 +1764,7 @@ export default function BusinessHubPage(props: {
                   type="submit"
                   variant="default"
                   size="lg"
-                  className="w-full font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
+                  className="w-full font-semibold text-xs bg-evergreen hover:bg-evergreen-deep text-white rounded-xl shadow-xs h-11 cursor-pointer transition-colors"
                   disabled={ownerLoggingIn || !ownerEmail || !ownerPassword}
                 >
                   {ownerLoggingIn ? "Opening Portal..." : "Open Owner Dashboard →"}
@@ -1772,9 +1778,9 @@ export default function BusinessHubPage(props: {
       {/* Footer */}
       <footer className="mt-16 border-t border-zinc-200 bg-white py-5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
-          <span>&copy; {new Date().getFullYear()} {hubData.tenant.name}. Loyalty card by LoyaltyPlatform</span>
+          <span>&copy; {new Date().getFullYear()} {hubData.tenant.name}. Loyalty card by Rappio</span>
           <div className="flex items-center space-x-4">
-            <Link href="/" className="hover:text-slate-800">LoyaltyPlatform</Link>
+            <Link href="/" className="hover:text-slate-800">Rappio</Link>
             <Link href={`/b/${slug}/terms`} className="hover:text-slate-800">Card terms</Link>
             <Link href="/privacy" className="hover:text-slate-800">Privacy</Link>
           </div>

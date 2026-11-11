@@ -45,7 +45,7 @@ export function StampCard({
   /** Animate the newest stamp landing as soon as the card appears (e.g. right after a scan). */
   justEarned?: boolean;
 }) {
-  const surface = brandColor && /^#[0-9a-f]{6}$/i.test(brandColor) ? brandColor : "#495e57";
+  const surface = brandColor && /^#[0-9a-f]{6}$/i.test(brandColor) ? brandColor : "#0056f9";
   const light = isLight(surface);
   const ink = light ? "text-zinc-900" : "text-white";
   const soft = light ? "text-zinc-700" : "text-white/75";

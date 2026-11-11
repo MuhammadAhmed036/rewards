@@ -3,22 +3,22 @@ import Link from "next/link";
 import { LegalPage } from "@/components/legal/LegalPage";
 
 export const metadata: Metadata = {
-  title: "Privacy notice — LoyaltyPlatform",
+  title: "Privacy notice",
   description: "What we collect when you use a loyalty card, why, how long we keep it, and your rights.",
 };
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy notice" meta="Last updated 29 October 2026">
+    <LegalPage title="Privacy notice" meta="Last updated 11 November 2026">
       <p>
-        This notice explains what information is collected when you use a digital loyalty card on LoyaltyPlatform, why it&rsquo;s
+        This notice explains what information is collected when you use a digital loyalty card on Rappio, why it&rsquo;s
         collected, how long it&rsquo;s kept and what you can do about it.
       </p>
 
       <h2>Who is responsible</h2>
       <p>
         Each shop runs its own loyalty programme and decides how your points and rewards work. The shop is responsible for the
-        information it holds about you as its customer. LoyaltyPlatform provides the software and stores that information on the
+        information it holds about you as its customer. Rappio provides the software and stores that information on the
         shop&rsquo;s behalf.
       </p>
 
@@ -30,6 +30,10 @@ export default function PrivacyPage() {
         <li>Your points history: when you earned or spent points, how much, at which location and which staff member did it.</li>
         <li>Messages you send to the shop and problems you report about your points.</li>
         <li>Your choices: whether you accepted the programme terms and whether you want marketing emails.</li>
+        <li>
+          If you share a card with other people (a household card): the name or email of each person on it, and the fact that
+          you share it. Everyone on the card sees and adds to the same points.
+        </li>
         <li>Which of the shop&rsquo;s links (for example its review page) you open, without your IP address or device details.</li>
       </ul>
       <p>We never ask for payment card details and your QR code doesn&rsquo;t contain any personal information.</p>
@@ -47,12 +51,39 @@ export default function PrivacyPage() {
         <li>Your account and points history: while your card is active, so your balance stays correct.</li>
         <li>Link click records: 13 months.</li>
         <li>Messages, feedback and audit records of staff actions: 24 months.</li>
+        <li>Records of things that happened on your card (used to send alerts to the shop's systems): 90 days.</li>
+        <li>Emails we sent you, including their text: 60 days. Emails still waiting to be sent are kept until they go.</li>
         <li>Sign-in sessions: removed as soon as they expire.</li>
+        <li>Household invitations nobody opened: removed a month after they expire.</li>
       </ul>
       <p>
         If you delete your account, your name and email are removed straight away. A record of past points with no personal
         details may be kept so the shop&rsquo;s accounts still add up.
       </p>
+
+      <h2>Who else sees your information</h2>
+      <ul>
+        <li>
+          <strong>The shop.</strong> It sees your card, your points history and, if you said yes, can email you offers.
+        </li>
+        <li>
+          <strong>People sharing your card.</strong> If you set up a household card, the people you invite see the same card.
+          You can remove them, and they can leave, at any time. When someone leaves, the card&rsquo;s QR code is replaced.
+        </li>
+        <li>
+          <strong>A group the shop belongs to.</strong> Some businesses with several brands link them in a group. The
+          group&rsquo;s owner sees combined counts for each brand, such as how many members it has. They never see your name,
+          email or points balance.
+        </li>
+        <li>
+          <strong>Comparison with other shops.</strong> A shop can choose to take part in an anonymous comparison. Only its
+          totals are used, never anything about you.
+        </li>
+        <li>
+          <strong>Our service providers.</strong> We use hosting, database and email-sending services to run Rappio and to
+          send you messages such as a password reset. They act on our instructions.
+        </li>
+      </ul>
 
       <h2>Your rights</h2>
       <p>You can, at any time:</p>

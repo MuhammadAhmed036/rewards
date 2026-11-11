@@ -56,7 +56,7 @@ const field = "w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px
 export function BusinessSettings({ value, onSaved }: { value: BusinessSettingsValue | null; onSaved: (v: BusinessSettingsValue) => void }) {
   const [form, setForm] = useState({
     name: "",
-    brandPrimaryHex: "#495e57",
+    brandPrimaryHex: "#0056f9",
     industry: "",
     timezone: "Europe/London",
     currency: "GBP",
@@ -70,7 +70,7 @@ export function BusinessSettings({ value, onSaved }: { value: BusinessSettingsVa
     if (!value) return;
     setForm({
       name: value.name,
-      brandPrimaryHex: value.brandPrimaryHex || "#495e57",
+      brandPrimaryHex: value.brandPrimaryHex || "#0056f9",
       industry: value.industry || "",
       timezone: value.timezone || "Europe/London",
       currency: value.currency || "GBP",
@@ -193,7 +193,7 @@ export function BusinessSettings({ value, onSaved }: { value: BusinessSettingsVa
         <h3 className="font-display text-lg font-bold text-evergreen-deep">How it looks</h3>
         <div
           className="mt-4 aspect-[1.586/1] rounded-2xl p-5 text-white flex flex-col justify-between shadow-[0_20px_40px_-24px_rgba(38,48,45,0.7)]"
-          style={{ backgroundColor: /^#[0-9a-f]{6}$/i.test(form.brandPrimaryHex) ? form.brandPrimaryHex : "#495e57" }}
+          style={{ backgroundColor: /^#[0-9a-f]{6}$/i.test(form.brandPrimaryHex) ? form.brandPrimaryHex : "#0056f9" }}
         >
           <span className="font-display font-bold text-lg truncate">{form.name || "Your business"}</span>
           <span className="font-display font-bold text-4xl">120</span>

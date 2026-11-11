@@ -56,7 +56,7 @@ export async function queueEmail(options: QueueEmailOptions) {
 function footerHtml(payload: Record<string, unknown>) {
   const businessName = String(payload.businessName || "this shop");
   return payload.unsubscribeUrl
-    ? `You're getting this because you have a ${businessName} loyalty card. <a href="${String(payload.unsubscribeUrl)}" style="color:#495e57;">Stop these emails</a>.`
+    ? `You're getting this because you have a ${businessName} loyalty card. <a href="${String(payload.unsubscribeUrl)}" style="color:#0056f9;">Stop these emails</a>.`
     : `You're getting this because you have a ${businessName} loyalty card.`;
 }
 function footerText(payload: Record<string, unknown>) {
@@ -66,13 +66,14 @@ function footerText(payload: Record<string, unknown>) {
 /** A plain, single-button email in the platform's colours. */
 function buttonEmail(title: string, body: string, button: string, url: string, footnote: string) {
   return `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #26302d;">
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #011e5a;">
+      <p style="margin: 0 0 22px;"><img src="${getBaseUrl()}/brand/rappio-logo.png" alt="Rappio" height="28" style="height: 28px; width: auto; display: block;" /></p>
       <h2 style="margin: 0 0 12px;">${title}</h2>
-      <p style="line-height: 1.5; font-size: 16px; color: #45474b;">${body}</p>
+      <p style="line-height: 1.5; font-size: 16px; color: #3b4466;">${body}</p>
       <p style="margin: 28px 0;">
-        <a href="${url}" style="background: #495e57; color: #ffffff; padding: 12px 24px; border-radius: 999px; text-decoration: none; font-weight: 600; display: inline-block;">${button}</a>
+        <a href="${url}" style="background: #0056f9; color: #ffffff; padding: 12px 24px; border-radius: 999px; text-decoration: none; font-weight: 600; display: inline-block;">${button}</a>
       </p>
-      <p style="font-size: 13px; color: #6c7476;">${footnote}<br/>If the button doesn't work, copy this link: <span style="color: #495e57;">${url}</span></p>
+      <p style="font-size: 13px; color: #6a7394;">${footnote}<br/>If the button doesn't work, copy this link: <span style="color: #0056f9;">${url}</span></p>
     </div>
   `;
 }
@@ -142,12 +143,12 @@ function renderEmailRaw(
         text: `Click the link below to sign in:\n\n${url}\n\nThis link expires in 10 minutes. If you did not request this, please ignore this email.`,
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
-            <h2 style="color: #0f172a; margin-bottom: 16px;">Sign in to ${appName}</h2>
+            <h2 style="color: #011e5a; margin-bottom: 16px;">Sign in to ${appName}</h2>
             <p style="color: #334155; line-height: 1.5; font-size: 16px;">Click the button below to authenticate your account. This one-time link expires in 10 minutes.</p>
             <div style="margin: 28px 0;">
-              <a href="${url}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Sign in to your account</a>
+              <a href="${url}" style="background-color: #0056f9; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; display: inline-block;">Sign in to your account</a>
             </div>
-            <p style="color: #64748b; font-size: 13px;">If the button does not work, copy and paste this URL into your browser:<br/><span style="color: #4f46e5;">${url}</span></p>
+            <p style="color: #6a7394; font-size: 13px;">If the button does not work, copy and paste this URL into your browser:<br/><span style="color: #0056f9;">${url}</span></p>
           </div>
         `,
       };
@@ -198,11 +199,11 @@ The link works for 10 minutes and only once. If it wasn't you, ignore this email
 
 It works once, for 10 minutes. If you didn't ask for it, ignore this email and consider changing your password.`,
         html: `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #26302d;">
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #011e5a;">
       <h2 style="margin: 0 0 12px;">Your code</h2>
-      <p style="line-height: 1.5; font-size: 16px; color: #45474b;">Use this code to ${reason}. It works once, for 10 minutes.</p>
-      <p style="margin: 24px 0; font-size: 34px; letter-spacing: 8px; font-weight: 700; color: #495e57;">${code}</p>
-      <p style="font-size: 13px; color: #6c7476;">If you didn't ask for it, ignore this email and consider changing your password.</p>
+      <p style="line-height: 1.5; font-size: 16px; color: #3b4466;">Use this code to ${reason}. It works once, for 10 minutes.</p>
+      <p style="margin: 24px 0; font-size: 34px; letter-spacing: 8px; font-weight: 700; color: #0056f9;">${code}</p>
+      <p style="font-size: 13px; color: #6a7394;">If you didn't ask for it, ignore this email and consider changing your password.</p>
     </div>
   `,
       };
@@ -281,23 +282,23 @@ If you don't know ${inviter}, ignore this email.`,
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px;">
             <div style="text-align: center; margin-bottom: 24px;">
               <span style="font-size: 36px;">🎉</span>
-              <h1 style="color: #0f172a; font-size: 24px; font-weight: 800; margin: 8px 0 4px 0;">Welcome to ${appName}!</h1>
-              <p style="color: #64748b; font-size: 14px; margin: 0;">Your business account has been created successfully.</p>
+              <h1 style="color: #011e5a; font-size: 24px; font-weight: 800; margin: 8px 0 4px 0;">Welcome to ${appName}!</h1>
+              <p style="color: #6a7394; font-size: 14px; margin: 0;">Your business account has been created successfully.</p>
             </div>
 
-            <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 1px solid #cbd5e1; border-radius: 14px; padding: 20px; margin: 24px 0;">
-              <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Registered Store</div>
-              <div style="font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 4px;">${businessName}</div>
+            <div style="background: linear-gradient(135deg, #f8fafc 0%, #eef3ff 100%); border: 1px solid #cbd5e1; border-radius: 14px; padding: 20px; margin: 24px 0;">
+              <div style="font-size: 11px; font-weight: 700; color: #6a7394; text-transform: uppercase; letter-spacing: 1px;">Registered Store</div>
+              <div style="font-size: 20px; font-weight: 800; color: #011e5a; margin-top: 4px;">${businessName}</div>
               <div style="font-size: 13px; color: #475569; margin-top: 2px;">Category: ${category}</div>
 
               <div style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed #cbd5e1;">
-                <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Your Store Website URL</div>
-                <div style="font-family: monospace; font-size: 14px; font-weight: 700; color: #4f46e5; margin-top: 4px; word-break: break-all;">${storeUrl}</div>
+                <div style="font-size: 11px; font-weight: 700; color: #6a7394; text-transform: uppercase; letter-spacing: 1px;">Your Store Website URL</div>
+                <div style="font-family: monospace; font-size: 14px; font-weight: 700; color: #0056f9; margin-top: 4px; word-break: break-all;">${storeUrl}</div>
               </div>
             </div>
 
             <div style="margin: 28px 0; text-align: center;">
-              <a href="${storeUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);">Visit Your Store Page →</a>
+              <a href="${storeUrl}" style="background-color: #0056f9; color: #ffffff; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);">Visit Your Store Page →</a>
             </div>
 
             <div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 12px; padding: 14px; margin-top: 24px;">
@@ -306,7 +307,7 @@ If you don't know ${inviter}, ignore this email.`,
               </p>
             </div>
 
-            <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #f1f5f9; text-align: center; color: #94a3b8; font-size: 12px;">
+            <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #eef3ff; text-align: center; color: #94a3b8; font-size: 12px;">
               ${appName} • Enterprise Customer Loyalty Infrastructure
             </div>
           </div>
@@ -339,10 +340,10 @@ If you don't know ${inviter}, ignore this email.`,
       const escape = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const paragraphs = escape(body)
         .split(/\n{2,}/)
-        .map((p) => `<p style="line-height:1.5;font-size:16px;color:#45474b;">${p.replace(/\n/g, "<br/>")}</p>`)
+        .map((p) => `<p style="line-height:1.5;font-size:16px;color:#3b4466;">${p.replace(/\n/g, "<br/>")}</p>`)
         .join("");
       const optOut = payload.unsubscribeUrl
-        ? `<a href="${String(payload.unsubscribeUrl)}" style="color:#495e57;">${String(payload.unsubscribeLabel || "Stop these emails")}</a>`
+        ? `<a href="${String(payload.unsubscribeUrl)}" style="color:#0056f9;">${String(payload.unsubscribeLabel || "Stop these emails")}</a>`
         : "";
       return {
         subject,
@@ -352,12 +353,12 @@ Open your card: ${url}
 
 You're getting this because you said yes to offers from ${businessName}.${payload.unsubscribeUrl ? ` Stop offers: ${String(payload.unsubscribeUrl)}` : ""}`,
         html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #26302d;">
-            <p style="font-size:13px;color:#6c7476;margin:0 0 8px;">${escape(businessName)}</p>
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #011e5a;">
+            <p style="font-size:13px;color:#6a7394;margin:0 0 8px;">${escape(businessName)}</p>
             <h2 style="margin: 0 0 12px;">${escape(subject)}</h2>
             ${paragraphs}
-            <p style="margin: 28px 0;"><a href="${url}" style="background:#495e57;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block;">Open my card</a></p>
-            <p style="font-size:13px;color:#6c7476;">You're getting this because you said yes to offers from ${escape(businessName)}. ${optOut}</p>
+            <p style="margin: 28px 0;"><a href="${url}" style="background:#0056f9;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;display:inline-block;">Open my card</a></p>
+            <p style="font-size:13px;color:#6a7394;">You're getting this because you said yes to offers from ${escape(businessName)}. ${optOut}</p>
           </div>
         `,
       };
@@ -405,12 +406,12 @@ You're getting this because you said yes to offers from ${businessName}.${payloa
         text: `New private feedback received from ${customerEmail}:\n\n"${message}"\n\nLog in to your dashboard to review and respond.`,
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
-            <h2 style="color: #0f172a;">New Customer Feedback</h2>
-            <p style="color: #64748b; font-size: 14px;">From: <strong>${customerEmail}</strong></p>
-            <div style="background-color: #f1f5f9; padding: 16px; border-left: 4px solid #4f46e5; border-radius: 4px; margin: 16px 0; font-size: 15px; color: #1e293b; line-height: 1.5;">
+            <h2 style="color: #011e5a;">New Customer Feedback</h2>
+            <p style="color: #6a7394; font-size: 14px;">From: <strong>${customerEmail}</strong></p>
+            <div style="background-color: #eef3ff; padding: 16px; border-left: 4px solid #0056f9; border-radius: 4px; margin: 16px 0; font-size: 15px; color: #1e293b; line-height: 1.5;">
               "${message}"
             </div>
-            <p style="color: #64748b; font-size: 13px;">You can view and mark this message as resolved in your Owner Dashboard.</p>
+            <p style="color: #6a7394; font-size: 13px;">You can view and mark this message as resolved in your Owner Dashboard.</p>
           </div>
         `,
       };
@@ -421,9 +422,9 @@ You're getting this because you said yes to offers from ${businessName}.${payloa
         text: `Your requested personal data export is attached or available in your profile. Under UK GDPR, you have the right to inspect your stored information.`,
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
-            <h2 style="color: #0f172a;">Your Data Export is Ready</h2>
+            <h2 style="color: #011e5a;">Your Data Export is Ready</h2>
             <p style="color: #334155; font-size: 15px;">In accordance with your Subject Access Request (UK GDPR Article 15), your personal loyalty records have been compiled into machine-readable JSON format.</p>
-            <p style="color: #64748b; font-size: 13px;">You can download your export file at any time from your account settings at <a href="${appUrl}/me" style="color: #4f46e5;">${appUrl}/me</a>.</p>
+            <p style="color: #6a7394; font-size: 13px;">You can download your export file at any time from your account settings at <a href="${appUrl}/me" style="color: #0056f9;">${appUrl}/me</a>.</p>
           </div>
         `,
       };

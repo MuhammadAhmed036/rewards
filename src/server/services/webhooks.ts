@@ -171,7 +171,7 @@ async function deliverOne(delivery: typeof webhookDeliveries.$inferSelect) {
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: {
         "Content-Type": "application/json",
-        "User-Agent": "LoyaltyPlatform-Webhooks/1",
+        "User-Agent": "Rappio-Webhooks/1",
         "X-Loyalty-Event": event.name,
         "X-Loyalty-Event-Id": event.id,
         "X-Loyalty-Signature": `t=${timestamp},v1=${signPayload(openSecret(endpoint.secretEncrypted), timestamp, body)}`,

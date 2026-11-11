@@ -20,7 +20,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             {
               "bg-evergreen text-white hover:bg-indigo-700 active:scale-[0.98]":
                 variant === "default",
-              "bg-[var(--brand,#495e57)] text-[var(--brand-foreground,#ffffff)] hover:opacity-90 active:scale-[0.98]":
+              "bg-[var(--brand,#0056f9)] text-[var(--brand-foreground,#ffffff)] hover:opacity-90 active:scale-[0.98]":
                 variant === "brand",
               "border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 shadow-2xs":
                 variant === "outline",

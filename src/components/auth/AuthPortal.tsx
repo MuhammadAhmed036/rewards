@@ -33,7 +33,6 @@ interface RegisteredTenant {
   industry?: string | null;
   brandPrimaryHex?: string | null;
   logoUrl?: string | null;
-  plan: string;
 }
 
 interface AuthPortalProps {
@@ -268,7 +267,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
             {/* Search Bar */}
             <div className="relative">
               <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5 stroke-[1.8]" />
-              <input
+              <input aria-label="Search by shop name or type of business"
                 type="text"
                 placeholder="Search by shop name or type of business"
                 value={storeSearchQuery}
@@ -291,9 +290,8 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
             ) : (
               <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
                 {filteredStores.map((store) => {
-                  const brandColor = store.brandPrimaryHex || "#495e57";
+                  const brandColor = store.brandPrimaryHex || "#0056f9";
                   const storeUrl = `/b/${store.slug}`;
-                  const isPending = store.status === "pending";
 
                   return (
                     <div
@@ -307,15 +305,6 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                             <h3 className="font-bold text-xs text-zinc-950 truncate">
                               {store.name}
                             </h3>
-                            <span
-                              className={`text-[11px] font-semibold px-1.5 py-0.2 rounded shrink-0 border ${
-                                isPending
-                                  ? "bg-amber-50 text-amber-800 border-amber-200"
-                                  : "bg-emerald-50 text-emerald-800 border-emerald-200"
-                              }`}
-                            >
-                              {isPending ? "Pending" : "Active"}
-                            </span>
                           </div>
                           <p className="text-xs text-zinc-400 truncate">
                             /b/{store.slug}
@@ -325,7 +314,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
 
                       <Link
                         href={storeUrl}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-zinc-800 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-lg shadow-2xs transition-colors shrink-0 group-hover:border-zinc-300"
+                        className="inline-flex items-center justify-center gap-1 min-h-[40px] px-3.5 text-xs font-semibold text-zinc-800 bg-white hover:bg-zinc-100 border border-zinc-200 rounded-lg shadow-2xs transition-colors shrink-0 group-hover:border-zinc-300"
                       >
                         <span>Open</span>
                         <ArrowRight className="w-3 h-3 text-zinc-500 group-hover:translate-x-0.5 transition-transform stroke-[1.8]" />
@@ -463,7 +452,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                     Platform admin sign-in
                   </h3>
                   <p className="text-sm text-zinc-600 mt-1">
-                    For the LoyaltyPlatform team only. Shop owners, staff and customers: pick your shop on the left.
+                    For the Rappio team only. Shop owners, staff and customers: pick your shop on the left.
                   </p>
                 </div>
 
@@ -480,7 +469,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                     </label>
                     <div className="relative">
                       <Mail className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5 stroke-[1.8]" />
-                      <input
+                      <input aria-label="Email address"
                         type="email"
                         value={adminEmail}
                         onChange={(e) => setAdminEmail(e.target.value)}
@@ -502,7 +491,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                     </div>
                     <div className="relative">
                       <Lock className="w-4 h-4 text-zinc-400 absolute left-3 top-2.5 stroke-[1.8]" />
-                      <input
+                      <input aria-label="Password"
                         type="password"
                         value={adminPassword}
                         onChange={(e) => setAdminPassword(e.target.value)}
@@ -541,7 +530,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       <label className="text-[11px] font-semibold text-zinc-700 block mb-1">
                         Owner Full Name
                       </label>
-                      <input
+                      <input aria-label="e.g. Alex Johnson"
                         type="text"
                         placeholder="e.g. Alex Johnson"
                         value={signupName}
@@ -555,7 +544,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                       <label className="text-[11px] font-semibold text-zinc-700 block mb-1">
                         Business / Shop Name
                       </label>
-                      <input
+                      <input aria-label="e.g. Royal Coffee Roasters"
                         type="text"
                         placeholder="e.g. Royal Coffee Roasters"
                         value={signupBusinessName}
@@ -649,7 +638,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                     <label className="text-[11px] font-semibold text-zinc-700 block mb-1">
                       Owner Email Address
                     </label>
-                    <input
+                    <input aria-label="Email address"
                       type="email"
                       placeholder="owner@yourbusiness.com"
                       value={signupEmail}
@@ -663,7 +652,7 @@ function AuthForm({ initialMode = "signin" }: AuthPortalProps) {
                     <label className="text-[11px] font-semibold text-zinc-700 block mb-1">
                       Password (min. 8 characters)
                     </label>
-                    <input
+                    <input aria-label="Password"
                       type="password"
                       placeholder="••••••••"
                       value={signupPassword}

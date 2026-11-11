@@ -40,7 +40,7 @@ export function BusinessLogo({
   return (
     <span
       className={`${box} font-display font-bold text-white`}
-      style={{ backgroundColor: brandColor || "#495e57" }}
+      style={{ backgroundColor: brandColor || "#0056f9" }}
       aria-label={`${name} logo`}
       role="img"
     >

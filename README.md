@@ -147,7 +147,7 @@ DATABASE_URL_UNPOOLED=postgres://...
 # Application URLs
 APP_URL=https://yourdomain.com
 NEXT_PUBLIC_APP_URL=https://yourdomain.com
-NEXT_PUBLIC_APP_NAME="LoyaltyPlatform"
+NEXT_PUBLIC_APP_NAME="Rappio"
 
 # Cryptographic Secrets (Minimum 32 random characters each)
 AUTH_SECRET=generate_with_openssl_rand_hex_32

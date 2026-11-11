@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { Coffee, RotateCw } from "lucide-react";
 
 const TOTAL_STAMPS = 8;
@@ -29,14 +30,18 @@ const QR = qrCells();
 function Finder({ x, y }: { x: number; y: number }) {
   return (
     <g>
-      <rect x={x} y={y} width={7} height={7} fill="#26302d" />
+      <rect x={x} y={y} width={7} height={7} fill="#011e5a" />
       <rect x={x + 1} y={y + 1} width={5} height={5} fill="#ffffff" />
-      <rect x={x + 2} y={y + 2} width={3} height={3} fill="#26302d" />
+      <rect x={x + 2} y={y + 2} width={3} height={3} fill="#011e5a" />
     </g>
   );
 }
 
-export function StampCard3D() {
+/**
+ * The hero's loyalty card: leans towards the pointer, and turns over to show the QR code staff scan.
+ * `bare` drops the "turn over" button and the stage padding so it can sit inside a larger 3D scene.
+ */
+export function StampCard3D({ bare = false }: { bare?: boolean }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const frame = useRef<number | null>(null);
@@ -84,10 +89,10 @@ export function StampCard3D() {
   };
 
   return (
-    <div className="flex flex-col items-center gap-6 w-full">
+    <div className={`flex flex-col items-center gap-6 w-full ${bare ? "" : ""}`}>
       <div
         ref={stageRef}
-        className="card-stage w-full max-w-[440px] py-6"
+        className={`card-stage w-full ${bare ? "" : "max-w-[440px] py-6"}`}
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
       >
@@ -104,22 +109,22 @@ export function StampCard3D() {
           }
         >
           {/* Front */}
-          <div className="card-face bg-evergreen text-white p-5 sm:p-6 flex flex-col justify-between overflow-hidden shadow-[0_30px_60px_-20px_rgba(38,48,45,0.55)]">
-            {/* fine paper grain lines */}
-            <div
+          <div className="card-face bg-brand-gradient text-white p-5 sm:p-6 flex flex-col justify-between overflow-hidden shadow-[0_34px_70px_-22px_rgba(1,30,90,0.6)]">
+            {/* the logo's R, large and faint, as the card's watermark */}
+            <Image
+              src="/brand/rappio-mark.png"
+              alt=""
+              width={355}
+              height={371}
               aria-hidden
-              className="absolute inset-0 rounded-[1.5rem] opacity-[0.07]"
-              style={{
-                backgroundImage:
-                  "repeating-linear-gradient(115deg, #ffffff 0 1px, transparent 1px 7px)",
-              }}
+              className="absolute -right-8 -bottom-10 w-[58%] opacity-[0.16] mix-blend-soft-light pointer-events-none select-none"
             />
             <div className="card-lift-2 relative flex items-start justify-between">
               <div>
                 <p className="font-display text-xl sm:text-2xl font-bold leading-none">Artisan Roast</p>
-                <p className="text-[13px] text-white/70 mt-1.5">Coffee card · Priya S.</p>
+                <p className="text-[13px] text-white/75 mt-1.5">Coffee card · Priya S.</p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-marigold text-evergreen-deep flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-marigold text-evergreen-deep flex items-center justify-center shadow-[0_6px_16px_-6px_rgba(1,30,90,0.6)]">
                 <Coffee className="w-5 h-5" strokeWidth={2.2} />
               </div>
             </div>
@@ -133,7 +138,7 @@ export function StampCard3D() {
                   return (
                     <div
                       key={i}
-                      className="w-10 h-10 sm:w-[3.25rem] sm:h-[3.25rem] rounded-full border-2 border-dashed border-marigold/80 flex items-center justify-center text-[11px] sm:text-xs font-bold text-marigold"
+                      className="w-10 h-10 sm:w-[3.25rem] sm:h-[3.25rem] rounded-full border-2 border-dashed border-marigold flex items-center justify-center text-[11px] sm:text-xs font-bold text-marigold"
                     >
                       Free
                     </div>
@@ -143,7 +148,7 @@ export function StampCard3D() {
                   <div
                     key={i}
                     className={`w-10 h-10 sm:w-[3.25rem] sm:h-[3.25rem] rounded-full flex items-center justify-center ${
-                      filled || isNew ? "bg-marigold text-evergreen-deep" : "border-2 border-white/25"
+                      filled || isNew ? "bg-marigold text-evergreen-deep shadow-[0_5px_12px_-5px_rgba(1,30,90,0.6)]" : "border-2 border-white/35"
                     } ${isNew ? "stamp-new" : ""}`}
                     style={filled ? { transform: `rotate(${(i * 37) % 24 - 12}deg)` } : undefined}
                   >
@@ -154,17 +159,17 @@ export function StampCard3D() {
             </div>
 
             <div className="card-lift-1 relative flex items-end justify-between text-[13px]">
-              <span className="text-white/80">1 more stamp for a free drink</span>
+              <span className="text-white/85">1 more stamp for a free drink</span>
               <span className="font-display font-bold text-marigold">7 / 8</span>
             </div>
           </div>
 
           {/* Back */}
-          <div className="card-face card-face--back bg-white border border-zinc-200 p-5 sm:p-6 flex items-center gap-5 shadow-[0_30px_60px_-20px_rgba(38,48,45,0.45)]">
+          <div className="card-face card-face--back bg-white border border-zinc-200 p-5 sm:p-6 flex items-center gap-5 shadow-[0_34px_70px_-22px_rgba(1,30,90,0.5)]">
             <div className="card-lift-1 shrink-0 w-[42%] aspect-square rounded-xl bg-white p-2 ring-1 ring-zinc-200">
               <svg viewBox="0 0 21 21" className="w-full h-full" shapeRendering="crispEdges" aria-hidden>
                 {QR.map(([x, y]) => (
-                  <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="#26302d" />
+                  <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="#011e5a" />
                 ))}
                 <Finder x={0} y={0} />
                 <Finder x={14} y={0} />
@@ -186,14 +191,16 @@ export function StampCard3D() {
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={flip}
-        className="inline-flex items-center gap-2 text-sm font-semibold text-evergreen hover:text-evergreen-deep px-3 py-1.5 rounded-full hover:bg-mist transition-colors cursor-pointer"
-      >
-        <RotateCw className={`w-4 h-4 transition-transform duration-700 ${flipped ? "rotate-180" : ""}`} />
-        {flipped ? "Show the stamps" : "Turn the card over"}
-      </button>
+      {!bare && (
+        <button
+          type="button"
+          onClick={flip}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-evergreen hover:text-evergreen-deep px-3 py-1.5 rounded-full hover:bg-mist transition-colors cursor-pointer"
+        >
+          <RotateCw className={`w-4 h-4 transition-transform duration-700 ${flipped ? "rotate-180" : ""}`} />
+          {flipped ? "Show the stamps" : "Turn the card over"}
+        </button>
+      )}
     </div>
   );
 }

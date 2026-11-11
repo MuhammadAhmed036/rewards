@@ -1,27 +1,30 @@
 @import "tailwindcss";
 
 /*
-  Palette — from Color Hunt (#f5f7f8 #f4ce14 #495e57 #45474b)
-  paper     #f5f7f8  page ground
-  evergreen #495e57  primary actions, navigation, staff
-  graphite  #45474b  body text
-  marigold  #f4ce14  points, stamps and rewards only
+  Rappio palette, taken from the logo
+  ink     #011e5a  the wordmark's navy: headings and dark surfaces
+  blue    #0056f9  the left of the R: buttons, links, navigation
+  violet  #a55efd  the right of the R: the far end of the brand gradient
+  paper   #f6f8ff  page ground, with a breath of blue
+  gold    #ffc53d  points, stamps and rewards only (the logo has no warm colour, so it stays rare)
 */
 
 :root {
   color-scheme: light;
-  --paper: #f5f7f8;
-  --evergreen: #495e57;
-  --evergreen-deep: #26302d;
-  --graphite: #45474b;
-  --marigold: #f4ce14;
-  --mist: #e6ece9;
+  --paper: #f6f8ff;
+  --evergreen: #0056f9; /* kept name: primary action colour */
+  --evergreen-deep: #011e5a; /* kept name: ink */
+  --graphite: #3b4466;
+  --marigold: #ffc53d; /* kept name: points and rewards */
+  --mist: #e8eeff;
+  --violet: #a55efd;
+  --brand-gradient: linear-gradient(135deg, #0056f9 0%, #4f5bfb 48%, #a55efd 100%);
 
   --background: var(--paper);
-  --foreground: #25282b;
+  --foreground: #0f1b47;
   --primary: var(--evergreen);
   --primary-foreground: #ffffff;
-  --border: #dde2e3;
+  --border: #dde2f0;
   --ring: var(--evergreen);
   --radius: 0.875rem;
 }
@@ -31,85 +34,92 @@
   accents, so remapping those scales re-themes the whole app in one place.
 */
 @theme {
-  /* Neutrals: cool grey anchored on graphite, darkening into evergreen */
-  --color-zinc-50: #f5f7f8;
-  --color-zinc-100: #eceff0;
-  --color-zinc-200: #dde2e3;
-  --color-zinc-300: #c4cbcc;
-  --color-zinc-400: #9aa3a4;
-  --color-zinc-500: #6c7476;
-  --color-zinc-600: #565c5f;
-  --color-zinc-700: #45474b;
-  --color-zinc-800: #34413d;
-  --color-zinc-900: #26302d;
-  --color-zinc-950: #1d2624;
+  /* Neutrals: cool greys with a navy cast, darkening into the ink colour */
+  --color-zinc-50: #f6f8ff;
+  --color-zinc-100: #eceff9;
+  --color-zinc-200: #dde2f0;
+  --color-zinc-300: #c3cadf;
+  --color-zinc-400: #959db9;
+  --color-zinc-500: #6a7394;
+  --color-zinc-600: #525b7c;
+  --color-zinc-700: #3b4466;
+  --color-zinc-800: #242d52;
+  --color-zinc-900: #0f1b47;
+  --color-zinc-950: #081236;
 
-  --color-slate-50: #f5f7f8;
-  --color-slate-100: #eceff0;
-  --color-slate-200: #dde2e3;
-  --color-slate-300: #c4cbcc;
-  --color-slate-400: #9aa3a4;
-  --color-slate-500: #6c7476;
-  --color-slate-600: #565c5f;
-  --color-slate-700: #45474b;
-  --color-slate-800: #34413d;
-  --color-slate-900: #26302d;
-  --color-slate-950: #1d2624;
+  --color-slate-50: #f6f8ff;
+  --color-slate-100: #eceff9;
+  --color-slate-200: #dde2f0;
+  --color-slate-300: #c3cadf;
+  --color-slate-400: #959db9;
+  --color-slate-500: #6a7394;
+  --color-slate-600: #525b7c;
+  --color-slate-700: #3b4466;
+  --color-slate-800: #242d52;
+  --color-slate-900: #0f1b47;
+  --color-slate-950: #081236;
 
-  /* Primary accent: evergreen */
-  --color-indigo-50: #eef3f1;
-  --color-indigo-100: #dce7e3;
-  --color-indigo-200: #bccfc8;
-  --color-indigo-300: #93b0a6;
-  --color-indigo-400: #6d8e83;
-  --color-indigo-500: #557268;
-  --color-indigo-600: #495e57;
-  --color-indigo-700: #3c4e48;
-  --color-indigo-800: #31403b;
-  --color-indigo-900: #283431;
-  --color-indigo-950: #18201e;
+  /* Primary accent: the logo's blue */
+  --color-indigo-50: #eef4ff;
+  --color-indigo-100: #dde8ff;
+  --color-indigo-200: #bdd1ff;
+  --color-indigo-300: #8fb0ff;
+  --color-indigo-400: #5a88ff;
+  --color-indigo-500: #2c66fb;
+  --color-indigo-600: #0056f9;
+  --color-indigo-700: #0045cc;
+  --color-indigo-800: #0a3a9f;
+  --color-indigo-900: #0e317a;
+  --color-indigo-950: #081a46;
 
-  --color-violet-50: #eef3f1;
-  --color-violet-100: #dce7e3;
-  --color-violet-200: #bccfc8;
-  --color-violet-600: #495e57;
-  --color-violet-700: #3c4e48;
+  /* Secondary accent: the logo's violet */
+  --color-violet-50: #f7f1ff;
+  --color-violet-100: #ede0ff;
+  --color-violet-200: #dcc3ff;
+  --color-violet-300: #c79bff;
+  --color-violet-400: #b479ff;
+  --color-violet-500: #a55efd;
+  --color-violet-600: #8d40ee;
+  --color-violet-700: #7230c4;
 
-  /* Points & rewards: marigold (dark steps keep text readable on white) */
-  --color-purple-50: #fefbe8;
-  --color-purple-100: #fdf5c4;
-  --color-purple-200: #f9e78a;
-  --color-purple-300: #f6db4a;
-  --color-purple-400: #f4ce14;
-  --color-purple-500: #d8b40a;
-  --color-purple-600: #a88a05;
-  --color-purple-700: #7d6606;
-  --color-purple-800: #66530b;
-  --color-purple-900: #54440e;
-  --color-purple-950: #302605;
+  /* Points & rewards: gold (dark steps keep text readable on white) */
+  --color-purple-50: #fff9e6;
+  --color-purple-100: #fff0c2;
+  --color-purple-200: #ffe38a;
+  --color-purple-300: #ffd45c;
+  --color-purple-400: #ffc53d;
+  --color-purple-500: #f0ad14;
+  --color-purple-600: #b97f06;
+  --color-purple-700: #8a5f08;
+  --color-purple-800: #70500e;
+  --color-purple-900: #5a410f;
+  --color-purple-950: #302205;
 
-  --color-amber-50: #fefbe8;
-  --color-amber-100: #fdf5c4;
-  --color-amber-200: #f9e78a;
-  --color-amber-300: #f6db4a;
-  --color-amber-400: #f4ce14;
-  --color-amber-500: #e0bb0c;
-  --color-amber-600: #a88a05;
-  --color-amber-700: #7d6606;
-  --color-amber-800: #66530b;
-  --color-amber-900: #54440e;
-  --color-amber-950: #302605;
+  --color-amber-50: #fff9e6;
+  --color-amber-100: #fff0c2;
+  --color-amber-200: #ffe38a;
+  --color-amber-300: #ffd45c;
+  --color-amber-400: #ffc53d;
+  --color-amber-500: #f0ad14;
+  --color-amber-600: #b97f06;
+  --color-amber-700: #8a5f08;
+  --color-amber-800: #70500e;
+  --color-amber-900: #5a410f;
+  --color-amber-950: #302205;
 
-  /* Named palette tokens: bg-evergreen, text-marigold, etc. */
-  --color-paper: #f5f7f8;
-  --color-evergreen: #495e57;
-  --color-evergreen-deep: #26302d;
-  --color-graphite: #45474b;
-  --color-marigold: #f4ce14;
-  --color-mist: #e6ece9;
+  /* Named palette tokens: bg-evergreen, text-marigold, etc. (the names stay, the colours are Rappio's) */
+  --color-paper: #f6f8ff;
+  --color-evergreen: #0056f9;
+  --color-evergreen-deep: #011e5a;
+  --color-graphite: #3b4466;
+  --color-marigold: #ffc53d;
+  --color-mist: #e8eeff;
+  --color-ink: #011e5a;
+  --color-rappio-blue: #0056f9;
+  --color-rappio-violet: #a55efd;
 
   --font-sans: var(--font-figtree), ui-sans-serif, system-ui, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-display: var(--font-bricolage), var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sora), var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -131,7 +141,7 @@
   h2,
   h3 {
     font-family: var(--font-display);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.025em;
     text-wrap: balance;
   }
 
@@ -162,12 +172,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c4cbcc;
+  background: #c3cadf;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9aa3a4;
+  background: #959db9;
 }
 
 .font-display {
@@ -181,13 +191,13 @@
 /* Kept for pages that still reference them */
 .enterprise-card {
   background: #ffffff;
-  border: 1px solid #dde2e3;
+  border: 1px solid #dde2f0;
 }
 
 .glass-pill {
   backdrop-filter: blur(12px);
   background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #dde2e3;
+  border: 1px solid #dde2f0;
 }
 
 /* ---------- 3D stamp card (home hero) ---------- */
@@ -236,7 +246,7 @@
   bottom: -2.5rem;
   height: 2.5rem;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(38, 48, 45, 0.28), transparent);
+  background: radial-gradient(closest-side, rgba(1, 30, 90, 0.32), transparent);
   filter: blur(6px);
   transform: translateZ(-40px);
 }
@@ -400,5 +410,133 @@
   .check-tick {
     animation: none;
     stroke-dashoffset: 0;
+  }
+}
+
+/* ---------- Rappio brand + scene helpers ---------- */
+
+.bg-brand-gradient {
+  background-image: var(--brand-gradient);
+}
+
+.text-brand-gradient {
+  background-image: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* A stage for 3D scenes: children sit at different depths and the pointer moves the whole scene a little */
+.scene {
+  perspective: 1600px;
+  perspective-origin: 50% 40%;
+}
+.scene-layer {
+  transform-style: preserve-3d;
+  transform: translate3d(
+      calc(var(--px, 0) * var(--mx, 0px)),
+      calc(var(--py, 0) * var(--my, 0px)),
+      var(--z, 0px)
+    )
+    rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) rotateZ(var(--rz, 0deg));
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+/* Things that hang in the air and drift slowly */
+@keyframes float-y {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -14px;
+  }
+}
+.float-slow {
+  animation: float-y 7s ease-in-out infinite;
+}
+.float-slower {
+  animation: float-y 9s ease-in-out -3s infinite;
+}
+
+/* A coin built from stacked discs, spinning on its edge */
+@keyframes coin-spin {
+  to {
+    transform: rotateY(360deg);
+  }
+}
+.coin {
+  position: relative;
+  transform-style: preserve-3d;
+  animation: coin-spin 9s linear infinite;
+}
+.coin-disc {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+}
+
+/* A panel tilted in space that settles flat when it scrolls into view or is pointed at */
+.tilt-panel {
+  transform: perspective(1800px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Cards that lean towards the pointer, with the light following it */
+.tilt-card {
+  transform: perspective(1000px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(0);
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s ease;
+  will-change: transform;
+}
+.tilt-card.is-tracking {
+  transition: transform 0.08s linear, box-shadow 0.35s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float-slow,
+  .float-slower,
+  .coin {
+    animation: none;
+  }
+  .scene-layer,
+  .tilt-card,
+  .tilt-panel {
+    transition: none;
+  }
+}
+
+/* The scanning line on the phone in the home page scene */
+@keyframes scan-sweep {
+  0%,
+  100% {
+    top: 6%;
+  }
+  50% {
+    top: 92%;
+  }
+}
+.scan-line {
+  animation: scan-sweep 3.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scan-line {
+    animation: none;
+    top: 50%;
+  }
+}
+
+/* On phones and tablets, buttons and links that act like buttons are at least 40px tall so a thumb can hit them */
+@media (pointer: coarse) {
+  button:not([data-compact]),
+  [role="button"],
+  [role="tab"],
+  summary,
+  select {
+    min-height: 40px;
+  }
+  button:not([data-compact]):not(.w-full) {
+    min-width: 40px;
   }
 }

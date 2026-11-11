@@ -43,7 +43,7 @@ export function MemberCard3D({
   onFlip?: () => void;
 }) {
   const surface =
-    brandColor && /^#[0-9a-f]{6}$/i.test(brandColor) ? brandColor : "#495e57";
+    brandColor && /^#[0-9a-f]{6}$/i.test(brandColor) ? brandColor : "#0056f9";
   const light = isLight(surface);
   const cardRef = useRef<HTMLDivElement>(null);
   const shown = useCountUp(balance);

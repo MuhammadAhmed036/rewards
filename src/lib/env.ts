@@ -33,7 +33,7 @@ const envSchema = z.object({
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
   SENTRY_DSN: z.string().optional(),
   SENTRY_AUTH_TOKEN: z.string().optional(),
-  NEXT_PUBLIC_APP_NAME: z.string().default("LoyaltyPlatform"),
+  NEXT_PUBLIC_APP_NAME: z.string().default("Rappio"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { tenants } from "@/server/db/schema";
-import { desc } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { logoRefSql, resolveLogoUrl } from "@/server/services/business-logo";
 
 export async function GET(request: NextRequest) {
@@ -15,10 +15,11 @@ export async function GET(request: NextRequest) {
         industry: tenants.industry,
         brandPrimaryHex: tenants.brandPrimaryHex,
         logoRef: logoRefSql,
-        plan: tenants.plan,
-        createdAt: tenants.createdAt,
       })
       .from(tenants)
+      // Only businesses that are open to the public, and not ones marked as unlisted (demo or test shops).
+      // Pending, suspended and closed businesses never appear, and neither does anything about a plan.
+      .where(and(eq(tenants.status, "active"), sql`coalesce(${tenants.features}->>'unlisted', 'false') <> 'true'`))
       .orderBy(desc(tenants.createdAt))
       .limit(50);
 

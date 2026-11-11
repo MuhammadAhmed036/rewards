@@ -68,7 +68,7 @@ const updateSchema = z
     name: z.string().trim().min(2, "Business name is too short").max(120).optional(),
     brandPrimaryHex: z
       .string()
-      .regex(/^#[0-9a-fA-F]{6}$/, "Pick a colour like #495e57")
+      .regex(/^#[0-9a-fA-F]{6}$/, "Pick a colour like #0056f9")
       .optional(),
     industry: z.string().trim().max(80).optional(),
     timezone: z

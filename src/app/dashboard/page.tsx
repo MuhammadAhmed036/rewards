@@ -1498,7 +1498,7 @@ export default function OwnerDashboardPage() {
                 <div className="flex items-center gap-2 w-full md:w-auto">
                   <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-2xs">
                     <span className="text-xs font-bold text-slate-500">Discount:</span>
-                    <input
+                    <input aria-label="Number"
                       type="number"
                       min={0}
                       max={100}
@@ -1949,7 +1949,7 @@ export default function OwnerDashboardPage() {
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <div className="relative flex-1 sm:w-72">
                     <Search className="w-4 h-4 absolute left-3 top-3 text-zinc-400 stroke-[1.8]" />
-                    <Input
+                    <Input aria-label="Search member # or name..."
                       placeholder="Search member # or name..."
                       value={memberSearch}
                       onChange={(e) => setMemberSearch(e.target.value)}
@@ -2142,7 +2142,7 @@ export default function OwnerDashboardPage() {
                 <div className="flex items-center gap-2">
                   <div className="relative w-64">
                     <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                    <Input
+                    <Input aria-label="Filter ledger entries..."
                       placeholder="Filter ledger entries..."
                       value={ledgerSearch}
                       onChange={(e) => setLedgerSearch(e.target.value)}
@@ -2262,7 +2262,7 @@ export default function OwnerDashboardPage() {
               <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
                 <LinksAndPageEditor
                   businessName={business?.name || "Your business"}
-                  brandPrimaryHex={business?.brandPrimaryHex || "#495e57"}
+                  brandPrimaryHex={business?.brandPrimaryHex || "#0056f9"}
                   logoUrl={business?.logoUrl}
                   initialLinks={links}
                   onSave={async (updatedLinks) => {
@@ -2372,7 +2372,7 @@ export default function OwnerDashboardPage() {
                   >
                     <h3 className="font-display text-xl font-bold text-evergreen-deep">Set a new password</h3>
                     <p className="text-sm text-zinc-600">For {resetTarget.email}. They&rsquo;ll be signed out everywhere and use this to sign in again.</p>
-                    <Input
+                    <Input aria-label="At least 8 characters"
                       type="text"
                       required
                       minLength={8}
@@ -2727,7 +2727,7 @@ export default function OwnerDashboardPage() {
 
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Audited Note (Mandatory)</label>
-                <Input
+                <Input aria-label="Reason for reversal"
                   placeholder="Reason for reversal"
                   value={reverseNote}
                   onChange={(e) => setReverseNote(e.target.value)}
@@ -2765,7 +2765,7 @@ export default function OwnerDashboardPage() {
             <div className="space-y-3.5 text-xs">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Full Name</label>
-                <Input
+                <Input aria-label="e.g. John Doe"
                   placeholder="e.g. John Doe"
                   value={newStaffName}
                   onChange={(e) => setNewStaffName(e.target.value)}
@@ -2775,7 +2775,7 @@ export default function OwnerDashboardPage() {
 
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Email Address</label>
-                <Input
+                <Input aria-label="Email address"
                   type="email"
                   placeholder="staff@example.com"
                   value={newStaffEmail}
@@ -2804,7 +2804,7 @@ export default function OwnerDashboardPage() {
               </p>
               <details className="text-sm">
                 <summary className="cursor-pointer text-zinc-600">They don&rsquo;t have email access? Set a password for them</summary>
-                <Input
+                <Input aria-label="At least 8 characters"
                   type="text"
                   placeholder="At least 8 characters"
                   value={newStaffPassword}
@@ -2843,7 +2843,7 @@ export default function OwnerDashboardPage() {
             <div className="space-y-3.5 text-xs">
               <div>
                 <label className="font-semibold text-zinc-800 block mb-1">Item / Service Name</label>
-                <Input
+                <Input aria-label="e.g. Cappuccino, Skin Fade, Margherita Pizza"
                   placeholder="e.g. Cappuccino, Skin Fade, Margherita Pizza"
                   value={newProductName}
                   onChange={(e) => setNewProductName(e.target.value)}
@@ -2853,7 +2853,7 @@ export default function OwnerDashboardPage() {
 
               <div>
                 <label className="font-semibold text-zinc-800 block mb-1">Category</label>
-                <Input
+                <Input aria-label="e.g. Hot Drinks, Bakery, Haircut, Food"
                   placeholder="e.g. Hot Drinks, Bakery, Haircut, Food"
                   value={newProductCategory}
                   onChange={(e) => setNewProductCategory(e.target.value)}
@@ -2864,7 +2864,7 @@ export default function OwnerDashboardPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-zinc-800 block mb-1">Price ({cur})</label>
-                  <Input
+                  <Input aria-label="e.g. 3.50"
                     type="number"
                     step="0.01"
                     placeholder="e.g. 3.50"
@@ -2876,7 +2876,7 @@ export default function OwnerDashboardPage() {
 
                 <div>
                   <label className="font-semibold text-zinc-800 block mb-1">Points Given</label>
-                  <Input
+                  <Input aria-label="e.g. 3"
                     type="number"
                     min="1"
                     placeholder="e.g. 3"
@@ -2889,7 +2889,7 @@ export default function OwnerDashboardPage() {
 
               <div>
                 <label className="font-semibold text-zinc-800 block mb-1">Special Discount (%) - Optional</label>
-                <Input
+                <Input aria-label="e.g. 10"
                   type="number"
                   min="0"
                   max="100"
@@ -2909,7 +2909,7 @@ export default function OwnerDashboardPage() {
                   Cancel
                 </Button>
                 <Button
-                  className="flex-1 font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+                  className="flex-1 font-semibold text-xs bg-evergreen hover:bg-evergreen-deep text-white rounded-xl shadow-xs transition-colors cursor-pointer"
                   onClick={handleAddProduct}
                   disabled={loading || !newProductName.trim()}
                 >
@@ -2938,7 +2938,7 @@ export default function OwnerDashboardPage() {
             <div className="space-y-3.5 text-xs">
               <div>
                 <label className="font-semibold text-zinc-800 block mb-1">Campaign Title / Offer Description</label>
-                <Input
+                <Input aria-label="e.g. Buy 3 coffees get 1 free, Weekend VIP Bonus, 20% Off"
                   placeholder="e.g. Buy 3 coffees get 1 free, Weekend VIP Bonus, 20% Off"
                   value={promoTitle}
                   onChange={(e) => setPromoTitle(e.target.value)}
@@ -2984,7 +2984,7 @@ export default function OwnerDashboardPage() {
               {promoOfferType === "points_bonus" && (
                 <div>
                   <label className="font-semibold text-zinc-800 block mb-1">Points Credited to Pass</label>
-                  <Input
+                  <Input aria-label="e.g. 15"
                     type="number"
                     min="1"
                     placeholder="e.g. 15"
@@ -3001,7 +3001,7 @@ export default function OwnerDashboardPage() {
               {promoOfferType === "discount_promo" && (
                 <div>
                   <label className="font-semibold text-zinc-800 block mb-1">Discount Percentage (%)</label>
-                  <Input
+                  <Input aria-label="e.g. 20"
                     type="number"
                     min="1"
                     max="100"
@@ -3018,7 +3018,7 @@ export default function OwnerDashboardPage() {
                   Purchases / Visits Required (e.g. 3 for &quot;Buy 3 Get 1 Free&quot;)
                 </label>
                 <div className="flex items-center gap-2">
-                  <Input
+                  <Input aria-label="3"
                     type="number"
                     min="1"
                     max="50"
@@ -3065,7 +3065,7 @@ export default function OwnerDashboardPage() {
                   Cancel
                 </Button>
                 <Button
-                  className="flex-1 font-semibold text-xs bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+                  className="flex-1 font-semibold text-xs bg-evergreen hover:bg-evergreen-deep text-white rounded-xl shadow-xs transition-colors cursor-pointer"
                   onClick={handleCreatePromoQr}
                   disabled={loading || !promoTitle.trim()}
                 >

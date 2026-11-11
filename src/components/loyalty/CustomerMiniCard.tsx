@@ -22,7 +22,7 @@ export function CustomerMiniCard({
   brandColor?: string | null;
   businessName: string;
 }) {
-  const surface = brandColor && /^#[0-9a-f]{6}$/i.test(brandColor) ? brandColor : "#495e57";
+  const surface = brandColor && /^#[0-9a-f]{6}$/i.test(brandColor) ? brandColor : "#0056f9";
   const shown = useCountUp(balance);
 
   return (

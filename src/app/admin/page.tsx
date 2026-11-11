@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { LogoMark } from "@/components/brand/Logo";
+import { Tilt } from "@/components/marketing/Tilt";
 import { SecuritySettings } from "@/components/auth/SecuritySettings";
 import { SupportAgentsPanel } from "@/components/dashboard/SupportAgentsPanel";
 import { TenantBillingModal } from "@/components/dashboard/TenantBillingModal";
@@ -124,7 +126,7 @@ export default function PlatformAdminPage() {
   const [addOwnerEmail, setAddOwnerEmail] = useState("");
   const [addPassword, setAddPassword] = useState("");
   const [addLocationName, setAddLocationName] = useState("Main Branch");
-  const [addBrandColor, setAddBrandColor] = useState("#495e57");
+  const [addBrandColor, setAddBrandColor] = useState("#0056f9");
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState("");
   const [createdTenantData, setCreatedTenantData] = useState<{
@@ -199,7 +201,7 @@ export default function PlatformAdminPage() {
     setAddOwnerEmail("");
     setAddPassword("");
     setAddLocationName("Main Branch");
-    setAddBrandColor("#495e57");
+    setAddBrandColor("#0056f9");
     setAddError("");
     setCreatedTenantData(null);
     setCopiedLink(false);
@@ -355,17 +357,15 @@ export default function PlatformAdminPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-0 sm:h-16 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-zinc-950 text-white rounded-lg flex items-center justify-center font-bold text-sm shadow-xs ring-1 ring-zinc-900/10">
-                <ShieldAlert className="w-4 h-4 stroke-[1.8]" />
-              </div>
+              <LogoMark className="w-9 h-9" />
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-sm sm:text-base font-bold text-zinc-950 leading-tight">Platform Admin Console</h1>
+                  <h1 className="text-sm sm:text-base font-bold text-zinc-950 leading-tight">Rappio admin</h1>
                   <span className="text-xs font-semibold px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-600 border border-zinc-200">
                     Cluster
                   </span>
                 </div>
-                <p className="text-[11px] text-zinc-500 font-medium">UK Multi-Tenant Loyalty Platform Management</p>
+                <p className="text-[11px] text-zinc-500 font-medium">All businesses on Rappio, in one place</p>
               </div>
             </div>
 
@@ -454,7 +454,7 @@ export default function PlatformAdminPage() {
           <div className="space-y-6">
             {/* Enterprise Platform Overview KPIs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+              <Tilt max={5} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between text-xs text-slate-500">
                   <span className="font-extrabold text-xs">Total Businesses</span>
                   <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-bold">{tenants.filter((t) => t.status === "active").length} Active</span>
@@ -462,48 +462,48 @@ export default function PlatformAdminPage() {
                 <div className="text-3xl font-bold text-slate-950 mt-1.5 tabular-nums">
                   {tenants.length}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Multi-tenant database isolates</p>
-              </div>
+                <p className="text-[11px] text-slate-400 mt-1">Every business kept separate</p>
+              </Tilt>
 
-              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+              <Tilt max={5} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-extrabold text-xs">Active Locations</span>
-                  <span className="text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded font-bold">UK Network</span>
+                  <span className="font-extrabold text-xs">Locations</span>
+                  <span className="text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded font-bold">All businesses</span>
                 </div>
                 <div className="text-3xl font-bold text-slate-950 mt-1.5 tabular-nums">
                   {tenants.reduce((acc, t) => acc + (t.stats?.locationCount || 0), 0)}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Cashier terminal branches</p>
-              </div>
+                <p className="text-[11px] text-slate-400 mt-1">Branches across all businesses</p>
+              </Tilt>
 
-              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+              <Tilt max={5} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-extrabold text-xs">Platform Members</span>
-                  <span className="text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded font-bold">Cross-Tenant</span>
+                  <span className="font-extrabold text-xs">Customer cards</span>
+                  <span className="text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded font-bold">All businesses</span>
                 </div>
                 <div className="text-3xl font-bold text-slate-950 mt-1.5 tabular-nums">
                   {tenants.reduce((acc, t) => acc + (t.stats?.memberCount || 0), 0).toLocaleString()}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">Enrolled customer passes</p>
-              </div>
+                <p className="text-[11px] text-slate-400 mt-1">Customer cards across all businesses</p>
+              </Tilt>
 
-              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+              <Tilt max={5} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm">
                 <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-extrabold text-xs">Ledger Points Liability</span>
+                  <span className="font-extrabold text-xs">Points customers hold</span>
                   <span className="text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded font-bold">Audited</span>
                 </div>
                 <div className="text-3xl font-bold text-amber-700 mt-1.5 tabular-nums">
                   {tenants.reduce((acc, t) => acc + (t.stats?.outstandingPoints || 0), 0).toLocaleString()} <span className="text-sm font-semibold text-slate-400">pts</span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">Total points outstanding</p>
-              </div>
+              </Tilt>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
               <div className="flex items-center space-x-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-80">
                   <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-400" />
-                  <Input
+                  <Input aria-label="Search by business name or slug..."
                     placeholder="Search by business name or slug..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -716,7 +716,7 @@ export default function PlatformAdminPage() {
               <div className="flex items-center space-x-2 w-full sm:w-auto">
                 <div className="relative flex-1 sm:w-80">
                   <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                  <Input
+                  <Input aria-label="Search by customer name, email, or business..."
                     placeholder="Search by customer name, email, or business..."
                     value={customerSearch}
                     onChange={(e) => setCustomerSearch(e.target.value)}
@@ -1011,7 +1011,7 @@ export default function PlatformAdminPage() {
               <label className="text-xs font-semibold text-slate-400 block mb-1">
                 Audit Reason (Mandatory per Section 10 & 22.10)
               </label>
-              <Input
+              <Input aria-label="e.g. Terms of service violation, billing dispute, owner request"
                 placeholder="e.g. Terms of service violation, billing dispute, owner request"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
@@ -1119,7 +1119,7 @@ export default function PlatformAdminPage() {
                     <label className="font-semibold text-slate-300 block mb-1">
                       Business Name <span className="text-rose-400">*</span>
                     </label>
-                    <Input
+                    <Input aria-label="e.g. Bella Italia Restaurant"
                       placeholder="e.g. Bella Italia Restaurant"
                       value={addBusinessName}
                       onChange={(e) => handleBusinessNameChange(e.target.value)}
@@ -1135,7 +1135,7 @@ export default function PlatformAdminPage() {
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-2.5 text-slate-500 text-xs font-mono">/b/</span>
-                      <Input
+                      <Input aria-label="bella-italia"
                         placeholder="bella-italia"
                         value={addSlug}
                         onChange={(e) => setAddSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
@@ -1193,7 +1193,7 @@ export default function PlatformAdminPage() {
                   {/* Initial Location */}
                   <div className="sm:col-span-2">
                     <label className="font-semibold text-slate-300 block mb-1">Primary Store Location</label>
-                    <Input
+                    <Input aria-label="e.g. Central Branch / Soho"
                       placeholder="e.g. Central Branch / Soho"
                       value={addLocationName}
                       onChange={(e) => setAddLocationName(e.target.value)}
@@ -1214,7 +1214,7 @@ export default function PlatformAdminPage() {
                     <label className="font-semibold text-slate-300 block mb-1">
                       Owner Full Name <span className="text-rose-400">*</span>
                     </label>
-                    <Input
+                    <Input aria-label="e.g. Marco Rossi"
                       placeholder="e.g. Marco Rossi"
                       value={addOwnerName}
                       onChange={(e) => setAddOwnerName(e.target.value)}
@@ -1228,7 +1228,7 @@ export default function PlatformAdminPage() {
                     <label className="font-semibold text-slate-300 block mb-1">
                       Owner Email <span className="text-rose-400">*</span>
                     </label>
-                    <Input
+                    <Input aria-label="Email address"
                       type="email"
                       placeholder="e.g. marco@bellaitalia.co.uk"
                       value={addOwnerEmail}
@@ -1243,7 +1243,7 @@ export default function PlatformAdminPage() {
                     <label className="font-semibold text-slate-300 block mb-1">
                       Initial Login Password <span className="text-rose-400">*</span>
                     </label>
-                    <Input
+                    <Input aria-label="At least 8 characters"
                       type="text"
                       placeholder="At least 8 characters"
                       value={addPassword}

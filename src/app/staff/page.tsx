@@ -1084,7 +1084,7 @@ export default function StaffPage() {
                     <label className="text-xs font-bold block mb-1">
                       They already earned points a moment ago. Why add more?
                     </label>
-                    <Input
+                    <Input aria-label="e.g. Split bill / second purchase with manager consent"
                       placeholder="e.g. Split bill / second purchase with manager consent"
                       value={overrideReason}
                       onChange={(e) => setOverrideReason(e.target.value)}
@@ -1190,7 +1190,7 @@ export default function StaffPage() {
                   <summary className="cursor-pointer font-medium text-zinc-600">Testing tools</summary>
                   <div className="mt-3 space-y-3">
                     <div className="flex gap-2">
-                      <Input
+                      <Input aria-label="Paste a QR token, e.g. LP1.mem_..."
                         placeholder="Paste a QR token, e.g. LP1.mem_..."
                         value={qrInput}
                         onChange={(e) => setQrInput(e.target.value)}
@@ -1324,7 +1324,7 @@ export default function StaffPage() {
                   <label className="text-xs font-extrabold text-slate-600 block mb-1">
                     Redemption Code (from Customer Screen)
                   </label>
-                  <Input
+                  <Input aria-label="e.g. 7K9X2B4P"
                     type="text"
                     maxLength={8}
                     placeholder="e.g. 7K9X2B4P"
@@ -1813,7 +1813,7 @@ export default function StaffPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">Product Name</label>
-                <Input
+                <Input aria-label="e.g. Americano or Standard Haircut"
                   placeholder="e.g. Americano or Standard Haircut"
                   value={newProdName}
                   onChange={(e) => setNewProdName(e.target.value)}
@@ -1824,7 +1824,7 @@ export default function StaffPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Price ({cur})</label>
-                  <Input
+                  <Input aria-label="Number"
                     type="number"
                     step="0.01"
                     value={newProdPrice}
@@ -1834,7 +1834,7 @@ export default function StaffPage() {
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-700 block mb-1">Points Awarded</label>
-                  <Input
+                  <Input aria-label="Number"
                     type="number"
                     value={newProdPoints}
                     onChange={(e) => setNewProdPoints(e.target.value)}
@@ -1894,7 +1894,7 @@ export default function StaffPage() {
             <div className="space-y-3 text-xs">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Offer Title</label>
-                <Input
+                <Input aria-label="e.g. Free Coffee, 10 Bonus Points, 15% Off"
                   placeholder="e.g. Free Coffee, 10 Bonus Points, 15% Off"
                   value={promoTitle}
                   onChange={(e) => setPromoTitle(e.target.value)}
@@ -1937,7 +1937,7 @@ export default function StaffPage() {
               {promoOfferType === "points_bonus" && (
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Points to Award</label>
-                  <Input
+                  <Input aria-label="e.g. 10"
                     type="number"
                     min="1"
                     placeholder="e.g. 10"
@@ -1951,7 +1951,7 @@ export default function StaffPage() {
               {promoOfferType === "discount_promo" && (
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Discount %</label>
-                  <Input
+                  <Input aria-label="e.g. 15"
                     type="number"
                     min="1"
                     max="100"
@@ -1968,7 +1968,7 @@ export default function StaffPage() {
                   Purchases / Visits Required (e.g. 3)
                 </label>
                 <div className="flex items-center gap-2">
-                  <Input
+                  <Input aria-label="3"
                     type="number"
                     min="1"
                     max="50"
