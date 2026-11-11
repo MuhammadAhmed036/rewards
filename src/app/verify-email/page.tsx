@@ -10,7 +10,16 @@ function Verify() {
   const token = useSearchParams().get("token") || "";
   const [state, setState] = useState<"working" | "done" | "failed">(token ? "working" : "failed");
   const [message, setMessage] = useState("This link is incomplete. Open it from the email again.");
+  const [shopSlug, setShopSlug] = useState<string | null>(null);
   const started = useRef(false);
+  const signInHref = shopSlug ? `/b/${shopSlug}?role=owner&verified=1` : "/login";
+
+  // Hand the owner on to their shop's owner sign-in, so it works on any phone or browser
+  useEffect(() => {
+    if (state !== "done" || !shopSlug) return;
+    const id = setTimeout(() => window.location.assign(signInHref), 1800);
+    return () => clearTimeout(id);
+  }, [state, shopSlug, signInHref]);
 
   useEffect(() => {
     if (!token || started.current) return;
@@ -23,6 +32,7 @@ function Verify() {
       .then(async (res) => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error?.message);
+        setShopSlug(json.data?.shopSlug || null);
         setState("done");
       })
       .catch((err) => {
@@ -35,12 +45,15 @@ function Verify() {
 
   if (state === "done") {
     return (
-      <AuthShell title="Email confirmed" intro="Thanks. Your account is all set.">
+      <AuthShell
+        title="Email confirmed"
+        intro={shopSlug ? "Thanks. Taking you to your shop's owner sign in." : "Thanks. Your account is all set."}
+      >
         <div className="text-evergreen mb-6">
           <DrawnCheck className="w-14 h-14" />
         </div>
-        <Link href="/dashboard" className={`${primaryButtonClass} inline-flex items-center justify-center`}>
-          Go to my dashboard
+        <Link href={signInHref} className={`${primaryButtonClass} inline-flex items-center justify-center`}>
+          {shopSlug ? "Sign in to my shop" : "Go to my dashboard"}
         </Link>
       </AuthShell>
     );

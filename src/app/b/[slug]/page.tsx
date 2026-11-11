@@ -129,6 +129,15 @@ export default function BusinessHubPage(props: {
   // Store Role Tab Switcher: "customer" | "staff" | "owner"
   const [activePortalRole, setActivePortalRole] = useState<"customer" | "staff" | "owner">("customer");
 
+  // Links from owner emails open straight on the owner tab (?role=owner)
+  const [justVerified, setJustVerified] = useState(false);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const role = q.get("role");
+    if (role === "owner" || role === "staff") setActivePortalRole(role);
+    if (q.get("verified") === "1") setJustVerified(true);
+  }, []);
+
   // Customer sub-tab: "join" (Sign up) vs "signin" (Existing member)
   const [customerAuthMode, setCustomerAuthMode] = useState<"join" | "signin">("join");
 
@@ -1724,6 +1733,11 @@ export default function BusinessHubPage(props: {
                 </p>
               </div>
 
+              {justVerified && (
+                <p role="status" className="text-sm rounded-lg bg-evergreen/10 text-evergreen-deep px-3 py-2">
+                  Your email is confirmed. Sign in below.
+                </p>
+              )}
               <form onSubmit={handleOwnerLogin} className="space-y-3.5">
                 <div>
                   <label className="text-xs font-semibold text-zinc-800 block mb-1">Owner Email Address</label>

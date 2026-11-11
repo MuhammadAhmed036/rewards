@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { users, verifications } from "../db/schema";
+import { users, verifications, staffMembers, tenants } from "../db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { checkEmailOtpRateLimit } from "../security/rate-limit";
 import { env } from "@/lib/env";
@@ -59,7 +59,15 @@ export async function verifyEmailToken(token: string) {
   await db.delete(verifications).where(eq(verifications.id, record.id));
   if (!user) throw new Error("This link has expired or was already used. Sign in and ask for a new one.");
 
-  return { success: true, userId: user.id, email: user.email };
+  // Owners are sent to their own shop's owner sign-in afterwards, so the link works on any device.
+  const [shop] = await db
+    .select({ slug: tenants.slug })
+    .from(staffMembers)
+    .innerJoin(tenants, eq(tenants.id, staffMembers.tenantId))
+    .where(and(eq(staffMembers.userId, user.id), eq(staffMembers.role, "owner")))
+    .limit(1);
+
+  return { success: true, userId: user.id, email: user.email, shopSlug: shop?.slug ?? null };
 }
 
 export async function resendEmailVerification(userId: string) {

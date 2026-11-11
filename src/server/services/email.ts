@@ -298,7 +298,7 @@ If you don't know ${inviter}, ignore this email.`,
             </div>
 
             <div style="margin: 28px 0; text-align: center;">
-              <a href="${storeUrl}" style="background-color: #0056f9; color: #ffffff; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);">Visit Your Store Page →</a>
+              <a href="${storeUrl}?role=owner" style="background-color: #0056f9; color: #ffffff; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);">Open owner sign in</a>
             </div>
 
             <div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 12px; padding: 14px; margin-top: 24px;">

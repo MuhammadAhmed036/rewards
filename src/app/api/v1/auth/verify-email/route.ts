@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const { token } = bodySchema.parse(await request.json().catch(() => ({})));
     const result = await verifyEmailToken(token);
-    return NextResponse.json({ data: { verified: true, email: result.email } });
+    return NextResponse.json({ data: { verified: true, email: result.email, shopSlug: result.shopSlug } });
   } catch (err) {
     const message =
       err instanceof z.ZodError ? err.errors[0]?.message : err instanceof Error ? err.message : "Couldn't confirm the email";
