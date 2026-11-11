@@ -61,6 +61,56 @@ describe("Password reset", () => {
     await expect(resetPassword(token, "AnotherPass789!")).rejects.toThrow(/expired or was already used/);
   });
 
+  it("spaces out repeat requests for the same address: 10, 30, 60, then 90 minutes", async () => {
+    const s = await shop("cooldown");
+    const email = s.user.email;
+    const key = `resetwait:${email}`;
+    const askedAgo = async (sends: number, minutesAgo: number) => {
+      await db.delete(verifications).where(eq(verifications.identifier, key));
+      await db.insert(verifications).values({
+        identifier: key,
+        value: String(sends),
+        createdAt: new Date(Date.now() - minutesAgo * 60 * 1000),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      });
+    };
+
+    // 1 link sent 5 min ago: must wait 10 min, so ~5 more
+    await askedAgo(1, 5);
+    await expect(requestPasswordReset(email, "owner")).rejects.toMatchObject({ code: "TOO_SOON", message: expect.stringMatching(/in 5 minutes/) });
+    // 2 links, last 20 min ago: must wait 30, so 10 more
+    await askedAgo(2, 20);
+    await expect(requestPasswordReset(email, "owner")).rejects.toMatchObject({ code: "TOO_SOON", message: expect.stringMatching(/in 10 minutes/) });
+    // 3 links, last 30 min ago: 60 wait, 30 more
+    await askedAgo(3, 30);
+    await expect(requestPasswordReset(email, "owner")).rejects.toMatchObject({ code: "TOO_SOON", message: expect.stringMatching(/in 30 minutes/) });
+    // 4 links, last 10 min ago: 90 wait, 80 more = 1 hour 20 minutes. A 7th request waits 90 as well.
+    await askedAgo(4, 10);
+    await expect(requestPasswordReset(email, "owner")).rejects.toMatchObject({ code: "TOO_SOON", message: expect.stringMatching(/in 1 hour 20 minutes/) });
+    await askedAgo(7, 10);
+    await expect(requestPasswordReset(email, "owner")).rejects.toMatchObject({ code: "TOO_SOON", message: expect.stringMatching(/in 1 hour 20 minutes/) });
+
+    // A refused request must not replace the link that is already out there
+    await db.delete(verifications).where(eq(verifications.identifier, `reset:${email}`));
+    await db.insert(verifications).values({ identifier: `reset:${email}`, value: "earlier-link", expiresAt: new Date(Date.now() + 60_000) });
+    await askedAgo(1, 1);
+    await expect(requestPasswordReset(email, "owner")).rejects.toMatchObject({ code: "TOO_SOON" });
+    const kept = await db.select().from(verifications).where(eq(verifications.identifier, `reset:${email}`));
+    expect(kept.map((r) => r.value)).toEqual(["earlier-link"]);
+
+    // Once the wait is over, a new request goes through, is counted, and the next one has to wait again
+    await askedAgo(1, 11);
+    const sent = await requestPasswordReset(email, "owner").then(() => true, (e) => (e.code === "EMAIL_FAILED" ? false : Promise.reject(e)));
+    const [slot] = await db.select().from(verifications).where(eq(verifications.identifier, key));
+    if (sent) {
+      expect(slot.value).toBe("2");
+      await expect(requestPasswordReset(email, "owner")).rejects.toMatchObject({ code: "TOO_SOON", message: expect.stringMatching(/in 30 minutes/) });
+    } else {
+      // No mail server: the slot is given back rather than costing the person a wait for an email that never left
+      expect(slot.value).toBe("1");
+    }
+  });
+
   it("asks an unregistered email to register first", async () => {
     await expect(requestPasswordReset(`nobody-${Date.now()}@p0.test`)).rejects.toThrow(/register first/);
     await expect(requestPasswordReset(`nobody-${Date.now()}@p0.test`, "owner")).rejects.toThrow(/No shop owner/);

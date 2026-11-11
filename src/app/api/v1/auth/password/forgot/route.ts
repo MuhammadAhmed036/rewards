@@ -25,8 +25,11 @@ export async function POST(request: NextRequest) {
       );
     }
     if (err instanceof PasswordResetError) {
-      const status = err.code === "NO_ACCOUNT" ? 404 : err.code === "WRONG_ACCOUNT_TYPE" ? 403 : 502;
-      return NextResponse.json({ error: { code: err.code, message: err.message } }, { status });
+      const status = err.code === "NO_ACCOUNT" ? 404 : err.code === "WRONG_ACCOUNT_TYPE" ? 403 : err.code === "TOO_SOON" ? 429 : 502;
+      return NextResponse.json(
+        { error: { code: err.code, message: err.message } },
+        { status, headers: err.retryAfterSeconds ? { "Retry-After": String(err.retryAfterSeconds) } : undefined }
+      );
     }
     console.error("Password reset request failed:", err);
     return NextResponse.json(

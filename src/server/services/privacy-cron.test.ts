@@ -188,3 +188,35 @@ describe("Privacy Compliance, Email Outbox & Maintenance Crons (M9)", () => {
     expect(retentionJson.success).toBe(true);
   });
 });
+
+describe("Retention keeps the database small", () => {
+  it("clears old event history and delivered emails, but never a queued or failed email", async () => {
+    const { db } = await import("../db");
+    const { domainEvents, emailOutbox } = await import("../db/schema");
+    const { eq } = await import("drizzle-orm");
+    const { runRetentionCleanup } = await import("./privacy");
+    const { registerOwnerAndTenant } = await import("./tenant");
+    const stamp = `ret-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const s = await registerOwnerAndTenant({ email: `owner-${stamp}@ret.test`, password: "Password123!", name: "Ret", businessName: `Ret ${stamp}`, slug: stamp, emailVerified: true });
+    const old = new Date(Date.now() - 120 * 86400_000);
+
+    const [oldEvent] = await db.insert(domainEvents).values({ tenantId: s.tenant.id, name: "points.earned", payload: {}, createdAt: old }).returning();
+    const [newEvent] = await db.insert(domainEvents).values({ tenantId: s.tenant.id, name: "points.earned", payload: {} }).returning();
+    const mail = async (status: string, createdAt: Date) =>
+      (await db.insert(emailOutbox).values({ toEmail: `x-${Math.random()}@ret.test`, template: "welcome", payload: {}, status, createdAt, tenantId: s.tenant.id }).returning())[0];
+    const oldSent = await mail("sent", old);
+    const oldQueued = await mail("queued", old);
+    const oldFailed = await mail("failed", old);
+    const freshSent = await mail("sent", new Date());
+
+    await runRetentionCleanup();
+    const has = async (table: typeof domainEvents | typeof emailOutbox, id: string) => (await db.select().from(table as never).where(eq((table as typeof emailOutbox).id, id))).length === 1;
+    expect(await has(domainEvents, oldEvent.id)).toBe(false);
+    expect(await has(domainEvents, newEvent.id)).toBe(true);
+    expect(await has(emailOutbox, oldSent.id)).toBe(false);
+    expect(await has(emailOutbox, freshSent.id)).toBe(true);
+    // Mail still waiting to go out must never be thrown away
+    expect(await has(emailOutbox, oldQueued.id)).toBe(true);
+    expect(await has(emailOutbox, oldFailed.id)).toBe(true);
+  });
+});

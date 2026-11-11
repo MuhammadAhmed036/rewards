@@ -35,8 +35,8 @@ function ForgotPasswordForm() {
 
   if (sent) {
     return (
-      <AuthShell title="Check your email" intro={<>We&rsquo;ve sent a link to <strong>{email}</strong> to choose a new password. It works for 30 minutes.</>}>
-        <p className="text-sm text-zinc-600">Nothing there? Check your spam folder, or try again in a few minutes.</p>
+      <AuthShell title="Check your email" intro={<>We&rsquo;ve sent a link to <strong>{email}</strong> to choose a new password. It works for 10 minutes.</>}>
+        <p className="text-sm text-zinc-600">Nothing there? Check your spam folder. If it hasn&rsquo;t arrived after 10 minutes you can ask for a new link.</p>
         <Link href="/login" className={`${primaryButtonClass} mt-6 inline-flex items-center justify-center`}>
           Back to sign in
         </Link>

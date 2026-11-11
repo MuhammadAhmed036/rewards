@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { emitEvent } from "./events";
 import { NOTE_RETENTION_MONTHS } from "./member-notes";
-import { memberNotes } from "../db/schema";
+import { memberNotes, domainEvents, emailOutbox } from "../db/schema";
 import { inArray } from "drizzle-orm";
 import {
   users,
@@ -314,6 +314,16 @@ export async function runRetentionCleanup() {
     .where(lt(memberNotes.createdAt, new Date(now - NOTE_RETENTION_MONTHS * 30 * 24 * 60 * 60 * 1000)))
     .returning({ id: memberNotes.id });
 
+  // 3c. Retention: event history and delivered emails are only needed for a short while. Keeping them forever
+  // fills the database (and email bodies hold personal details); the ledger and audit log are the lasting record.
+  const ninetyDaysAgo = new Date(now - 90 * 24 * 60 * 60 * 1000);
+  const sixtyDaysAgo = new Date(now - 60 * 24 * 60 * 60 * 1000);
+  const deletedEvents = await db.delete(domainEvents).where(lt(domainEvents.createdAt, ninetyDaysAgo)).returning({ id: domainEvents.id });
+  const deletedEmails = await db
+    .delete(emailOutbox)
+    .where(and(lt(emailOutbox.createdAt, sixtyDaysAgo), inArray(emailOutbox.status, ["sent", "dead"])))
+    .returning({ id: emailOutbox.id });
+
   // 4. Expired sign-in sessions (idle timeout passed, or staff/admin absolute limit reached)
   const deletedSessionsCount = await purgeExpiredSessions();
 
@@ -322,6 +332,8 @@ export async function runRetentionCleanup() {
     deletedFeedbackCount: deletedFeedback.length,
     deletedAuditCount: deletedAudit.length,
     deletedNotesCount: deletedNotes.length,
+    deletedEventsCount: deletedEvents.length,
+    deletedEmailsCount: deletedEmails.length,
     deletedSessionsCount,
   };
 }

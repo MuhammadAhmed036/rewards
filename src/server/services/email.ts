@@ -177,10 +177,10 @@ The link works for 24 hours. If you didn't create an account, ignore this email.
 
 ${url}
 
-The link works for 30 minutes and only once. If it wasn't you, ignore this email and your password stays the same.`,
+The link works for 10 minutes and only once. If it wasn't you, ignore this email and your password stays the same.`,
         html: buttonEmail(
           "Reset your password",
-          "Someone asked to reset the password for this email address. The link works for 30 minutes and only once.",
+          "Someone asked to reset the password for this email address. The link works for 10 minutes and only once.",
           "Choose a new password",
           url,
           "If it wasn't you, ignore this email. Your password stays the same."
