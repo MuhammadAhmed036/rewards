@@ -80,6 +80,22 @@ export const verifications = pgTable(
 // ==========================================
 // 2. Tenancy & Locations
 // ==========================================
+/**
+ * A group of brands (FR-015). It belongs to the owner of the brand that created it, and other brands join with the
+ * group's code and can leave whenever they like. Each brand keeps its own customers and points; the group's owner
+ * only sees combined totals per brand.
+ */
+export const organisations = pgTable("organisations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  ownerUserId: uuid("owner_user_id")
+    .notNull()
+    .references(() => users.id),
+  ownerTenantId: uuid("owner_tenant_id").notNull(),
+  joinCode: varchar("join_code", { length: 16 }).notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const tenants = pgTable(
   "tenants",
   {
@@ -104,10 +120,13 @@ export const tenants = pgTable(
     customDomainVerifiedAt: timestamp("custom_domain_verified_at", { withTimezone: true }),
     features: jsonb("features").default({}).notNull(),
     limits: jsonb("limits").default({}).notNull(),
+    // FR-015: a group of brands. The group's owner sees combined totals for its brands, never their customers.
+    organisationId: uuid("organisation_id").references((): AnyPgColumn => organisations.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("tenants_slug_idx").on(table.slug),
+    index("tenants_organisation_idx").on(table.organisationId),
     index("tenants_status_idx").on(table.status),
   ]
 );
@@ -353,6 +372,12 @@ export const rewards = pgTable(
     quantityTotal: integer("quantity_total"),
     quantityRedeemed: integer("quantity_redeemed").default(0).notNull(),
     perMemberLimit: integer("per_member_limit"),
+    // How long a customer's claim holds its points and stock before it lapses (FR-066 reservations)
+    holdMinutes: integer("hold_minutes").default(10).notNull(),
+    // Partial use (FR-066): the customer may put some of their points towards it for a proportional part of its value
+    allowPartial: boolean("allow_partial").default(false).notNull(),
+    valueMinor: integer("value_minor"), // what the whole reward is worth, in pence/cents
+    minPartialPoints: integer("min_partial_points"),
     status: varchar("status", { length: 32 }).default("active").notNull(), // active, paused, archived
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -392,6 +417,9 @@ export const redemptions = pgTable(
       .references(() => rewards.id, { onDelete: "cascade" }),
     rewardVersion: integer("reward_version").notNull(),
     costPoints: integer("cost_points").notNull(),
+    // A partial use: only some of the reward's points, for a proportional part of its value
+    isPartial: boolean("is_partial").default(false).notNull(),
+    valueMinor: integer("value_minor"),
     status: varchar("status", { length: 32 }).default("pending").notNull(), // pending, confirmed, expired, cancelled, voided
     codeHash: varchar("code_hash", { length: 255 }).notNull(),
     codeLast4: varchar("code_last4", { length: 8 }).notNull(),
@@ -580,11 +608,49 @@ export const campaigns = pgTable(
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
     // A ceiling on how many people one offer may reach (a simple budget)
     maxRecipients: integer("max_recipients"),
+    // A/B test (FR-096): a second wording, sent to this share of the audience; the rest get the first
+    subjectB: varchar("subject_b", { length: 150 }),
+    bodyB: text("body_b"),
+    abSplitPercent: integer("ab_split_percent"),
     createdBy: uuid("created_by").references(() => users.id),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("campaigns_tenant_created_idx").on(table.tenantId, table.createdAt)]
+);
+
+/**
+ * A household card (FR-029): one membership whose points are shared by a few people who each sign in as themselves.
+ * Joining takes the invited person's own agreement (they open the emailed link), and the card's owner or the person
+ * themselves can end it at any time. Who joined and left is kept in the audit log.
+ */
+export const householdMembers = pgTable(
+  "household_members",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    // The shared card, which belongs to the person who invited the others
+    membershipId: uuid("membership_id")
+      .notNull()
+      .references(() => memberships.id, { onDelete: "cascade" }),
+    email: varchar("email", { length: 255 }).notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 120 }),
+    status: varchar("status", { length: 16 }).default("invited").notNull(), // invited, active, removed
+    tokenHash: varchar("token_hash", { length: 64 }),
+    invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("household_members_membership_idx").on(table.membershipId),
+    index("household_members_user_idx").on(table.userId, table.tenantId),
+    index("household_members_token_idx").on(table.tokenHash),
+  ]
 );
 
 export const supportReports = pgTable(

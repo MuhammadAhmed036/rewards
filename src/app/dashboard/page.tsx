@@ -26,6 +26,7 @@ import { LiveQrSettings } from "@/components/dashboard/LiveQrSettings";
 import { SupportAccessSettings } from "@/components/dashboard/SupportAccessSettings";
 import { BillingBanner, BillingSettings } from "@/components/dashboard/BillingSettings";
 import { DomainSettings } from "@/components/dashboard/DomainSettings";
+import { GroupSettings } from "@/components/dashboard/GroupSettings";
 import { TermsEditor } from "@/components/dashboard/TermsEditor";
 import { ensureRecentAuth } from "@/lib/security-client";
 import { SupportReports } from "@/components/dashboard/SupportReports";
@@ -1400,6 +1401,7 @@ export default function OwnerDashboardPage() {
               <LiveQrSettings />
               <TermsEditor />
               <DomainSettings />
+              <GroupSettings />
               <BillingSettings />
               <SupportAccessSettings />
               <IntegrationsSettings />

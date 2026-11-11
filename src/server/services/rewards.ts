@@ -3,7 +3,7 @@ import { emitEvent } from "./events";
 import { rewards, rewardLocations, programmes, tenants, products, redemptions } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
 import { logAuditEvent } from "./audit";
-import { eq, and, asc, count, getTableColumns } from "drizzle-orm";
+import { eq, and, asc, count, getTableColumns, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 
 export const createRewardSchema = z.object({
@@ -18,9 +18,22 @@ export const createRewardSchema = z.object({
   quantityTotal: z.number().int().min(1).optional(),
   perMemberLimit: z.number().int().min(1).optional(),
   locationIds: z.array(z.string().uuid()).optional(),
+  // FR-066: how long a claim holds its points and stock, and whether points can be put towards it part by part
+  holdMinutes: z.number().int().min(1, "Hold for at least 1 minute").max(1440, "Hold for 24 hours at most").default(10),
+  allowPartial: z.boolean().default(false),
+  valueMinor: z.number().int().min(1).optional(),
+  minPartialPoints: z.number().int().min(1).optional(),
 });
 
 export type CreateRewardInput = z.input<typeof createRewardSchema>;
+
+/** Partial use needs to know what the whole reward is worth and the smallest amount of points allowed. */
+function assertPartialRules(r: { allowPartial: boolean; costPoints: number; valueMinor?: number | null; minPartialPoints?: number | null }) {
+  if (!r.allowPartial) return;
+  if (!r.valueMinor) throw new Error("Say what the whole reward is worth, so a part of it can be given.");
+  if (!r.minPartialPoints) throw new Error("Set the smallest number of points a customer can use.");
+  if (r.minPartialPoints >= r.costPoints) throw new Error("The smallest part must be less than the full cost.");
+}
 
 /** Confirms a menu item belongs to this business before a reward points at it. */
 async function assertOwnProduct(tenantId: string, productId: string) {
@@ -63,6 +76,7 @@ export async function createReward(ctx: RequestContext, input: CreateRewardInput
     throw new Error("The end date must be after the start date");
   }
   if (validated.productId) await assertOwnProduct(ctx.tenantId, validated.productId);
+  assertPartialRules(validated);
 
   const [prog] = await db
     .select({ id: programmes.id })
@@ -89,6 +103,10 @@ export async function createReward(ctx: RequestContext, input: CreateRewardInput
         endsAt: validated.endsAt || null,
         quantityTotal: validated.quantityTotal || null,
         perMemberLimit: validated.perMemberLimit || null,
+        holdMinutes: validated.holdMinutes,
+        allowPartial: validated.allowPartial,
+        valueMinor: validated.valueMinor ?? null,
+        minPartialPoints: validated.allowPartial ? (validated.minPartialPoints ?? null) : null,
         status: "active",
       })
       .returning();
@@ -122,12 +140,14 @@ export async function createReward(ctx: RequestContext, input: CreateRewardInput
 export async function updateReward(
   ctx: RequestContext,
   rewardId: string,
-  input: Omit<Partial<CreateRewardInput>, "productId" | "startsAt" | "endsAt" | "quantityTotal" | "perMemberLimit"> & {
+  input: Omit<Partial<CreateRewardInput>, "productId" | "startsAt" | "endsAt" | "quantityTotal" | "perMemberLimit" | "valueMinor" | "minPartialPoints"> & {
     productId?: string | null;
     startsAt?: Date | null;
     endsAt?: Date | null;
     quantityTotal?: number | null;
     perMemberLimit?: number | null;
+    valueMinor?: number | null;
+    minPartialPoints?: number | null;
     status?: "active" | "paused" | "archived";
   }
 ) {
@@ -145,9 +165,24 @@ export async function updateReward(
 
   const nextVersion = existing.version + 1;
 
+  const next = {
+    allowPartial: input.allowPartial ?? existing.allowPartial,
+    costPoints: input.costPoints ?? existing.costPoints,
+    valueMinor: input.valueMinor !== undefined ? input.valueMinor : existing.valueMinor,
+    minPartialPoints: input.minPartialPoints !== undefined ? input.minPartialPoints : existing.minPartialPoints,
+  };
+  if (input.holdMinutes !== undefined && (input.holdMinutes < 1 || input.holdMinutes > 1440)) {
+    throw new Error("Hold a claim for between 1 minute and 24 hours");
+  }
+  assertPartialRules(next);
+
   const [updated] = await db
     .update(rewards)
     .set({
+      holdMinutes: input.holdMinutes ?? existing.holdMinutes,
+      allowPartial: next.allowPartial,
+      valueMinor: next.valueMinor,
+      minPartialPoints: next.allowPartial ? next.minPartialPoints : null,
       title: input.title ?? existing.title,
       description: input.description !== undefined ? input.description : existing.description,
       imageUrl: input.imageUrl !== undefined ? input.imageUrl : existing.imageUrl,
@@ -183,6 +218,10 @@ export type RewardWithEligibility = RewardItem & {
   unavailableReason: string | null;
   /** How many times this customer has had it. */
   timesRedeemed: number;
+  /** The customer's points minus those held by their own claims that haven't been used or lapsed yet. */
+  availablePoints: number;
+  /** Can be claimed whole right now (`eligible` is also true when only a partial use is possible). */
+  fullyEligible: boolean;
 };
 
 export async function getRewards(
@@ -210,17 +249,44 @@ export async function getRewards(
     .orderBy(asc(rewards.costPoints), asc(rewards.title));
 
   if (options.memberBalance !== undefined) {
-    const balance = options.memberBalance;
+    const now = new Date();
     const used = new Map<string, number>();
+    // Claims that are still open hold their points and one unit of stock until they are used or lapse (FR-066)
+    const onHold = new Map<string, { all: number; mine: number }>();
+    let heldPoints = 0;
     if (options.membershipId) {
       const rows = await db
         .select({ rewardId: redemptions.rewardId, count: count() })
         .from(redemptions)
-        .where(and(eq(redemptions.membershipId, options.membershipId), eq(redemptions.status, "confirmed")))
+        .where(
+          and(
+            eq(redemptions.membershipId, options.membershipId),
+            eq(redemptions.status, "confirmed"),
+            eq(redemptions.isPartial, false)
+          )
+        )
         .groupBy(redemptions.rewardId);
       rows.forEach((r) => used.set(r.rewardId, Number(r.count)));
+
+      const open = await db
+        .select({
+          rewardId: redemptions.rewardId,
+          isPartial: redemptions.isPartial,
+          costPoints: redemptions.costPoints,
+          mine: sql<boolean>`${redemptions.membershipId} = ${options.membershipId}`,
+        })
+        .from(redemptions)
+        .where(and(eq(redemptions.tenantId, tenantId), eq(redemptions.status, "pending"), gt(redemptions.expiresAt, now)));
+      for (const o of open) {
+        if (o.mine) heldPoints += o.costPoints;
+        if (o.isPartial) continue;
+        const entry = onHold.get(o.rewardId) ?? { all: 0, mine: 0 };
+        entry.all += 1;
+        if (o.mine) entry.mine += 1;
+        onHold.set(o.rewardId, entry);
+      }
     }
-    const now = new Date();
+    const balance = options.memberBalance - heldPoints;
     const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
     return list
@@ -228,16 +294,22 @@ export async function getRewards(
       .filter((r) => !r.endsAt || now.getTime() - r.endsAt.getTime() < 7 * 24 * 60 * 60 * 1000)
       .map((r) => {
         const timesRedeemed = used.get(r.id) ?? 0;
+        const held = onHold.get(r.id) ?? { all: 0, mine: 0 };
         let unavailableReason: string | null = null;
         if (r.startsAt && r.startsAt > now) unavailableReason = `Available from ${day(r.startsAt)}`;
         else if (r.endsAt && r.endsAt < now) unavailableReason = `Ended on ${day(r.endsAt)}`;
         else if (r.quantityTotal && r.quantityRedeemed >= r.quantityTotal) unavailableReason = "All gone for now";
-        else if (r.perMemberLimit && timesRedeemed >= r.perMemberLimit)
-          unavailableReason = r.perMemberLimit === 1 ? "You've already had this one" : `You've had this ${timesRedeemed} times, the most allowed`;
+        else if (r.quantityTotal && r.quantityRedeemed + held.all >= r.quantityTotal)
+          unavailableReason = "On hold for other customers for a few minutes";
+        else if (r.perMemberLimit && timesRedeemed + held.mine >= r.perMemberLimit)
+          unavailableReason = r.perMemberLimit === 1 ? "You've already had this one" : `You've had this ${timesRedeemed + held.mine} times, the most allowed`;
         const enough = balance >= r.costPoints;
+        const canPartial = r.allowPartial && !!r.valueMinor && !!r.minPartialPoints && balance >= r.minPartialPoints;
         return {
           ...r,
-          eligible: enough && !unavailableReason,
+          eligible: (enough || canPartial) && !unavailableReason,
+          fullyEligible: enough && !unavailableReason,
+          availablePoints: balance,
           pointsShortfall: enough ? 0 : r.costPoints - balance,
           unavailableReason,
           timesRedeemed,

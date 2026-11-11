@@ -22,6 +22,7 @@ import { logAuditEvent } from "./audit";
 import { notifyWelcome } from "./notifications";
 import { grantWelcomeBonus } from "./loyalty-jobs";
 import { emitEvent } from "./events";
+import { householdCardFor, userCanUseMembership } from "./household";
 import { hashPassword } from "../auth";
 import { eq, and, sql } from "drizzle-orm";
 import crypto from "crypto";
@@ -130,6 +131,10 @@ export async function joinProgramme(input: JoinProgrammeInput) {
       })
       .returning({ id: users.id });
     userId = newUser.id;
+  }
+
+  if (await householdCardFor(userId, tenant.id)) {
+    throw new Error("You already share a household card at this shop, so you can't start a second one. Leave the household first if you want your own.");
   }
 
   // 2. Check if already a member
@@ -441,7 +446,7 @@ export async function revokeMemberQr(ctx: RequestContext, membershipId: string) 
   if (!membership) throw new Error("Membership not found");
 
   // The member themselves, or an owner/manager of the same business, can revoke
-  const isSelf = ctx.userId === membership.userId;
+  const isSelf = ctx.userId === membership.userId || (await userCanUseMembership(ctx.userId, membership.id));
   const isShopManager = (ctx.role === "owner" || ctx.role === "manager") && ctx.tenantId === membership.tenantId;
   if (!isSelf && !isShopManager) {
     throw new Error("FORBIDDEN: Cannot revoke another member's QR");

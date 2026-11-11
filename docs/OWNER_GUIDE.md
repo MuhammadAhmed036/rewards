@@ -38,10 +38,17 @@ Offers → choose who gets it (everyone, people who haven't been back, regulars,
 
 Automatic "we miss you" emails: in Earning rules → Extras, set how many days of quiet before one is sent.
 
+**Test two versions (A/B test)**: tick *Test a second version*, change the subject or the message for version B, and choose what share of customers get it. Customers are split by a fixed shuffle, so you can't favour one version. Afterwards the offer shows, for each version, how many were reached, opened their card, and bought within a week. A winner is only named when each version reached at least 30 people and the gap is too big to be chance. Change one thing at a time so you know what made the difference.
+
 ## Growing the programme
 - **Bonus offers**: double points on Fridays, a limited-time boost.
 - **Levels** (Silver, Gold): customers move up by what they earn over a period, and earn faster at higher levels.
 - **Invite a friend**: both get points after the friend's first purchase.
+- **Rewards held for a while**: when a customer claims a reward, its points (and one item, if you limit the number) are set aside until it is used, cancelled by the customer, or runs out. The default is 10 minutes; in the reward's *Holding and part payments* you can allow up to 24 hours for things collected later.
+- **Part payments**: on a reward, tick *Let customers use some of their points for part of it*, say what the whole reward is worth and the smallest amount allowed. A £5.00 voucher that costs 500 points gives £2.50 off for 250 points (always rounded down). The staff screen shows "PART USE: give £2.50 off". A part use doesn't use up stock or count towards "times one customer can have it".
+- **Household cards**: a customer can share their card with up to three people (family, housemates). They all see and add to the same points. The owner of the card invites by email; the other person chooses to join from the link, and either side can stop at any time (the card's QR code then changes). A person who already has their own card at your shop can't also join one. Customers manage this on their own card page; you don't need to do anything.
+- **Group of businesses** (Settings): if you run several brands that are separate businesses here, start a group in one of them and give the code to the others. Each brand keeps its own customers, points and staff. The group's owner sees a table of counts per brand (members, new members, customers who bought, purchases, points given, rewards used, points held), never a customer's details. Any brand can leave at any time; the owner can remove a brand or end the group.
+- **Compare with other shops** (Insights): off until you switch it on. Take part and your three figures (customers who came back, visits per customer, customers who used a reward) are counted without your name in what other shops see. You see the middle half of the other shops, never a single shop, and only once at least 8 other shops with 20+ customers take part.
 - **Live QR codes** (Settings): each customer's QR changes every 30 seconds so a screenshot is useless. Customers must open their card on their phone.
 
 ## Keeping your account safe

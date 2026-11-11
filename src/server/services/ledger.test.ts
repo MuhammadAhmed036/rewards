@@ -439,7 +439,7 @@ describe("Ledger, Earn, Redeem & Concurrency Engine (M4)", () => {
     expect(bal.balance).toBe(30);
   });
 
-  it("handles two redeems exceeding the balance at once: one fails, balance never drops below 0", async () => {
+  it("holds the points of an open claim, and the balance never drops below 0", async () => {
     const slug = `over-redeem-${Date.now()}`;
     const business = await registerOwnerAndTenant({
       email: `over-${Date.now()}@test.com`,
@@ -482,44 +482,33 @@ describe("Ledger, Earn, Redeem & Concurrency Engine (M4)", () => {
       requestId: "req-over-cust",
     };
 
-    // Customer requests two 60-point vouchers (total 120 points, but member only has 100)
+    // Two 60-point claims against 100 points: the first holds 60, so the second is refused when it is made
     const req1 = await requestRedemption(custCtx, {
       membershipId: member.membership.id,
       rewardId: reward.id,
     });
+    await expect(
+      requestRedemption(custCtx, { membershipId: member.membership.id, rewardId: reward.id })
+    ).rejects.toThrow(/INSUFFICIENT_BALANCE/);
 
-    const req2 = await requestRedemption(custCtx, {
+    // The check at the counter still stands in case points go away after a claim is made (here, a correction)
+    await adjustBalance(staffCtx, {
       membershipId: member.membership.id,
-      rewardId: reward.id,
+      pointsDelta: -50,
+      reasonCode: "correction",
+      note: "test",
+      idempotencyKey: crypto.randomUUID(),
     });
+    await expect(
+      confirmRedemption(staffCtx, { code: req1.code, locationId: business.location.id, idempotencyKey: crypto.randomUUID() })
+    ).rejects.toThrow(/INSUFFICIENT_BALANCE/);
 
-    // Both codes are confirmed concurrently at checkout
-    const p1 = confirmRedemption(staffCtx, {
-      code: req1.code,
-      locationId: business.location.id,
-      idempotencyKey: crypto.randomUUID(),
-    }).then(() => "success").catch((e) => e.message);
-
-    const p2 = confirmRedemption(staffCtx, {
-      code: req2.code,
-      locationId: business.location.id,
-      idempotencyKey: crypto.randomUUID(),
-    }).then(() => "success").catch((e) => e.message);
-
-    const results = await Promise.all([p1, p2]);
-    const successCount = results.filter((r) => r === "success").length;
-    const failureCount = results.filter((r) => r !== "success").length;
-
-    // Exactly one could be confirmed before balance ran out
-    expect(successCount).toBe(1);
-    expect(failureCount).toBe(1);
-
-    // Balance is 100 - 60 = 40 (never below 0)
+    // Balance is 100 - 50 = 50 (never below 0, nothing deducted for the refused voucher)
     const [finalBal] = await db
       .select()
       .from(membershipBalances)
       .where(eq(membershipBalances.membershipId, member.membership.id));
-    expect(finalBal.balance).toBe(40);
+    expect(finalBal.balance).toBe(50);
     expect(finalBal.balance).toBeGreaterThanOrEqual(0);
   });
 });

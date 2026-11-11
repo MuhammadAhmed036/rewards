@@ -18,7 +18,23 @@ interface CampaignRow {
   optOuts: number;
   scheduledAt: string | null;
   maxRecipients: number | null;
+  // Set when the offer was sent as an A/B test (FR-096)
+  abTest: {
+    splitPercent: number;
+    a: AbArm;
+    b: AbArm;
+    verdict: { winner: "A" | "B" | null; reason: string };
+  } | null;
 }
+
+interface AbArm {
+  subject: string;
+  reached: number;
+  clicked: number;
+  converted: number;
+}
+
+const percent = (part: number, whole: number) => (whole > 0 ? `${Math.round((part / whole) * 100)}%` : "0%");
 
 type VisitFilter = "any" | "lapsed" | "recent";
 
@@ -48,6 +64,10 @@ export function CampaignsManager({ businessName, unit = "points" }: { businessNa
   const [timing, setTiming] = useState<"now" | "later">("now");
   const [sendAtLocal, setSendAtLocal] = useState("");
   const [maxPeople, setMaxPeople] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [subjectB, setSubjectB] = useState("");
+  const [bodyB, setBodyB] = useState("");
+  const [splitB, setSplitB] = useState(50);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -118,6 +138,9 @@ export function CampaignsManager({ businessName, unit = "points" }: { businessNa
           audience: audience(),
           sendAt: timing === "later" && sendAtLocal ? new Date(sendAtLocal).toISOString() : undefined,
           maxRecipients: parseInt(maxPeople, 10) > 0 ? parseInt(maxPeople, 10) : undefined,
+          versionB: testing
+            ? { subject: subjectB.trim() || undefined, body: bodyB.trim() || undefined, splitPercent: splitB }
+            : undefined,
         }),
       });
       const json = await res.json();
@@ -133,6 +156,10 @@ export function CampaignsManager({ businessName, unit = "points" }: { businessNa
       setSendAtLocal("");
       setTiming("now");
       setMaxPeople("");
+      setTesting(false);
+      setSubjectB("");
+      setBodyB("");
+      setSplitB(50);
       setConfirming(false);
       setTimeout(loadHistory, 1500);
     } catch (err) {
@@ -152,7 +179,8 @@ export function CampaignsManager({ businessName, unit = "points" }: { businessNa
 
   const laterOk = timing === "now" || (sendAtLocal !== "" && new Date(sendAtLocal).getTime() > Date.now());
   const reach = Math.min(count?.recipients ?? 0, parseInt(maxPeople, 10) > 0 ? parseInt(maxPeople, 10) : Infinity);
-  const ready = subject.trim().length >= 3 && body.trim().length >= 10 && (count?.recipients ?? 0) > 0 && laterOk;
+  const testReady = !testing || ((subjectB.trim().length >= 3 || bodyB.trim().length >= 10) && reach >= 2);
+  const ready = subject.trim().length >= 3 && body.trim().length >= 10 && (count?.recipients ?? 0) > 0 && laterOk && testReady;
 
   return (
     <div className="space-y-6">
@@ -285,6 +313,67 @@ export function CampaignsManager({ businessName, unit = "points" }: { businessNa
               />
             </label>
             <div className="rounded-2xl border border-zinc-200 p-4 space-y-3">
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={testing}
+                  onChange={(e) => setTesting(e.target.checked)}
+                  className="mt-1 h-4 w-4 accent-evergreen"
+                />
+                <span>
+                  <span className="font-medium text-zinc-800">Test a second version (A/B test)</span>
+                  <span className="block text-xs text-zinc-500">
+                    Some customers get version B instead. Afterwards you can see which one brought more people back.
+                  </span>
+                </span>
+              </label>
+              {testing && (
+                <div className="space-y-3 rounded-xl bg-zinc-50 border border-zinc-200 p-3">
+                  <p className="text-xs text-zinc-600">
+                    Version B uses the subject and message above unless you change them here. Change one thing at a time, so you know what made the difference.
+                  </p>
+                  <label className="block text-sm">
+                    <span className="font-medium text-zinc-800">Version B subject</span>
+                    <input
+                      maxLength={150}
+                      placeholder="Leave empty to keep the subject above"
+                      value={subjectB}
+                      onChange={(e) => setSubjectB(e.target.value)}
+                      className={`${field} mt-1`}
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="font-medium text-zinc-800">Version B message</span>
+                    <textarea
+                      rows={4}
+                      maxLength={3000}
+                      placeholder="Leave empty to keep the message above"
+                      value={bodyB}
+                      onChange={(e) => setBodyB(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-zinc-300 bg-white p-3 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="font-medium text-zinc-800">
+                      Version B goes to {splitB}% of customers, version A to {100 - splitB}%
+                    </span>
+                    <input
+                      type="range"
+                      min={10}
+                      max={90}
+                      step={10}
+                      value={splitB}
+                      onChange={(e) => setSplitB(parseInt(e.target.value, 10))}
+                      className="mt-1 w-full accent-evergreen"
+                    />
+                  </label>
+                  {reach > 0 && reach < 60 && (
+                    <p className="text-xs text-amber-800">
+                      With only {reach} customers the result will be a guess. A test needs at least 30 in each version to say which is better.
+                    </p>
+                  )}
+                </div>
+              )}
               <fieldset>
                 <legend className="text-sm font-medium text-zinc-800">When</legend>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -330,6 +419,7 @@ export function CampaignsManager({ businessName, unit = "points" }: { businessNa
                 <p className="text-sm text-zinc-800">
                   {timing === "later" ? "Schedule" : "Send"} &ldquo;{subject}&rdquo; to <strong>{reach}</strong> customers
                   {timing === "later" ? ` on ${new Date(sendAtLocal).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : " now"}?
+                  {testing ? ` Version B goes to ${splitB}% of them.` : ""}
                   {timing === "later" ? " You can cancel it until it goes out." : " You can\u2019t unsend it."}
                 </p>
                 <div className="mt-3 flex gap-2">
@@ -385,7 +475,7 @@ export function CampaignsManager({ businessName, unit = "points" }: { businessNa
         ) : (
           <ul className="mt-4 divide-y divide-zinc-100">
             {history.map((c) => (
-              <li key={c.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <li key={c.id} className="py-3 flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold text-zinc-900 truncate">{c.subject}</p>
                   <p className="text-xs text-zinc-500">
@@ -412,6 +502,30 @@ export function CampaignsManager({ businessName, unit = "points" }: { businessNa
                       {c.clicks} opened their card from it{c.optOuts > 0 ? `, ${c.optOuts} stopped offers` : ""}
                     </span>
                   </p>
+                )}
+                {c.abTest && c.status === "sent" && (
+                  <div className="sm:basis-full rounded-xl bg-zinc-50 border border-zinc-200 p-3 text-xs text-zinc-700">
+                    <p className="font-semibold text-zinc-900">A/B test: which one brought people back?</p>
+                    <div className="mt-2 grid sm:grid-cols-2 gap-2">
+                      {(["a", "b"] as const).map((k) => {
+                        const arm = c.abTest![k];
+                        const winner = c.abTest!.verdict.winner === k.toUpperCase();
+                        return (
+                          <div key={k} className={`rounded-lg border p-2 ${winner ? "border-evergreen bg-mist/60" : "border-zinc-200 bg-white"}`}>
+                            <p className="font-semibold text-zinc-900 truncate">
+                              Version {k.toUpperCase()}: {arm.subject}
+                              {winner && <span className="ml-1 text-evergreen-deep">(winner)</span>}
+                            </p>
+                            <p className="tabular-nums">
+                              {arm.reached} reached &middot; {percent(arm.clicked, arm.reached)} opened their card &middot;{" "}
+                              <strong>{percent(arm.converted, arm.reached)}</strong> bought ({arm.converted})
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2">{c.abTest.verdict.reason} &ldquo;Bought&rdquo; means a purchase within a week of the offer going out.</p>
+                  </div>
                 )}
               </li>
             ))}

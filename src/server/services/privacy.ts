@@ -1,5 +1,6 @@
 import { db } from "../db";
 import { emitEvent } from "./events";
+import { leaveAllHouseholds, purgeLapsedInvites } from "./household";
 import { NOTE_RETENTION_MONTHS } from "./member-notes";
 import { memberNotes, domainEvents, emailOutbox } from "../db/schema";
 import { inArray } from "drizzle-orm";
@@ -267,6 +268,9 @@ export async function deleteAndAnonymiseAccount(userId: string) {
       })
       .where(eq(memberships.userId, userId));
 
+    // They leave any card they share, and the ones they own stop being shared
+    await leaveAllHouseholds(userId, tx);
+
     // Invalidate sessions immediately
     await invalidateUserSessions(userId);
 
@@ -324,6 +328,9 @@ export async function runRetentionCleanup() {
     .where(and(lt(emailOutbox.createdAt, sixtyDaysAgo), inArray(emailOutbox.status, ["sent", "dead"])))
     .returning({ id: emailOutbox.id });
 
+  // 3d. Household invitations nobody opened
+  const deletedInvites = await purgeLapsedInvites();
+
   // 4. Expired sign-in sessions (idle timeout passed, or staff/admin absolute limit reached)
   const deletedSessionsCount = await purgeExpiredSessions();
 
@@ -334,6 +341,7 @@ export async function runRetentionCleanup() {
     deletedNotesCount: deletedNotes.length,
     deletedEventsCount: deletedEvents.length,
     deletedEmailsCount: deletedEmails.length,
+    deletedInvitesCount: deletedInvites,
     deletedSessionsCount,
   };
 }

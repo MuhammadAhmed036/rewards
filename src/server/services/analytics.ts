@@ -8,6 +8,37 @@ export type AnalyticsRange = keyof typeof ANALYTICS_RANGES;
 /** A campaign counts as having worked if the person bought something within this many days of it going out. */
 export const CAMPAIGN_ATTRIBUTION_DAYS = 7;
 
+/** For A/B tests (FR-096): how each wording of an offer did, by people reached, people who clicked and people who bought. */
+export async function variantResults(tenantId: string, campaignIds: string[]) {
+  const out = new Map<string, Record<"A" | "B", { reached: number; clicked: number; converted: number }>>();
+  if (campaignIds.length === 0) return out;
+  const ids = sql.join(campaignIds.map((id) => sql`${id}::uuid`), sql`, `);
+  const rows = await db.execute<{ id: string; variant: string; reached: number; clicked: number; converted: number }>(sql`
+    select c.id, coalesce(o.payload->>'variant', 'A') as variant,
+      count(distinct o.id)::int as reached,
+      count(distinct o.id) filter (where exists (
+        select 1 from email_events e where e.outbox_id = o.id and e.type = 'click'
+      ))::int as clicked,
+      count(distinct o.id) filter (where exists (
+        select 1 from users u
+        join memberships m on m.user_id = u.id and m.tenant_id = c.tenant_id
+        join ledger_entries le on le.membership_id = m.id
+        where u.email = o.to_email and le.type = 'earn' and le.reason_code is distinct from 'bonus'
+          and le.occurred_at >= c.sent_at and le.occurred_at < c.sent_at + make_interval(days => ${CAMPAIGN_ATTRIBUTION_DAYS})
+      ))::int as converted
+    from campaigns c
+    join email_outbox o on o.template = 'campaign' and o.payload->>'campaignId' = c.id::text and o.status = 'sent'
+    where c.tenant_id = ${tenantId} and c.id in (${ids}) and c.sent_at is not null
+    group by c.id, 2
+  `);
+  for (const r of rows) {
+    const entry = out.get(r.id) ?? { A: { reached: 0, clicked: 0, converted: 0 }, B: { reached: 0, clicked: 0, converted: 0 } };
+    entry[r.variant === "B" ? "B" : "A"] = { reached: r.reached, clicked: r.clicked, converted: r.converted };
+    out.set(r.id, entry);
+  }
+  return out;
+}
+
 // A purchase is a normal earn; welcome, birthday and referral bonuses are not visits
 const PURCHASE = sql`le.type = 'earn' and le.reason_code is distinct from 'bonus'`;
 

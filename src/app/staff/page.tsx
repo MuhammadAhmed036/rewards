@@ -218,7 +218,7 @@ export default function StaffPage() {
   const [redeemCodeInput, setRedeemCodeInput] = useState("");
   const [validatingRedeemCode, setValidatingRedeemCode] = useState(false);
   const [redeemValidation, setRedeemValidation] = useState<{
-    redemption: { id: string; costPoints: number };
+    redemption: { id: string; costPoints: number; isPartial?: boolean; valueMinor?: number | null };
     reward: { title: string; costPoints: number };
     memberBalance: number;
     hasSufficientBalance: boolean;
@@ -1353,8 +1353,14 @@ export default function StaffPage() {
                     <div className="text-sm font-bold text-slate-900">
                       Reward: {redeemValidation.reward.title}
                     </div>
+                    {redeemValidation.redemption.isPartial && redeemValidation.redemption.valueMinor != null && (
+                      <div className="mt-1 rounded-lg bg-amber-100 border border-amber-300 px-2.5 py-1.5 text-xs font-bold text-amber-900">
+                        PART USE: give {cur}{(redeemValidation.redemption.valueMinor / 100).toFixed(2)} off, not the whole reward
+                      </div>
+                    )}
                     <div className="text-xs text-slate-600 mt-1">
-                      Cost: <span className="font-bold">{redeemValidation.reward.costPoints} points</span> (Customer Balance:{" "}
+                      Cost: <span className="font-bold">{redeemValidation.redemption.costPoints} points</span>
+                      {redeemValidation.redemption.isPartial ? ` of ${redeemValidation.reward.costPoints}` : ""} (Customer Balance:{" "}
                       {redeemValidation.memberBalance} pts)
                     </div>
 

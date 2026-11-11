@@ -113,6 +113,34 @@
       "when": 1793438604968,
       "tag": "0015_platform_features",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1794379923803,
+      "tag": "0016_partial_redemption",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794380303009,
+      "tag": "0017_ab_test",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794380512863,
+      "tag": "0018_household_cards",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794381732393,
+      "tag": "0019_franchise_groups",
+      "breakpoints": true
     }
   ]
 }

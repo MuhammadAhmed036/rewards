@@ -12,6 +12,8 @@ import { logger } from "@/lib/logger";
 import { logAuditEvent } from "./audit";
 import { processOutbox, queueEmail } from "./email";
 import { campaignEventCounts, recordEmailEvent } from "./email-events";
+import { variantResults } from "./analytics";
+import { compareVariants, splitForTest } from "@/lib/ab-test";
 import { emitEvent } from "./events";
 
 /**
@@ -44,6 +46,15 @@ export const campaignSchema = z.object({
   sendAt: z.string().datetime({ offset: true }).optional(),
   // Reach at most this many people
   maxRecipients: z.number().int().min(1).max(100000).optional(),
+  // A/B test (FR-096): a second wording sent to this share of the audience, with the rest getting the first
+  versionB: z
+    .object({
+      subject: z.string().trim().min(3, "Write a subject line for version B").max(150).optional(),
+      body: z.string().trim().min(10, "Write a short message for version B (at least 10 characters)").max(3000).optional(),
+      splitPercent: z.number().int().min(10).max(90).default(50),
+    })
+    .refine((v) => Boolean(v.subject || v.body), { message: "Change the subject or the message in version B" })
+    .optional(),
 });
 
 const MAX_CAMPAIGNS_PER_DAY = 3;
@@ -156,9 +167,14 @@ async function dispatchCampaign(campaignId: string, from: "scheduled" | "sending
   let rows = await audienceRows(claimed.tenantId, claimed.audience as Audience);
   if (claimed.maxRecipients && rows.length > claimed.maxRecipients) rows = rows.slice(0, claimed.maxRecipients);
 
+  // With an A/B test, a fixed shuffle decides who gets the second wording; everyone else gets the first
+  const testing = claimed.abSplitPercent && rows.length >= 2 && (claimed.subjectB || claimed.bodyB);
+  const versionB = testing ? new Set(splitForTest(rows, claimed.id, claimed.abSplitPercent!).b.map((r) => r.membershipId)) : null;
+
   const [tenant] = await db.select({ name: tenants.name, slug: tenants.slug }).from(tenants).where(eq(tenants.id, claimed.tenantId)).limit(1);
   const ids: string[] = [];
   for (const r of rows) {
+    const isB = versionB?.has(r.membershipId) ?? false;
     const entry = await queueEmail({
       toEmail: r.email,
       template: "campaign",
@@ -166,8 +182,9 @@ async function dispatchCampaign(campaignId: string, from: "scheduled" | "sending
       tenantId: claimed.tenantId,
       payload: {
         campaignId: claimed.id,
-        subject: claimed.subject,
-        body: claimed.body,
+        ...(versionB ? { variant: isB ? "B" : "A" } : {}),
+        subject: isB ? claimed.subjectB ?? claimed.subject : claimed.subject,
+        body: isB ? claimed.bodyB ?? claimed.body : claimed.body,
         businessName: tenant?.name,
         hubUrl: `${env.APP_URL}/b/${tenant?.slug}`,
         unsubscribeUrl: marketingOptOutUrl(r.membershipId, claimed.id),
@@ -207,7 +224,10 @@ async function dispatchCampaign(campaignId: string, from: "scheduled" | "sending
 export async function sendCampaign(ctx: RequestContext, input: unknown) {
   assertCan(ctx, "campaign.manage");
   if (!ctx.tenantId) throw new Error("tenantId required");
-  const { subject, body, audience, sendAt, maxRecipients } = campaignSchema.parse(input);
+  const { subject, body, audience, sendAt, maxRecipients, versionB } = campaignSchema.parse(input);
+  if (versionB && (versionB.subject ?? subject) === subject && (versionB.body ?? body) === body) {
+    throw new Error("Version B is the same as version A. Change the subject or the message.");
+  }
   await assertGrowthAllowed(ctx.tenantId, "Sending offers");
 
   const when = sendAt ? new Date(sendAt) : null;
@@ -225,6 +245,9 @@ export async function sendCampaign(ctx: RequestContext, input: unknown) {
 
   const rows = await audienceRows(ctx.tenantId, audience);
   if (rows.length === 0) throw new Error("Nobody matches these filters yet. Widen them and try again.");
+  if (versionB && Math.min(rows.length, maxRecipients ?? rows.length) < 2) {
+    throw new Error("An A/B test needs at least 2 customers, one for each version.");
+  }
 
   const [campaign] = await db
     .insert(campaigns)
@@ -236,6 +259,9 @@ export async function sendCampaign(ctx: RequestContext, input: unknown) {
       status: later ? "scheduled" : "sending",
       scheduledAt: later ? when : new Date(),
       maxRecipients: maxRecipients ?? null,
+      subjectB: versionB?.subject ?? null,
+      bodyB: versionB?.body ?? null,
+      abSplitPercent: versionB ? versionB.splitPercent : null,
       recipientCount: Math.min(rows.length, maxRecipients ?? rows.length),
       createdBy: ctx.userId,
     })
@@ -245,7 +271,7 @@ export async function sendCampaign(ctx: RequestContext, input: unknown) {
     action: later ? "campaign.scheduled" : "campaign.sent",
     targetType: "campaign",
     targetId: campaign.id,
-    metadata: { recipients: campaign.recipientCount, audience, sendAt: later ? when!.toISOString() : null, maxRecipients: maxRecipients ?? null },
+    metadata: { recipients: campaign.recipientCount, audience, sendAt: later ? when!.toISOString() : null, maxRecipients: maxRecipients ?? null, abTest: versionB ? { splitPercent: versionB.splitPercent } : null },
   });
 
   if (later) return campaign;
@@ -306,11 +332,21 @@ export async function listCampaigns(ctx: RequestContext) {
     .where(and(eq(emailOutbox.tenantId, ctx.tenantId!), eq(emailOutbox.template, "campaign")))
     .groupBy(sql`${emailOutbox.payload}->>'campaignId'`, emailOutbox.status);
   const events = await campaignEventCounts(list.map((c) => c.id));
+  const tests = await variantResults(ctx.tenantId!, list.filter((c) => c.abSplitPercent && c.status === "sent").map((c) => c.id));
   return list.map((c) => {
     const mine = stats.filter((s) => s.campaignId === c.id);
     const n = (status: string) => Number(mine.find((s) => s.status === status)?.count ?? 0);
     const e = events.get(c.id) ?? { clicks: 0, bounces: 0, complaints: 0, optOuts: 0 };
-    return { ...c, delivered: n("sent"), waiting: n("queued"), failed: n("failed") + n("dead"), ...e };
+    const test = tests.get(c.id);
+    const abTest = c.abSplitPercent
+      ? {
+          splitPercent: c.abSplitPercent,
+          a: { subject: c.subject, body: c.body, ...(test?.A ?? { reached: 0, clicked: 0, converted: 0 }) },
+          b: { subject: c.subjectB ?? c.subject, body: c.bodyB ?? c.body, ...(test?.B ?? { reached: 0, clicked: 0, converted: 0 }) },
+          verdict: compareVariants(test?.A ?? { reached: 0, converted: 0 }, test?.B ?? { reached: 0, converted: 0 }),
+        }
+      : null;
+    return { ...c, delivered: n("sent"), waiting: n("queued"), failed: n("failed") + n("dead"), ...e, abTest };
   });
 }
 

@@ -34,6 +34,8 @@ import { BusinessLogo } from "@/components/brand/BusinessLogo";
 import { StampCard, type StampCardData } from "@/components/loyalty/StampCard";
 import { CustomerChat } from "@/components/chat/CustomerChat";
 import { PointsMenu } from "@/components/rewards/PointsMenu";
+import { formatMoney } from "@/lib/money";
+import { HouseholdCard } from "@/components/loyalty/HouseholdCard";
 import { MemberCard3D } from "@/components/loyalty/MemberCard3D";
 import { ReportProblem } from "@/components/loyalty/ReportProblem";
 
@@ -45,6 +47,7 @@ interface HubPayload {
     brandPrimaryHex: string;
     logoUrl?: string | null;
     locale?: string;
+    currency?: string;
   };
   programme: {
     name: string;
@@ -87,6 +90,12 @@ interface HubPayload {
     timesRedeemed?: number;
     description?: string | null;
     productName?: string | null;
+    availablePoints?: number;
+    fullyEligible?: boolean;
+    allowPartial?: boolean;
+    valueMinor?: number | null;
+    minPartialPoints?: number | null;
+    holdMinutes?: number;
   }>;
   links: Array<{
     id: string;
@@ -182,6 +191,8 @@ export default function BusinessHubPage(props: {
     rewardTitle: string;
     costPoints: number;
     expiresAt: string;
+    valueMinor?: number | null;
+    isPartial?: boolean;
   } | null>(null);
   const [redemptionSuccess, setRedemptionSuccess] = useState(false);
   const [redemptionQrUrl, setRedemptionQrUrl] = useState<string | null>(null);
@@ -589,7 +600,7 @@ export default function BusinessHubPage(props: {
   };
 
   // Handle Request Redemption
-  const handleStartRedeem = async (rewardId: string, rewardTitle: string, costPoints: number) => {
+  const handleStartRedeem = async (rewardId: string, rewardTitle: string, costPoints: number, points?: number) => {
     if (!hubData?.member) return;
     if (isOffline()) {
       setErrorMsg(OFFLINE_MESSAGE);
@@ -606,6 +617,7 @@ export default function BusinessHubPage(props: {
         body: JSON.stringify({
           membershipId: hubData.member.membershipId,
           rewardId,
+          ...(points !== undefined && points !== costPoints ? { points } : {}),
         }),
       });
       const json = await res.json();
@@ -615,12 +627,28 @@ export default function BusinessHubPage(props: {
         id: json.data.redemptionId,
         code: json.data.code,
         rewardTitle,
-        costPoints,
+        costPoints: json.data.costPoints ?? costPoints,
         expiresAt: json.data.expiresAt,
+        valueMinor: json.data.valueMinor,
+        isPartial: json.data.isPartial,
       });
+      fetchHubData(); // The points held for this claim come off what is shown as available
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Error initiating redemption");
     }
+  };
+
+  // Giving a claim back frees its points and stock straight away, instead of leaving them held until it lapses
+  const handleCancelRedeem = async () => {
+    const claim = activeRedemption;
+    setActiveRedemption(null);
+    if (!claim) return;
+    try {
+      await fetch(`/api/v1/customer/redeem?id=${claim.id}`, { method: "DELETE", headers: { "x-tenant-id": hubData?.tenant.id ?? "" } });
+    } catch (err) {
+      console.error("Cancel claim error", err);
+    }
+    fetchHubData();
   };
 
   if (loading) {
@@ -1224,10 +1252,12 @@ export default function BusinessHubPage(props: {
                           rewards={hubData.rewards}
                           balance={member.balance}
                           unit={unitWord}
-                          onClaim={(reward) => handleStartRedeem(reward.id, reward.title, reward.costPoints)}
+                          currency={hubData.tenant.currency}
+                          onClaim={(reward, points) => handleStartRedeem(reward.id, reward.title, reward.costPoints, points)}
                         />
                       </div>
                       <CustomerChat membershipId={member.membershipId} businessName={hubData.tenant.name} />
+                      <HouseholdCard membershipId={member.membershipId} tenantId={hubData.tenant.id} unit={unitWord} />
                     </div>
 
                     {/* Side column: what happened, and where to find the shop online */}
@@ -1756,8 +1786,9 @@ export default function BusinessHubPage(props: {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in zoom-in-95">
           <div className="bg-white text-slate-900 rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl relative border border-slate-200">
             <button
-              onClick={() => setActiveRedemption(null)}
+              onClick={handleCancelRedeem}
               className="absolute right-4 top-4 p-2 text-slate-400 hover:text-slate-900 rounded-xl cursor-pointer"
+              aria-label="Close and give this claim back"
             >
               <X className="h-5 w-5" />
             </button>
@@ -1767,7 +1798,12 @@ export default function BusinessHubPage(props: {
             </div>
 
             <h3 className="text-xl font-bold text-slate-900">{activeRedemption.rewardTitle}</h3>
-            <p className="text-xs text-slate-500 mb-2">Present this voucher code to staff at counter</p>
+            {activeRedemption.isPartial && activeRedemption.valueMinor != null && (
+              <p className="text-sm font-semibold text-emerald-700">
+                {activeRedemption.costPoints} points = {formatMoney(activeRedemption.valueMinor, hubData?.tenant.currency || "GBP")} off
+              </p>
+            )}
+            <p className="text-xs text-slate-500 mb-2">Show this code to staff at the counter. Your points are held until it is used or runs out.</p>
 
             {/* Voucher QR Code */}
             {redemptionQrUrl && (
@@ -1790,7 +1826,7 @@ export default function BusinessHubPage(props: {
             ) : (
               <div className="flex items-center justify-center space-x-1.5 text-xs text-amber-700 font-bold mb-2.5">
                 <Clock className="h-3.5 w-3.5" />
-                <span>Expires in {redemptionTimeLeft || "10:00"}</span>
+                <span>Held for another {redemptionTimeLeft || "..."}</span>
               </div>
             )}
 
@@ -1802,10 +1838,10 @@ export default function BusinessHubPage(props: {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setActiveRedemption(null)}
+              onClick={handleCancelRedeem}
               className="w-full text-xs font-bold border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl cursor-pointer"
             >
-              Cancel Voucher
+              Cancel and keep my points
             </Button>
           </div>
         </div>

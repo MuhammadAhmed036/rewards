@@ -28,6 +28,8 @@ export const EVENT_NAMES = [
   "staff.role_changed",
   "tenant.suspended",
   "data_export.created",
+  "household.member_added",
+  "household.member_removed",
   "webhook.test",
 ] as const;
 export type EventName = (typeof EVENT_NAMES)[number];

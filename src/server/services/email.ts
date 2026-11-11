@@ -10,6 +10,7 @@ import nodemailer, { type SendMailOptions } from "nodemailer";
 export type EmailTemplate =
   | "magic_link"
   | "staff_invitation"
+  | "household_invite"
   | "welcome"
   | "reward_unlocked"
   | "redemption_receipt"
@@ -225,6 +226,29 @@ It works once, for 10 minutes. If you didn't ask for it, ignore this email and c
           isNewAccount ? "Choose my password" : "Sign in",
           url,
           "If you weren't expecting this, you can ignore this email."
+        ),
+      };
+    }
+    case "household_invite": {
+      const inviter = String(payload.inviterName || "Someone");
+      const businessName = String(payload.businessName || "the shop");
+      const url = String(payload.url || appUrl);
+      const days = Number(payload.days) || 7;
+      return {
+        subject: `${inviter} invited you to share their ${businessName} card`,
+        text: `${inviter} invited you to share their ${businessName} loyalty card. You would both see and add to the same points. Either of you can stop sharing at any time.
+
+If you want to join, open this link (it works for ${days} days):
+
+${url}
+
+If you don't know ${inviter}, ignore this email.`,
+        html: buttonEmail(
+          `Share ${inviter}'s ${businessName} card?`,
+          `${inviter} invited you to share their ${businessName} loyalty card. You would both see and add to the same points, and either of you can stop sharing at any time. The link works for ${days} days.`,
+          "Accept and share the card",
+          url,
+          `If you don't know ${inviter}, ignore this email and nothing changes.`
         ),
       };
     }

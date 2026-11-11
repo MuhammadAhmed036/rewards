@@ -11,6 +11,10 @@ export interface PointsReward {
   perMemberLimit?: number | null;
   startsAt?: string | null;
   endsAt?: string | null;
+  holdMinutes?: number;
+  allowPartial?: boolean;
+  valueMinor?: number | null;
+  minPartialPoints?: number | null;
 }
 
 export interface MenuProduct {

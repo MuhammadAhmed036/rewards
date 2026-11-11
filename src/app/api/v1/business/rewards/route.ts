@@ -18,6 +18,10 @@ const updateRewardBodySchema = z.object({
   perMemberLimit: z.number().int().min(1).nullable().optional(),
   startsAt: z.coerce.date().nullable().optional(),
   endsAt: z.coerce.date().nullable().optional(),
+  holdMinutes: z.number().int().min(1).max(1440).optional(),
+  allowPartial: z.boolean().optional(),
+  valueMinor: z.number().int().min(1).nullable().optional(),
+  minPartialPoints: z.number().int().min(1).nullable().optional(),
 });
 
 function failure(code: string, err: unknown, fallback: string) {

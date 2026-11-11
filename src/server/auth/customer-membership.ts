@@ -4,9 +4,10 @@ import { memberships } from "../db/schema";
 import { getSessionContext } from "./index";
 import { readSessionCookie } from "./session-response";
 import { and, eq } from "drizzle-orm";
+import { userCanUseMembership } from "../services/household";
 
 /**
- * Confirms the signed-in user owns the membership they are acting on.
+ * Confirms the signed-in user owns the membership they are acting on, or shares it in a household (FR-029).
  * Customer endpoints take a membershipId from the client; without this check
  * anyone who learned an id could act on someone else's card.
  */
@@ -29,16 +30,10 @@ export async function requireOwnMembership(
   const [membership] = await db
     .select({ id: memberships.id, tenantId: memberships.tenantId, userId: memberships.userId })
     .from(memberships)
-    .where(
-      and(
-        eq(memberships.id, membershipId),
-        eq(memberships.userId, ctx.userId),
-        ...(tenantId ? [eq(memberships.tenantId, tenantId)] : [])
-      )
-    )
+    .where(and(eq(memberships.id, membershipId), ...(tenantId ? [eq(memberships.tenantId, tenantId)] : [])))
     .limit(1);
 
-  if (!membership) {
+  if (!membership || !(await userCanUseMembership(ctx.userId, membership.id))) {
     return {
       response: NextResponse.json(
         { error: { code: "FORBIDDEN", message: "This card belongs to a different account" } },
@@ -46,5 +41,6 @@ export async function requireOwnMembership(
       ),
     };
   }
-  return { membership };
+  // `userId` is the person acting, which for a shared card is not always the one who owns it
+  return { membership: { ...membership, userId: ctx.userId } };
 }

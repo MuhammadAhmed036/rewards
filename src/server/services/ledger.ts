@@ -13,14 +13,16 @@ import {
   locations,
 } from "../db/schema";
 import { RequestContext, assertCan } from "../security/permissions";
+import { partialPointsProblem, partialValueMinor } from "@/lib/partial-reward";
 import { calculatePoints, earnBlockedReason, ruleConfigSchema, ruleForLocation, RuleConfig } from "@/lib/points";
 import { hashRedemptionCode, generateRedemptionCode } from "../qr";
+import { userCanUseMembership } from "./household";
 import { logAuditEvent } from "./audit";
 import { notifyRedemption, notifyRewardsUnlocked } from "./notifications";
 import { grantReferralBonuses } from "./loyalty-jobs";
 import { emitEvent } from "./events";
 import { sentry } from "@/lib/sentry";
-import { eq, and, sql, desc, gte, lt } from "drizzle-orm";
+import { eq, and, sql, desc, gte, gt, lt } from "drizzle-orm";
 
 export interface EarnParams {
   membershipId: string;
@@ -239,7 +241,7 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
     }
 
     // Nobody can give points to their own card, whatever their role
-    if (membership.userId === ctx.userId) {
+    if (membership.userId === ctx.userId || (await userCanUseMembership(ctx.userId, membership.id, tx))) {
       throw new Error("SELF_AWARD: You can't add points to your own loyalty card.");
     }
 
@@ -462,7 +464,7 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
 
 export async function requestRedemption(
   ctx: RequestContext,
-  params: { membershipId: string; rewardId: string }
+  params: { membershipId: string; rewardId: string; points?: number }
 ) {
   assertCan(ctx, "customer.redeem");
   if (!ctx.tenantId) throw new Error("tenantId required");
@@ -490,7 +492,8 @@ export async function requestRedemption(
     )
     .limit(1);
 
-  if (!membership) {
+  // Only the card's owner, or someone who shares it in a household, can claim with its points
+  if (!membership || !(await userCanUseMembership(ctx.userId, membership.id))) {
     throw new Error("Membership not found");
   }
 
@@ -517,70 +520,128 @@ export async function requestRedemption(
     throw new Error("REWARD_EXPIRED: Reward has expired");
   }
 
-  // Check stock
-  if (reward.quantityTotal && reward.quantityRedeemed >= reward.quantityTotal) {
-    throw new Error("Reward is out of stock");
-  }
+  // Everything that decides whether the claim may be made runs under a lock on the customer's balance (and the
+  // reward when its stock is limited), so two claims made at the same moment can't both take the last points or unit.
+  const claim = await db.transaction(async (tx) => {
+    const [balanceRow] = await tx
+      .select()
+      .from(membershipBalances)
+      .where(eq(membershipBalances.membershipId, params.membershipId))
+      .for("update");
 
-  // Check member balance
-  const [balanceRow] = await db
-    .select()
-    .from(membershipBalances)
-    .where(eq(membershipBalances.membershipId, params.membershipId))
-    .limit(1);
+    const lockedReward = reward.quantityTotal
+      ? (await tx.select().from(rewards).where(eq(rewards.id, reward.id)).for("update"))[0]
+      : reward;
+    const claimedAt = new Date();
 
-  if (!balanceRow || balanceRow.balance < reward.costPoints) {
-    throw new Error(
-      `INSUFFICIENT_BALANCE: You need ${reward.costPoints} points, but have ${balanceRow?.balance || 0}`
-    );
-  }
-
-  // Check per-member limit
-  if (reward.perMemberLimit) {
-    const [existingCount] = await db
-      .select({
-        count: sql<number>`count(*)::int`,
-      })
+    // Open claims hold their points and stock until they are used, cancelled or run out (FR-066)
+    const open = await tx
+      .select({ rewardId: redemptions.rewardId, membershipId: redemptions.membershipId, costPoints: redemptions.costPoints, isPartial: redemptions.isPartial })
       .from(redemptions)
-      .where(
-        and(
-          eq(redemptions.membershipId, params.membershipId),
-          eq(redemptions.rewardId, reward.id),
-          eq(redemptions.status, "confirmed")
-        )
-      );
+      .where(and(eq(redemptions.tenantId, ctx.tenantId!), eq(redemptions.status, "pending"), gt(redemptions.expiresAt, claimedAt)));
+    const heldPoints = open.filter((o) => o.membershipId === params.membershipId).reduce((n, o) => n + o.costPoints, 0);
+    const heldUnits = open.filter((o) => o.rewardId === reward.id && !o.isPartial);
+    const mineHeld = heldUnits.filter((o) => o.membershipId === params.membershipId).length;
 
-    if (existingCount.count >= reward.perMemberLimit) {
-      throw new Error(`You have reached the limit of ${reward.perMemberLimit} for this reward`);
+    // Full price, or a part of it when the shop allows that
+    let pointsToUse = reward.costPoints;
+    let isPartial = false;
+    let valueMinor: number | null = reward.valueMinor;
+    if (params.points !== undefined && params.points !== reward.costPoints) {
+      if (!reward.allowPartial || !reward.valueMinor) throw new Error("This reward has to be claimed in full.");
+      const problem = partialPointsProblem(reward, params.points);
+      if (problem) throw new Error(problem);
+      pointsToUse = params.points;
+      isPartial = true;
+      valueMinor = partialValueMinor(reward.valueMinor, reward.costPoints, params.points);
     }
-  }
 
-  // Generate 8-character code and set 10-minute expiry
-  const { code, codeHash, codeLast4 } = generateRedemptionCode();
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes TTL
+    if (!isPartial) {
+      const total = lockedReward?.quantityTotal;
+      if (total && (lockedReward?.quantityRedeemed ?? 0) >= total) throw new Error("Reward is out of stock");
+      if (total && (lockedReward?.quantityRedeemed ?? 0) + heldUnits.length >= total) {
+        throw new Error("The last ones are on hold for other customers for a few minutes. Try again shortly.");
+      }
+      if (reward.perMemberLimit) {
+        const [confirmed] = await tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(redemptions)
+          .where(
+            and(
+              eq(redemptions.membershipId, params.membershipId),
+              eq(redemptions.rewardId, reward.id),
+              eq(redemptions.status, "confirmed"),
+              eq(redemptions.isPartial, false)
+            )
+          );
+        if (confirmed.count + mineHeld >= reward.perMemberLimit) {
+          throw new Error(`You have reached the limit of ${reward.perMemberLimit} for this reward`);
+        }
+      }
+    }
 
-  const [newRedemption] = await db
-    .insert(redemptions)
-    .values({
-      tenantId: ctx.tenantId,
-      membershipId: params.membershipId,
-      rewardId: reward.id,
-      rewardVersion: reward.version,
-      costPoints: reward.costPoints,
-      status: "pending",
-      codeHash,
-      codeLast4,
-      expiresAt,
-    })
-    .returning();
+    const balance = balanceRow?.balance ?? 0;
+    const available = balance - heldPoints;
+    if (available < pointsToUse) {
+      throw new Error(
+        `INSUFFICIENT_BALANCE: You need ${pointsToUse} points, but have ${Math.max(0, available)} available` +
+          (heldPoints > 0 ? ` (${heldPoints} are held for a claim you already made)` : "")
+      );
+    }
+
+    // 8-character code, held for as long as the shop allows (10 minutes unless set otherwise)
+    const { code, codeHash, codeLast4 } = generateRedemptionCode();
+    const expiresAt = new Date(claimedAt.getTime() + reward.holdMinutes * 60 * 1000);
+    const [row] = await tx
+      .insert(redemptions)
+      .values({
+        tenantId: ctx.tenantId!,
+        membershipId: params.membershipId,
+        rewardId: reward.id,
+        rewardVersion: reward.version,
+        costPoints: pointsToUse,
+        isPartial,
+        valueMinor,
+        status: "pending",
+        codeHash,
+        codeLast4,
+        expiresAt,
+      })
+      .returning();
+    return { row, code, expiresAt, pointsToUse, isPartial, valueMinor };
+  });
 
   return {
-    redemptionId: newRedemption.id,
-    code,
-    expiresAt,
-    costPoints: reward.costPoints,
+    redemptionId: claim.row.id,
+    code: claim.code,
+    expiresAt: claim.expiresAt,
+    costPoints: claim.pointsToUse,
+    isPartial: claim.isPartial,
+    valueMinor: claim.valueMinor,
     rewardTitle: reward.title,
   };
+}
+
+/** A customer gives a claim back before it is used, so its points and stock are free straight away. */
+export async function cancelRedemptionRequest(ctx: RequestContext, redemptionId: string) {
+  assertCan(ctx, "customer.redeem");
+  if (!ctx.tenantId) throw new Error("tenantId required");
+
+  const [row] = await db
+    .select({ id: redemptions.id, status: redemptions.status, membershipId: redemptions.membershipId })
+    .from(redemptions)
+    .where(and(eq(redemptions.id, redemptionId), eq(redemptions.tenantId, ctx.tenantId)))
+    .limit(1);
+  if (!row || !(await userCanUseMembership(ctx.userId, row.membershipId))) throw new Error("Claim not found");
+  if (row.status === "confirmed") throw new Error("CODE_ALREADY_USED: This claim was already used at the counter");
+  if (row.status !== "pending") return { cancelled: false };
+
+  const [updated] = await db
+    .update(redemptions)
+    .set({ status: "cancelled" })
+    .where(and(eq(redemptions.id, redemptionId), eq(redemptions.status, "pending")))
+    .returning({ id: redemptions.id });
+  return { cancelled: Boolean(updated) };
 }
 
 export async function validateRedemptionCode(ctx: RequestContext, code: string) {
@@ -599,6 +660,8 @@ export async function validateRedemptionCode(ctx: RequestContext, code: string) 
       expiresAt: redemptions.expiresAt,
       codeLast4: redemptions.codeLast4,
       tenantId: redemptions.tenantId,
+      isPartial: redemptions.isPartial,
+      valueMinor: redemptions.valueMinor,
     })
     .from(redemptions)
     .where(
@@ -775,13 +838,13 @@ export async function confirmRedemption(
       })
       .where(eq(redemptions.id, redemption.id));
 
-    // 7. Increment reward quantity redeemed
-    await tx
-      .update(rewards)
-      .set({
-        quantityRedeemed: reward.quantityRedeemed + 1,
-      })
-      .where(eq(rewards.id, reward.id));
+    // 7. A whole reward uses up one unit of stock; a partial use is only points put towards it
+    if (!redemption.isPartial) {
+      await tx
+        .update(rewards)
+        .set({ quantityRedeemed: sql`${rewards.quantityRedeemed} + 1` })
+        .where(eq(rewards.id, reward.id));
+    }
 
     return {
       redemptionId: redemption.id,
@@ -789,11 +852,19 @@ export async function confirmRedemption(
       pointsDeducted: redemption.costPoints,
       newBalance,
       rewardTitle: reward.title,
+      isPartial: redemption.isPartial,
+      valueMinor: redemption.valueMinor,
     };
   });
 
   await emitEvent(ctx.tenantId, "points.redeemed", { membershipId: result.membershipId, points: result.pointsDeducted, newBalance: result.newBalance });
-  await emitEvent(ctx.tenantId, "reward.redeemed", { membershipId: result.membershipId, redemptionId: result.redemptionId, reward: result.rewardTitle });
+  await emitEvent(ctx.tenantId, "reward.redeemed", {
+    membershipId: result.membershipId,
+    redemptionId: result.redemptionId,
+    reward: result.rewardTitle,
+    partial: result.isPartial,
+    valueMinor: result.valueMinor,
+  });
   await notifyRedemption(result.membershipId, result.rewardTitle, result.pointsDeducted, result.newBalance);
   return result;
 }
@@ -1071,12 +1142,9 @@ export async function adjustBalance(
 
     if (!lockedBalance) throw new Error("Customer not found for this business");
 
-    const [ownCard] = await tx
-      .select({ userId: memberships.userId })
-      .from(memberships)
-      .where(eq(memberships.id, params.membershipId))
-      .limit(1);
-    if (ownCard?.userId === ctx.userId) throw new Error("SELF_AWARD: You can't change points on your own loyalty card.");
+    if (await userCanUseMembership(ctx.userId, params.membershipId, tx)) {
+      throw new Error("SELF_AWARD: You can't change points on your own loyalty card.");
+    }
 
     const newBalance = lockedBalance.balance + params.pointsDelta;
     if (newBalance < 0) {

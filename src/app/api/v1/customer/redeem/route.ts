@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardApiRequest } from "@/server/auth/route-guard";
-import { requestRedemption } from "@/server/services/ledger";
+import { cancelRedemptionRequest, requestRedemption } from "@/server/services/ledger";
 import { db } from "@/server/db";
 import { redemptions } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -9,6 +9,8 @@ import { z } from "zod";
 const redeemRequestSchema = z.object({
   membershipId: z.string().uuid(),
   rewardId: z.string().uuid(),
+  /** Only for a reward that can be used in part: how many points to put towards it */
+  points: z.number().int().positive().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -32,6 +34,22 @@ export async function POST(request: NextRequest) {
           message: err instanceof Error ? err.message : "Failed to request redemption",
         },
       },
+      { status: 400 }
+    );
+  }
+}
+
+/** The customer gives the claim back, so its points and stock are free straight away. */
+export async function DELETE(request: NextRequest) {
+  const guard = await guardApiRequest(request, { allowedRoles: ["customer"], requireTenant: true });
+  if ("response" in guard) return guard.response;
+  const id = z.string().uuid().safeParse(request.nextUrl.searchParams.get("id"));
+  if (!id.success) return NextResponse.json({ error: { code: "BAD_REQUEST", message: "Missing claim id" } }, { status: 400 });
+  try {
+    return NextResponse.json({ data: await cancelRedemptionRequest(guard.ctx, id.data) });
+  } catch (err) {
+    return NextResponse.json(
+      { error: { code: "CANCEL_FAILED", message: err instanceof Error ? err.message : "Couldn't cancel that claim" } },
       { status: 400 }
     );
   }

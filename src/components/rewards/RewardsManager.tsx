@@ -16,6 +16,11 @@ interface Draft {
   endsAt: string;
   quantityTotal: string;
   perMemberLimit: string;
+  // FR-066: how long a claim is held, and using part of the points for part of the value
+  holdMinutes: string;
+  allowPartial: boolean;
+  worth: string; // what the whole reward is worth, in pounds
+  minPartialPoints: string;
 }
 
 const emptyDraft: Draft = {
@@ -29,6 +34,10 @@ const emptyDraft: Draft = {
   endsAt: "",
   quantityTotal: "",
   perMemberLimit: "",
+  holdMinutes: "10",
+  allowPartial: false,
+  worth: "",
+  minPartialPoints: "",
 };
 
 const dateInput = (iso?: string | null) => (iso ? new Date(iso).toISOString().slice(0, 10) : "");
@@ -98,6 +107,14 @@ export function RewardsManager({
     const cost = parseInt(draft.costPoints, 10);
     if (!draft.title.trim()) return setError("Pick a menu item or type a name for this reward.");
     if (!Number.isInteger(cost) || cost < 1) return setError(`Enter how many ${unit} it costs (1 or more).`);
+    const hold = parseInt(draft.holdMinutes, 10);
+    if (!Number.isInteger(hold) || hold < 1 || hold > 1440) return setError("Hold a claim for between 1 and 1440 minutes.");
+    const worthMinor = Math.round(parseFloat(draft.worth) * 100);
+    const minPart = parseInt(draft.minPartialPoints, 10);
+    if (draft.allowPartial) {
+      if (!Number.isFinite(worthMinor) || worthMinor < 1) return setError("Say what the whole reward is worth, so a part of it can be given.");
+      if (!Number.isInteger(minPart) || minPart < 1 || minPart >= cost) return setError(`The smallest part must be at least 1 and less than ${cost}.`);
+    }
 
     setSaving(true);
     setError(null);
@@ -113,6 +130,10 @@ export function RewardsManager({
         endsAt: draft.endsAt ? new Date(`${draft.endsAt}T23:59:59`).toISOString() : draft.id ? null : undefined,
         quantityTotal: positiveOrNull(draft.quantityTotal) ?? (draft.id ? null : undefined),
         perMemberLimit: positiveOrNull(draft.perMemberLimit) ?? (draft.id ? null : undefined),
+        holdMinutes: hold,
+        allowPartial: draft.allowPartial,
+        valueMinor: draft.allowPartial ? worthMinor : draft.id ? null : undefined,
+        minPartialPoints: draft.allowPartial ? minPart : draft.id ? null : undefined,
       };
       const res = await fetch("/api/v1/business/rewards", {
         method: draft.id ? "PATCH" : "POST",
@@ -305,6 +326,67 @@ export function RewardsManager({
             </div>
           </details>
 
+          <details className="rounded-xl border border-zinc-200 bg-white px-4 py-3" open={draft.allowPartial || draft.holdMinutes !== "10"}>
+            <summary className="cursor-pointer text-sm font-semibold text-zinc-800">Holding and part payments (optional)</summary>
+            <div className="mt-3 space-y-4">
+              <label className="block text-sm">
+                <span className="text-zinc-700">Keep a customer&rsquo;s claim for (minutes)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={1440}
+                  value={draft.holdMinutes}
+                  onChange={(e) => setDraft({ ...draft, holdMinutes: e.target.value })}
+                  className="mt-1 w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+                />
+                <span className="block text-xs text-zinc-500 mt-1">
+                  While a claim is open its {unit} and one item are set aside for that customer. 10 is usual; use a longer time for things collected later, up to 1440 (a day).
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={draft.allowPartial}
+                  onChange={(e) => setDraft({ ...draft, allowPartial: e.target.checked })}
+                  className="mt-1 h-4 w-4 accent-evergreen"
+                />
+                <span>
+                  <span className="font-medium text-zinc-800">Let customers use some of their {unit} for part of it</span>
+                  <span className="block text-xs text-zinc-500">
+                    For example, a £5.00 voucher that costs 500 {unit}: using 250 gives £2.50 off.
+                  </span>
+                </span>
+              </label>
+              {draft.allowPartial && (
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <label className="block text-sm">
+                    <span className="text-zinc-700">What the whole reward is worth (£)</span>
+                    <input
+                      type="number"
+                      min={0.01}
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="5.00"
+                      value={draft.worth}
+                      onChange={(e) => setDraft({ ...draft, worth: e.target.value })}
+                      className="mt-1 w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="text-zinc-700">Smallest amount of {unit} allowed</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={draft.minPartialPoints}
+                      onChange={(e) => setDraft({ ...draft, minPartialPoints: e.target.value })}
+                      className="mt-1 w-full min-h-[44px] rounded-xl border border-zinc-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-evergreen"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          </details>
+
           {draft.title.trim() && parseInt(draft.costPoints, 10) > 0 && (
             <p className="text-sm text-zinc-700">
               Customers will see: <strong>{draft.title.trim()}</strong> for{" "}
@@ -366,6 +448,7 @@ export function RewardsManager({
                       Given {r.quantityRedeemed ?? 0} time{r.quantityRedeemed === 1 ? "" : "s"}
                       {r.quantityTotal ? `, ${Math.max(0, r.quantityTotal - (r.quantityRedeemed ?? 0))} left` : ""}
                       {r.endsAt ? `, ends ${new Date(r.endsAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}
+                      {r.allowPartial && r.valueMinor ? ` · Part use from ${r.minPartialPoints} ${unit} (worth ${formatPrice(r.valueMinor)} in full)` : ""}
                     </p>
                   </div>
                 </div>
@@ -384,6 +467,10 @@ export function RewardsManager({
                         endsAt: dateInput(r.endsAt),
                         quantityTotal: r.quantityTotal ? String(r.quantityTotal) : "",
                         perMemberLimit: r.perMemberLimit ? String(r.perMemberLimit) : "",
+                        holdMinutes: String(r.holdMinutes ?? 10),
+                        allowPartial: Boolean(r.allowPartial),
+                        worth: r.valueMinor ? (r.valueMinor / 100).toFixed(2) : "",
+                        minPartialPoints: r.minPartialPoints ? String(r.minPartialPoints) : "",
                       });
                       setError(null);
                     }}

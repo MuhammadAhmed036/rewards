@@ -22,6 +22,7 @@ import { getMemberStampCards } from "@/server/services/stamp-cards";
 import { getSessionContext } from "@/server/auth";
 import { readSessionCookie } from "@/server/auth/session-response";
 import { isBusinessAccount } from "@/server/auth/portal-access";
+import { householdCardFor } from "@/server/services/household";
 
 async function computeHub(request: NextRequest) {
   const slug = request.nextUrl.searchParams.get("slug");
@@ -129,7 +130,9 @@ async function computeHub(request: NextRequest) {
       sessionCtx && !(await isBusinessAccount(sessionCtx.userId)) ? { userId: sessionCtx.userId } : null;
 
     if (session) {
-      // A card exists only if the customer registered at this shop; nothing is created automatically.
+      // A card exists only if the customer registered at this shop (or joined someone's household card there);
+      // nothing is created automatically.
+      const sharedCardId = await householdCardFor(session.userId, tenant.id);
       const [membership] = await db
         .select({
           id: memberships.id,
@@ -146,7 +149,7 @@ async function computeHub(request: NextRequest) {
         .where(
           and(
             eq(memberships.tenantId, tenant.id),
-            eq(memberships.userId, session.userId)
+            sharedCardId ? eq(memberships.id, sharedCardId) : eq(memberships.userId, session.userId)
           )
         )
         .limit(1);

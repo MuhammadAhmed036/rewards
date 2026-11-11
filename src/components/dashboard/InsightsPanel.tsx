@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { BenchmarksPanel } from "./BenchmarksPanel";
 
 type Totals = { newMembers: number; activeMembers: number; purchases: number; pointsAwarded: number; redemptions: number };
 
@@ -172,6 +173,8 @@ export function InsightsPanel({ range, unit = "points" }: { range: "7d" | "30d" 
           </ul>
         </div>
       )}
+
+      <BenchmarksPanel />
     </section>
   );
 }

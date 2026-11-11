@@ -1,7 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Gift } from "lucide-react";
+import { formatMoney } from "@/lib/money";
+import { partialValueMinor } from "@/lib/partial-reward";
 import type { PointsUnit } from "./types";
 
 export interface CustomerReward {
@@ -15,6 +17,64 @@ export interface CustomerReward {
   /** Why it can't be claimed right now apart from points (ended, sold out, limit reached). */
   unavailableReason?: string | null;
   timesRedeemed?: number;
+  /** Points left after the ones held by claims the customer already made. */
+  availablePoints?: number;
+  /** Can be claimed whole right now; `eligible` is also true when only part of it can be used. */
+  fullyEligible?: boolean;
+  allowPartial?: boolean;
+  valueMinor?: number | null;
+  minPartialPoints?: number | null;
+}
+
+/**
+ * "Use some of my points": a customer puts part of the cost towards the reward and gets a proportional part
+ * of its value. The amount is always checked again by the server when the claim is made.
+ */
+function PartialClaim({
+  reward,
+  unit,
+  currency,
+  onClaim,
+}: {
+  reward: CustomerReward;
+  unit: PointsUnit;
+  currency: string;
+  onClaim: (points: number) => void;
+}) {
+  const min = reward.minPartialPoints ?? 1;
+  const max = Math.min(reward.costPoints - 1, reward.availablePoints ?? 0);
+  const [points, setPoints] = useState(max);
+  if (max < min || !reward.valueMinor) return null;
+  const shown = Math.min(Math.max(points, min), max);
+  const value = partialValueMinor(reward.valueMinor, reward.costPoints, shown);
+  return (
+    <div className="mt-3 rounded-xl bg-zinc-50 border border-zinc-200 p-3">
+      <label className="block text-sm font-medium text-zinc-800" htmlFor={`part-${reward.id}`}>
+        Or use part of your {unit}
+      </label>
+      <input
+        id={`part-${reward.id}`}
+        type="range"
+        min={min}
+        max={max}
+        value={shown}
+        onChange={(e) => setPoints(parseInt(e.target.value, 10))}
+        className="mt-2 w-full accent-evergreen"
+      />
+      <div className="mt-1 flex items-center justify-between gap-3">
+        <p className="text-sm text-zinc-700 tabular-nums">
+          <strong>{shown}</strong> {unit === "stamps" ? "stamps" : "pts"} → <strong>{formatMoney(value, currency)}</strong> off
+        </p>
+        <button
+          type="button"
+          onClick={() => onClaim(shown)}
+          className="press min-h-[40px] px-4 rounded-full border border-evergreen text-evergreen-deep text-sm font-semibold hover:bg-mist cursor-pointer shrink-0"
+        >
+          Use {shown}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -25,12 +85,15 @@ export function PointsMenu({
   rewards,
   balance,
   unit = "points",
+  currency = "GBP",
   onClaim,
 }: {
   rewards: CustomerReward[];
   balance?: number;
   unit?: PointsUnit;
-  onClaim?: (reward: CustomerReward) => void;
+  currency?: string;
+  /** `points` is only given when part of a reward is being used. */
+  onClaim?: (reward: CustomerReward, points?: number) => void;
 }) {
   const next =
     balance === undefined
@@ -139,9 +202,13 @@ export function PointsMenu({
                         </div>
                         <div className="mt-2 flex items-center justify-between gap-3">
                           <p className="text-sm text-zinc-600 tabular-nums">
-                            {r.eligible ? (
+                            {(r.fullyEligible ?? r.eligible) ? (
                               <span className="font-semibold text-evergreen-deep">
                                 Ready to claim
+                              </span>
+                            ) : r.eligible ? (
+                              <span className="font-semibold text-evergreen-deep">
+                                You can use part of your {unit}
                               </span>
                             ) : (
                               <>
@@ -152,7 +219,7 @@ export function PointsMenu({
                               </>
                             )}
                           </p>
-                          {r.eligible && onClaim && (
+                          {(r.fullyEligible ?? r.eligible) && onClaim && (
                             <button
                               type="button"
                               onClick={() => onClaim(r)}
@@ -162,6 +229,9 @@ export function PointsMenu({
                             </button>
                           )}
                         </div>
+                        {r.allowPartial && r.eligible && onClaim && (
+                          <PartialClaim reward={r} unit={unit} currency={currency} onClaim={(pts) => onClaim(r, pts)} />
+                        )}
                       </>
                     )
                   )}

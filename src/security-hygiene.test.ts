@@ -38,6 +38,8 @@ describe("Nothing sensitive is shipped in the app's own code", () => {
     const publicRoutes = [
       "health", "v1/public", "v1/customer/hub-data", "v1/customer/join", "v1/auth/login", "v1/auth/signup", "v1/auth/logout", "v1/auth/session",
       "v1/auth/google", "v1/auth/password", "v1/auth/verify-email", "v1/auth/invite", "auth/callback", "internal/domain",
+      // Opened from an emailed link: the single-use token is the proof, and it is rate limited per connection
+      "v1/customer/household/accept",
     ];
     const normal = (f: string) => f.split(path.sep).join("/");
     const routes = app.filter((f) => normal(f).includes("/api/") && normal(f).endsWith("route.ts"));
