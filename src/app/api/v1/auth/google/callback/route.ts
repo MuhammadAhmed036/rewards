@@ -149,8 +149,13 @@ export async function GET(request: NextRequest) {
     // 6. Create session (length depends on whether this user is an admin, staff or a customer)
     const session = await createSession(userId, await sessionKindForUser(userId));
 
-    // 7. Set session cookie and redirect
-    const response = NextResponse.redirect(new URL(returnTo, appUrl));
+    // 7. Set session cookie and redirect. A customer lands on their own portal (/me) with all their cards,
+    // except when a scanned reward QR still has to be claimed on the shop page.
+    let landing = returnTo;
+    if (targetRole === "customer" && returnTo.startsWith("/b/") && !returnTo.includes("claimQr=") && !(await isBusinessAccount(userId))) {
+      landing = "/me";
+    }
+    const response = NextResponse.redirect(new URL(landing, appUrl));
     setSessionCookie(response, session);
 
     return response;
