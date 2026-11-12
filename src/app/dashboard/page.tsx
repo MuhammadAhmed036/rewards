@@ -3177,7 +3177,7 @@ export default function OwnerDashboardPage() {
           aria-labelledby="manage-card-title"
           onClick={(e) => e.target === e.currentTarget && setManagingMember(null)}
         >
-          <div className="pop-in max-w-md w-full p-6 rounded-3xl bg-white border border-zinc-200 shadow-2xl">
+          <div className="pop-in max-w-md w-full max-h-[90vh] overflow-y-auto overscroll-contain p-5 sm:p-6 rounded-3xl bg-white border border-zinc-200 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 id="manage-card-title" className="font-display text-xl font-bold text-evergreen-deep">

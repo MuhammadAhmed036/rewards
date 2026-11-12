@@ -199,6 +199,8 @@ export default function StaffPage() {
   const [tipInput, setTipInput] = useState("");
   // Part of the bill that does not earn points (gift cards, discounted items)
   const [excludedInput, setExcludedInput] = useState("");
+  // What the customer bought, picked from the menu: product id -> quantity. Each product carries its own points.
+  const [basket, setBasket] = useState<Record<string, number>>({});
   const [previewPoints, setPreviewPoints] = useState<number | null>(null);
   // Name of the offer or level boosting this award, e.g. "Double Fridays"
   const [previewBoost, setPreviewBoost] = useState<string | null>(null);
@@ -387,6 +389,7 @@ export default function StaffPage() {
           amountMinor,
           tipMinor,
           excludedMinor,
+          items: basketItems.length > 0 ? basketItems : undefined,
         }),
       });
       const json = await res.json();
@@ -403,7 +406,8 @@ export default function StaffPage() {
     } finally {
       setPreviewLoading(false);
     }
-  }, [activeMember, spendInput, tipInput, excludedInput, selectedLocationId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMember, spendInput, tipInput, excludedInput, selectedLocationId, basket]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -440,6 +444,7 @@ export default function StaffPage() {
           amountMinor,
           tipMinor,
           excludedMinor,
+          items: basketItems.length > 0 ? basketItems : undefined,
           managerOverrideReason: managerOverride ? overrideReason || "Staff override" : undefined,
         }),
       });
@@ -459,6 +464,7 @@ export default function StaffPage() {
         pointsDelta: json.data.pointsDelta,
       });
       setActiveMember(null);
+      setBasket({});
       setSpendInput("");
       setTipInput("");
       setExcludedInput("");
@@ -748,11 +754,23 @@ export default function StaffPage() {
   };
 
   // Quick tap product to add to spend
-  const handleTapProduct = (prod: ProductItem) => {
-    const discountedPrice = Math.round(prod.priceMinor * (1 - (prod.discountPercent || 0) / 100)) / 100;
-    const current = parseFloat(spendInput || "0");
-    const nextTotal = (current + discountedPrice).toFixed(2);
-    setSpendInput(nextTotal);
+  const priceOf = (prod: ProductItem) => Math.round(prod.priceMinor * (1 - (prod.discountPercent || 0) / 100));
+  const basketItems = Object.entries(basket)
+    .filter(([, qty]) => qty > 0)
+    .map(([productId, quantity]) => ({ productId, quantity }));
+  const basketPointsTotal = basketItems.reduce(
+    (sum, i) => sum + (productsList.find((p) => p.id === i.productId)?.pointsAwarded ?? 0) * i.quantity,
+    0
+  );
+
+  const changeQty = (prod: ProductItem, delta: number) => {
+    const next = { ...basket, [prod.id]: Math.max(0, Math.min(99, (basket[prod.id] ?? 0) + delta)) };
+    setBasket(next);
+    const totalMinor = Object.entries(next).reduce((sum, [id, qty]) => {
+      const p = productsList.find((x) => x.id === id);
+      return sum + (p ? priceOf(p) * qty : 0);
+    }, 0);
+    setSpendInput(totalMinor > 0 ? (totalMinor / 100).toFixed(2) : "");
   };
 
   const cur = currencySymbol(business?.currency || "GBP", business?.locale || "en-GB");
@@ -992,41 +1010,81 @@ export default function StaffPage() {
                     ))}
                   </div>
 
-                  {/* Quick Tap Products from Store Menu */}
-                  {productsList.length > 0 && (
-                    <div className="mt-3 pt-2.5 border-t border-slate-100">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-sm text-zinc-600">Or tap what they bought</span>
-                        <button
-                          type="button"
-                          onClick={() => setSpendInput("0.00")}
-                          className="text-sm font-semibold text-zinc-600 hover:text-zinc-900 hover:underline cursor-pointer"
-                        >
-                          Clear
-                        </button>
+                  {/* What they bought: each product shows its own points, staff picks the quantity */}
+                  {productsList.filter((p) => p.isActive).length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold text-zinc-800">Or pick what they bought</span>
+                        {basketItems.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBasket({});
+                              setSpendInput("");
+                            }}
+                            className="text-sm font-semibold text-zinc-600 hover:text-zinc-900 hover:underline cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
                       </div>
-                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-                        {productsList.map((prod) => {
-                          const discount = prod.discountPercent || 0;
-                          const finalPrice = ((prod.priceMinor * (1 - discount / 100)) / 100).toFixed(2);
-                          return (
-                            <button
-                              key={prod.id}
-                              type="button"
-                              onClick={() => handleTapProduct(prod)}
-                              className="press min-h-[36px] px-3 bg-white hover:border-evergreen border border-zinc-200 text-zinc-800 rounded-full text-sm font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
-                            >
-                              <span>{prod.name}</span>
-                              <span className="text-zinc-500 tabular-nums">{cur}{finalPrice}</span>
-                              {discount > 0 && (
-                                <span className="text-[11px] bg-rose-100 text-rose-700 font-extrabold px-1 rounded-sm">
-                                  -{discount}%
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <ul className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                        {productsList
+                          .filter((p) => p.isActive)
+                          .map((prod) => {
+                            const qty = basket[prod.id] ?? 0;
+                            const discount = prod.discountPercent || 0;
+                            return (
+                              <li
+                                key={prod.id}
+                                className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2 ${
+                                  qty > 0 ? "border-evergreen bg-evergreen/5" : "border-zinc-200 bg-white"
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-sm text-zinc-900 truncate">{prod.name}</p>
+                                  <p className="text-xs text-zinc-600 tabular-nums">
+                                    {cur}
+                                    {(priceOf(prod) / 100).toFixed(2)}
+                                    {discount > 0 && <span className="ml-1 text-rose-700 font-bold">-{discount}%</span>}
+                                    <span className="mx-1.5 text-zinc-300">|</span>
+                                    <span className="font-semibold text-evergreen">
+                                      +{prod.pointsAwarded} {prod.pointsAwarded === 1 ? "point" : "points"} each
+                                    </span>
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    type="button"
+                                    aria-label={`Remove one ${prod.name}`}
+                                    disabled={qty === 0}
+                                    onClick={() => changeQty(prod, -1)}
+                                    className="press w-10 h-10 rounded-full border border-zinc-300 text-lg font-bold text-zinc-800 disabled:opacity-30 cursor-pointer"
+                                  >
+                                    &minus;
+                                  </button>
+                                  <span className="w-6 text-center font-bold tabular-nums" aria-live="polite">
+                                    {qty}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    aria-label={`Add one ${prod.name}`}
+                                    onClick={() => changeQty(prod, 1)}
+                                    className="press w-10 h-10 rounded-full bg-evergreen text-white text-lg font-bold hover:bg-evergreen-deep cursor-pointer"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </li>
+                            );
+                          })}
+                      </ul>
+                      {basketItems.length > 0 && (
+                        <p className="mt-2 text-sm text-zinc-700">
+                          {basketItems.reduce((n, i) => n + i.quantity, 0)} items, worth{" "}
+                          <strong className="text-evergreen">{basketPointsTotal} points</strong> before any bonus. The amount above is filled in for you.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

@@ -9,6 +9,7 @@ const previewSchema = z.object({
   amountMinor: z.number().int().min(0).optional(),
   tipMinor: z.number().int().min(0).optional(),
   excludedMinor: z.number().int().min(0).optional(),
+  items: z.array(z.object({ productId: z.string().uuid(), quantity: z.number().int().min(1).max(99) })).max(40).optional(),
 });
 
 export async function POST(request: NextRequest) {

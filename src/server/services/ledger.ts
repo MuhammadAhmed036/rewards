@@ -22,7 +22,7 @@ import { notifyRedemption, notifyRewardsUnlocked } from "./notifications";
 import { grantReferralBonuses } from "./loyalty-jobs";
 import { emitEvent } from "./events";
 import { sentry } from "@/lib/sentry";
-import { eq, and, sql, desc, gte, gt, lt } from "drizzle-orm";
+import { eq, and, sql, desc, gte, gt, lt, inArray } from "drizzle-orm";
 
 export interface EarnParams {
   membershipId: string;
@@ -33,6 +33,13 @@ export interface EarnParams {
   excludedMinor?: number;
   idempotencyKey: string;
   managerOverrideReason?: string;
+  /** What the customer bought, picked from the shop's menu. The points come from each product's own value. */
+  items?: BasketItem[];
+}
+
+export interface BasketItem {
+  productId: string;
+  quantity: number;
 }
 
 export interface EarnResult {
@@ -87,9 +94,49 @@ export async function earnedInTierWindow(executor: DbExecutor, tenantId: string,
   return row?.total ?? 0;
 }
 
+
+/**
+ * Points for a basket of the shop's own products. Everything is read from the database, never taken from the
+ * browser: a product's points, its price after any discount, and whether it is still on the menu.
+ */
+export async function basketPoints(executor: DbExecutor, tenantId: string, items: BasketItem[]) {
+  const merged = new Map<string, number>();
+  for (const item of items) {
+    if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99) {
+      throw new Error("BAD_BASKET: Each product needs a quantity between 1 and 99.");
+    }
+    merged.set(item.productId, (merged.get(item.productId) ?? 0) + item.quantity);
+  }
+  if (merged.size === 0 || merged.size > 40) throw new Error("BAD_BASKET: Pick at least one product.");
+
+  const rows = await executor
+    .select({
+      id: products.id,
+      name: products.name,
+      priceMinor: products.priceMinor,
+      discountPercent: products.discountPercent,
+      pointsAwarded: products.pointsAwarded,
+      isActive: products.isActive,
+    })
+    .from(products)
+    .where(and(eq(products.tenantId, tenantId), inArray(products.id, [...merged.keys()])));
+
+  let points = 0;
+  let amountMinor = 0;
+  const parts: string[] = [];
+  for (const [id, quantity] of merged) {
+    const product = rows.find((r) => r.id === id);
+    if (!product || !product.isActive) throw new Error("BAD_BASKET: One of those products isn't on your menu any more.");
+    points += product.pointsAwarded * quantity;
+    amountMinor += Math.round(product.priceMinor * (1 - product.discountPercent / 100)) * quantity;
+    parts.push(`${quantity} × ${product.name}`);
+  }
+  return { points, amountMinor, summary: parts.join(", ").slice(0, 400) };
+}
+
 export async function previewEarn(
   ctx: RequestContext,
-  params: { membershipId: string; locationId: string; amountMinor?: number; tipMinor?: number; excludedMinor?: number }
+  params: { membershipId: string; locationId: string; amountMinor?: number; tipMinor?: number; excludedMinor?: number; items?: BasketItem[] }
 ) {
   assertCan(ctx, "ledger.earn", { locationId: params.locationId });
   if (!ctx.tenantId) throw new Error("tenantId required");
@@ -145,10 +192,12 @@ export async function previewEarn(
       )
     );
 
+  const basket = params.items?.length ? await basketPoints(db, ctx.tenantId, params.items) : null;
   const pointsCalc = calculatePoints({
-    amountMinor: params.amountMinor,
-    tipMinor: params.tipMinor,
-    excludedMinor: params.excludedMinor,
+    amountMinor: basket ? basket.amountMinor : params.amountMinor,
+    tipMinor: basket ? 0 : params.tipMinor,
+    excludedMinor: basket ? 0 : params.excludedMinor,
+    fixedPoints: basket?.points,
     alreadyEarnedTodayInTenantTz: todayEarns?.total || 0,
     rule: ruleForLocation(rule, params.locationId),
     at: new Date(),
@@ -326,10 +375,12 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
         )
       );
 
+    const basket = params.items?.length ? await basketPoints(tx, ctx.tenantId!, params.items) : null;
     const pointsCalc = calculatePoints({
-      amountMinor: params.amountMinor,
-      tipMinor: params.tipMinor,
-      excludedMinor: params.excludedMinor,
+      amountMinor: basket ? basket.amountMinor : params.amountMinor,
+      tipMinor: basket ? 0 : params.tipMinor,
+      excludedMinor: basket ? 0 : params.excludedMinor,
+      fixedPoints: basket?.points,
       alreadyEarnedTodayInTenantTz: todayEarns?.total || 0,
       rule: ruleForLocation(rule, params.locationId),
       at: new Date(),
@@ -348,12 +399,12 @@ export async function earn(ctx: RequestContext, params: EarnParams): Promise<Ear
         membershipId: params.membershipId,
         type: "earn",
         pointsDelta: pointsCalc.points,
-        basisAmountMinor: params.amountMinor || null,
+        basisAmountMinor: (basket ? basket.amountMinor : params.amountMinor) || null,
         ruleVersionId: prog.currentRuleVersionId,
         locationId: params.locationId,
         actorUserId: ctx.userId,
         reasonCode: params.managerOverrideReason ? "manager_override" : null,
-        note: params.managerOverrideReason || null,
+        note: [basket?.summary, params.managerOverrideReason].filter(Boolean).join(" · ") || null,
         idempotencyKey: params.idempotencyKey,
       })
       .returning();

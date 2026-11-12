@@ -166,6 +166,8 @@ export interface CalculatePointsInput {
   rule: RuleConfig;
   at?: Date; // When the purchase happens, for limited-time boosts
   earnedInTierWindow?: number; // Points the member earned in the tier qualification window
+  /** Points the products in the basket are worth, set by the shop. When given, they replace the spend rule. */
+  fixedPoints?: number;
 }
 
 export interface CalculatePointsResult {
@@ -188,7 +190,7 @@ export function calculatePoints(input: CalculatePointsInput): CalculatePointsRes
   const tipToExclude = rule.exclusions.excludeTips ? tipMinor : 0;
   const eligibleMinor = Math.max(0, amountMinor - tipToExclude - excludedMinor);
 
-  if (eligibleMinor < rule.earn.minEligibleMinor && rule.earn.mode === "spend") {
+  if (input.fixedPoints === undefined && eligibleMinor < rule.earn.minEligibleMinor && rule.earn.mode === "spend") {
     return {
       points: 0,
       eligibleMinor,
@@ -199,7 +201,9 @@ export function calculatePoints(input: CalculatePointsInput): CalculatePointsRes
 
   let calculatedPoints = 0;
 
-  if (rule.earn.mode === "spend") {
+  if (input.fixedPoints !== undefined) {
+    calculatedPoints = Math.max(0, Math.floor(input.fixedPoints));
+  } else if (rule.earn.mode === "spend") {
     if (rule.earn.rounding === "nearest") {
       const units = Math.round(eligibleMinor / rule.earn.unitMinor);
       calculatedPoints = units * rule.earn.pointsPerUnit;
