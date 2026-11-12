@@ -109,6 +109,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // An owner, staff or admin email can't be a customer card. Say so, instead of quietly leaving them on the shop page.
+    if (existingUser && targetRole === "customer" && returnTo.startsWith("/b/") && (await isBusinessAccount(existingUser.id))) {
+      const shopSlug = returnTo.split("/")[2]?.split("?")[0];
+      const refused = NextResponse.redirect(new URL(`/b/${shopSlug}?auth=business_account`, appUrl));
+      refused.cookies.delete({ name: OAUTH_NONCE_COOKIE, path: "/api" });
+      return refused;
+    }
+
     if (existingUser) {
       userId = existingUser.id;
       // Update image if available

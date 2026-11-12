@@ -137,6 +137,9 @@ export default function BusinessHubPage(props: {
     const role = q.get("role");
     if (role === "owner" || role === "staff") setActivePortalRole(role);
     if (q.get("verified") === "1") setJustVerified(true);
+    if (q.get("auth") === "business_account") {
+      setErrorMsg("That Google account is used for a business (owner or staff), so it can't be a customer card. Use a different Google account.");
+    }
     if (q.get("auth") === "signup_first") {
       setCustomerAuthMode("join");
       setErrorMsg("We couldn't find a card for that Google account at this shop. Sign up first, then you can sign in.");
