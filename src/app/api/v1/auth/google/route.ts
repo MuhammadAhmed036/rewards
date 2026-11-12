@@ -63,7 +63,9 @@ export async function GET(request: NextRequest) {
         }
 
         const session = await createSession(user.id, await sessionKindForUser(user.id));
-        const landing = returnTo.startsWith("/b/") && !returnTo.includes("claimQr=") ? "/me" : returnTo;
+        const shop = returnTo.split("/")[2]?.split("?")[0];
+        const landing =
+          returnTo.startsWith("/b/") && !returnTo.includes("claimQr=") ? (shop ? `/me?joined=${encodeURIComponent(shop)}` : "/me") : returnTo;
         const response = NextResponse.redirect(new URL(landing, appUrl));
         setSessionCookie(response, session);
         return response;

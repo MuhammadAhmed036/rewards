@@ -76,8 +76,11 @@ export async function getCustomerPrivacyData(userId: string) {
     consents.push(...cRows);
   }
 
+  // Google sign-ups have no password yet; the account page offers to set one
+  const [pw] = await db.select({ hash: users.passwordHash }).from(users).where(eq(users.id, userId)).limit(1);
+
   return {
-    user,
+    user: { ...user, hasPassword: Boolean(pw?.hash) },
     memberships: membershipRows.map(({ logoRef, ...m }) => ({
       ...m,
       logoUrl: resolveLogoUrl(m.tenantId, logoRef),

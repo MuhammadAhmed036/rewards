@@ -120,6 +120,8 @@ async function computeHub(request: NextRequest) {
   // 4. Check for logged in customer session
   let memberData = null;
   let currentBalance = 0;
+  // A signed-in customer who has no card at this shop yet: the page offers a one-tap join instead of the sign-up form
+  let viewer: { email: string; name: string | null } | null = null;
 
   {
     // Same decryption, expiry and idle-timeout rules as every other signed-in request
@@ -153,6 +155,11 @@ async function computeHub(request: NextRequest) {
           )
         )
         .limit(1);
+
+      if (!membership) {
+        const [u] = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, session.userId)).limit(1);
+        if (u) viewer = u;
+      }
 
       if (membership && membership.status === "active") {
         const [bal] = await db
@@ -225,6 +232,7 @@ async function computeHub(request: NextRequest) {
       tenant: (({ logoRef, ...t }) => ({ ...t, logoUrl: resolveLogoUrl(t.id, logoRef) }))(tenant),
       programme: prog || { type: "points", name: `${tenant.name} Rewards` },
       member: memberData,
+      viewer,
       rewards: rewardsList,
       links: visibleLinks,
     },

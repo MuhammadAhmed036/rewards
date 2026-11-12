@@ -43,6 +43,57 @@ interface UserProfile {
   birthDay?: number | null;
   email: string;
   createdAt: string;
+  hasPassword?: boolean;
+}
+
+/** Shown to customers who joined with Google, so they can also sign in with email and a password. */
+function SetPasswordCard({ onSaved }: { onSaved: () => void }) {
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const res = await fetch("/api/v1/customer/me/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) return setError(json.error?.message || "Couldn't save your password");
+    onSaved();
+  };
+
+  return (
+    <form onSubmit={save} className="p-4 rounded-2xl border border-evergreen/25 bg-evergreen/5 space-y-3">
+      <div>
+        <h2 className="text-sm font-bold text-zinc-950">Set a password</h2>
+        <p className="text-xs text-zinc-600 mt-0.5">
+          You joined with Google. Add a password so you can also sign in with your email.
+        </p>
+      </div>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          type="password"
+          aria-label="New password"
+          autoComplete="new-password"
+          minLength={8}
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="At least 8 characters"
+          className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm"
+        />
+        <Button type="submit" disabled={busy || password.length < 8}>
+          {busy ? "Saving..." : "Save password"}
+        </Button>
+      </div>
+      {error && <p className="text-sm text-rose-700">{error}</p>}
+    </form>
+  );
 }
 
 /** Lets a customer change the name shops see on their card. */
@@ -199,9 +250,13 @@ export default function CustomerMePage() {
     }
   };
 
+  // After joining a shop, the customer lands here (?joined=<shop slug>) and is told which shop's card they now have
+  const [joinedSlug, setJoinedSlug] = useState<string | null>(null);
   useEffect(() => {
+    setJoinedSlug(new URLSearchParams(window.location.search).get("joined"));
     fetchPrivacyData();
   }, []);
+  const joinedShop = joinedSlug ? memberships.find((m) => m.tenantSlug === joinedSlug) : null;
 
   const handleToggleConsent = async (membershipId: string, currentVal: boolean, kind: "marketing" | "card" = "marketing") => {
     setUpdatingConsent(membershipId);
@@ -318,6 +373,16 @@ export default function CustomerMePage() {
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 stroke-[1.8]" />
             <span>{message}</span>
           </div>
+        )}
+
+        {joinedShop && (
+          <div role="status" className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-900 text-sm">
+            <strong>Welcome to {joinedShop.tenantName}.</strong> Your card is ready below. We&rsquo;ve also emailed it to {profile?.email}.
+          </div>
+        )}
+
+        {profile && profile.hasPassword === false && (
+          <SetPasswordCard onSaved={() => { setProfile((p) => (p ? { ...p, hasPassword: true } : p)); setMessage("Password saved. You can now sign in with your email."); setTimeout(() => setMessage(null), 4000); }} />
         )}
 
         {/* Section: Your Memberships */}

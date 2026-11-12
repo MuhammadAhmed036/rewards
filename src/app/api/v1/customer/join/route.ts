@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { joinProgramme } from "@/server/services/member";
-import { createSession, sessionKindForUser, verifyPassword } from "@/server/auth";
+import { createSession, sessionKindForUser, verifyPassword, getSessionContext } from "@/server/auth";
+import { readSessionCookie } from "@/server/auth/session-response";
 import { isBusinessAccount } from "@/server/auth/portal-access";
 import { db } from "@/server/db";
 import { users, tenants, memberships } from "@/server/db/schema";
@@ -65,9 +66,13 @@ export async function POST(request: NextRequest) {
           );
         }
       }
+      // Already signed in as this very customer (for example with Google): no password needed to add another shop
+      const sessionCtx = await getSessionContext(readSessionCookie(request));
+      const signedInAsThem = sessionCtx?.userId === existing.id;
       const passwordOk =
-        Boolean(existing.passwordHash && validated.password) &&
-        (await verifyPassword(validated.password!, existing.passwordHash!));
+        signedInAsThem ||
+        (Boolean(existing.passwordHash && validated.password) &&
+          (await verifyPassword(validated.password!, existing.passwordHash!)));
       if (!passwordOk) {
         return NextResponse.json(
           {

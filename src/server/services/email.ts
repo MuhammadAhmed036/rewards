@@ -258,11 +258,11 @@ If you don't know ${inviter}, ignore this email.`,
       const url = String(payload.hubUrl || appUrl);
       const rule = payload.earningRule ? ` You get ${String(payload.earningRule)}.` : "";
       return {
-        subject: `Your ${businessName} loyalty card is ready`,
-        text: `Welcome! Your card for ${businessName} is ready.${rule} Show the QR code on your card when you pay:\n\n${url}\n\nYour customer ID is ${String(payload.memberNumber || "")}.${footerText(payload)}`,
+        subject: `Thanks for joining ${businessName}: your loyalty card is ready`,
+        text: `Thank you for registering with ${businessName}! Your card is ready.${rule} Show the QR code on your card when you pay:\n\n${url}\n\nYour customer ID is ${String(payload.memberNumber || "")}.${footerText(payload)}`,
         html: buttonEmail(
-          `Your ${businessName} card is ready`,
-          `Show the QR code on your card when you pay, or tell staff your customer ID: <strong>${String(payload.memberNumber || "")}</strong>.${rule}`,
+          `Thank you for joining ${businessName}`,
+          `You've registered with <strong>${businessName}</strong>, and your loyalty card is ready. Show the QR code on your card when you pay, or tell staff your customer ID: <strong>${String(payload.memberNumber || "")}</strong>.${rule}`,
           "Open my card",
           url,
           footerHtml(payload)

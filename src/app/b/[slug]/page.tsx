@@ -61,6 +61,7 @@ interface HubPayload {
     tierMonths?: number;
     referralPoints?: number;
   };
+  viewer?: { email: string; name: string | null } | null;
   member: {
     membershipId: string;
     memberNumber: string;
@@ -487,6 +488,11 @@ export default function BusinessHubPage(props: {
         }
         throw new Error(json.error?.message || "Failed to join");
       }
+      // A new customer lands on their own dashboard (all their cards), unless a reward QR still needs claiming here
+      if (!scannedClaimCode) {
+        window.location.href = `/me?joined=${encodeURIComponent(slug)}`;
+        return;
+      }
       // Refresh hub data to show logged-in member view
       const updatedHubRes = await fetch(`/api/v1/customer/hub-data?slug=${encodeURIComponent(slug)}`);
       const updatedHubJson = await updatedHubRes.json();
@@ -498,6 +504,37 @@ export default function BusinessHubPage(props: {
       }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Join error");
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  // A customer who is already signed in adds this shop's card with one tap
+  const handleJoinSignedIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hubData?.viewer || !termsAgreed) return;
+    setJoining(true);
+    setErrorMsg(null);
+    try {
+      const res = await fetch("/api/v1/customer/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantSlug: slug, email: hubData.viewer.email, marketingOptIn, referralCode: refCode || undefined }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error?.message || "Couldn't add your card");
+      if (scannedClaimCode) {
+        const hubRes = await fetch(`/api/v1/customer/hub-data?slug=${encodeURIComponent(slug)}`);
+        const hubJson = await hubRes.json();
+        if (hubRes.ok && hubJson.data) {
+          setHubData(hubJson.data);
+          if (hubJson.data.member) handleClaimPromoQr(scannedClaimCode, hubJson.data.member.membershipId, hubJson.data.tenant.id);
+        }
+      } else {
+        window.location.href = `/me?joined=${encodeURIComponent(slug)}`;
+      }
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Couldn't add your card");
     } finally {
       setJoining(false);
     }
@@ -1431,7 +1468,44 @@ export default function BusinessHubPage(props: {
 
                   {/* Right Column: Customer Join / Sign In Card (6 cols) */}
                   <div className="lg:col-span-6">
-                    <div className="bg-white rounded-2xl shadow-xs p-6 sm:p-8 border border-zinc-200/90 space-y-5">
+                    {hubData.viewer && (
+                      <form
+                        onSubmit={handleJoinSignedIn}
+                        className="bg-white rounded-2xl shadow-xs p-6 sm:p-8 border border-zinc-200/90 space-y-4"
+                      >
+                        <div>
+                          <h3 className="text-lg sm:text-xl font-bold text-zinc-950">Add this shop to your account</h3>
+                          <p className="text-sm text-zinc-600 mt-1">
+                            You&rsquo;re signed in as <strong>{hubData.viewer.email}</strong>. One tap gets you a {hubData.tenant.name} card.
+                          </p>
+                        </div>
+                        <label className="flex items-start gap-2 text-xs text-zinc-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            required
+                            checked={termsAgreed}
+                            onChange={(e) => setTermsAgreed(e.target.checked)}
+                            className="mt-0.5 rounded border-zinc-300"
+                          />
+                          <span>
+                            I accept the{" "}
+                            <Link href={`/b/${slug}/terms`} target="_blank" className="font-semibold text-evergreen underline">
+                              programme terms
+                            </Link>{" "}
+                            and{" "}
+                            <Link href="/privacy" target="_blank" className="font-semibold text-evergreen underline">
+                              privacy notice
+                            </Link>
+                            . Points have no cash value.
+                          </span>
+                        </label>
+                        {errorMsg && <p className="text-sm text-rose-700">{errorMsg}</p>}
+                        <Button type="submit" disabled={joining || !termsAgreed} className="w-full">
+                          {joining ? "Adding your card..." : `Join ${hubData.tenant.name}`}
+                        </Button>
+                      </form>
+                    )}
+                    <div className={`bg-white rounded-2xl shadow-xs p-6 sm:p-8 border border-zinc-200/90 space-y-5${hubData.viewer ? " hidden" : ""}`}>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
                         <div>
                           <h3 className="text-lg sm:text-xl font-bold text-zinc-950">

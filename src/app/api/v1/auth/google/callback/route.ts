@@ -153,7 +153,8 @@ export async function GET(request: NextRequest) {
     // except when a scanned reward QR still has to be claimed on the shop page.
     let landing = returnTo;
     if (targetRole === "customer" && returnTo.startsWith("/b/") && !returnTo.includes("claimQr=") && !(await isBusinessAccount(userId))) {
-      landing = "/me";
+      const shop = returnTo.split("/")[2]?.split("?")[0];
+      landing = shop ? `/me?joined=${encodeURIComponent(shop)}` : "/me";
     }
     const response = NextResponse.redirect(new URL(landing, appUrl));
     setSessionCookie(response, session);
