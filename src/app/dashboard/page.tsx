@@ -1123,13 +1123,6 @@ export default function OwnerDashboardPage() {
                       : `${metrics?.newMembers ?? 0} joined and ${metrics?.activeMembers30d ?? 0} earned or spent points ${rangeLabel}.`}
                   </p>
                   <div className="rise-in mt-6 flex flex-wrap gap-3" style={{ "--d": "450ms" } as React.CSSProperties}>
-                    <Link
-                      href="/staff"
-                      className="press inline-flex items-center gap-2 min-h-[46px] px-5 rounded-full bg-evergreen text-white font-semibold hover:bg-evergreen-deep"
-                    >
-                      <Smartphone className="w-4 h-4" />
-                      Add points for a customer
-                    </Link>
                     <button
                       onClick={() => {
                         loadOverview();
@@ -1263,7 +1256,6 @@ export default function OwnerDashboardPage() {
                 <h3 className="font-display text-xl font-bold text-evergreen-deep">Things you can do</h3>
                 <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {[
-                    { label: "Add points for a customer", hint: "Opens the scanner", icon: Smartphone, href: "/staff" },
                     { label: "Create a reward", hint: `${activeRewards} live now`, icon: Gift, tab: "rewards" as const },
                     { label: "Print your QR poster", hint: "For the till or window", icon: QrCode, tab: "qr" as const },
                     { label: "Download your data", hint: "Spreadsheets for your records", icon: Download, tab: "reports" as const },
@@ -1280,12 +1272,8 @@ export default function OwnerDashboardPage() {
                     );
                     const cls =
                       "text-left rounded-2xl bg-white border border-zinc-200 p-4 sm:p-5 hover:border-evergreen transition-colors cursor-pointer";
-                    return job.href ? (
-                      <Link key={job.label} href={job.href} className={cls}>
-                        {inner}
-                      </Link>
-                    ) : (
-                      <button key={job.label} onClick={() => handleTabChange(job.tab!)} className={cls}>
+                    return (
+                      <button key={job.label} onClick={() => handleTabChange(job.tab)} className={cls}>
                         {inner}
                       </button>
                     );
