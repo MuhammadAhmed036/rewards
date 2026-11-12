@@ -2,7 +2,7 @@ import { db } from "../db";
 import { emitEvent } from "./events";
 import { leaveAllHouseholds, purgeLapsedInvites } from "./household";
 import { NOTE_RETENTION_MONTHS } from "./member-notes";
-import { memberNotes, domainEvents, emailOutbox } from "../db/schema";
+import { memberNotes, domainEvents, emailOutbox, householdMembers } from "../db/schema";
 import { inArray } from "drizzle-orm";
 import {
   users,
@@ -19,6 +19,7 @@ import { invalidateUserSessions, purgeExpiredSessions } from "../auth";
 import { logAuditEvent } from "./audit";
 import { logoRefSql, resolveLogoUrl } from "./business-logo";
 import { and, eq, desc, lt } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import crypto from "crypto";
 
 export async function getCustomerPrivacyData(userId: string) {
@@ -79,8 +80,33 @@ export async function getCustomerPrivacyData(userId: string) {
   // Google sign-ups have no password yet; the account page offers to set one
   const [pw] = await db.select({ hash: users.passwordHash }).from(users).where(eq(users.id, userId)).limit(1);
 
+  // Cards this person shares with a friend or family member (they belong to the person who invited them)
+  const owner = alias(users, "card_owner");
+  const sharedRows = await db
+    .select({
+      id: memberships.id,
+      tenantId: memberships.tenantId,
+      memberNumber: memberships.memberNumber,
+      status: memberships.status,
+      tenantName: tenants.name,
+      tenantSlug: tenants.slug,
+      brandPrimaryHex: tenants.brandPrimaryHex,
+      logoRef: logoRefSql,
+      balance: membershipBalances.balance,
+      lifetimeEarned: membershipBalances.lifetimeEarned,
+      lifetimeRedeemed: membershipBalances.lifetimeRedeemed,
+      sharedBy: owner.name,
+    })
+    .from(householdMembers)
+    .innerJoin(memberships, eq(memberships.id, householdMembers.membershipId))
+    .innerJoin(tenants, eq(tenants.id, memberships.tenantId))
+    .innerJoin(owner, eq(owner.id, memberships.userId))
+    .leftJoin(membershipBalances, eq(membershipBalances.membershipId, memberships.id))
+    .where(and(eq(householdMembers.userId, userId), eq(householdMembers.status, "active")));
+
   return {
     user: { ...user, hasPassword: Boolean(pw?.hash) },
+    sharedCards: sharedRows.map(({ logoRef, ...c }) => ({ ...c, logoUrl: resolveLogoUrl(c.tenantId, logoRef) })),
     memberships: membershipRows.map(({ logoRef, ...m }) => ({
       ...m,
       logoUrl: resolveLogoUrl(m.tenantId, logoRef),

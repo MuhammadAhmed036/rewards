@@ -36,6 +36,17 @@ interface Membership {
   lifetimeRedeemed: number;
 }
 
+interface SharedCard {
+  id: string;
+  tenantName: string;
+  tenantSlug: string;
+  brandPrimaryHex: string | null;
+  logoUrl?: string | null;
+  memberNumber: string;
+  balance: number | null;
+  sharedBy: string | null;
+}
+
 interface UserProfile {
   id: string;
   name: string | null;
@@ -226,6 +237,7 @@ function BirthdayEditor({ month, day, onSaved }: { month: number | null; day: nu
 export default function CustomerMePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [sharedCards, setSharedCards] = useState<SharedCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingConsent, setUpdatingConsent] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -242,6 +254,7 @@ export default function CustomerMePage() {
         const json = await res.json();
         setProfile(json.data.user);
         setMemberships(json.data.memberships || []);
+        setSharedCards(json.data.sharedCards || []);
       }
     } catch (e) {
       console.error(e);
@@ -256,7 +269,7 @@ export default function CustomerMePage() {
     setJoinedSlug(new URLSearchParams(window.location.search).get("joined"));
     fetchPrivacyData();
   }, []);
-  const joinedShop = joinedSlug ? memberships.find((m) => m.tenantSlug === joinedSlug) : null;
+  const joinedShop = joinedSlug ? (memberships.find((m) => m.tenantSlug === joinedSlug) ?? sharedCards.find((m) => m.tenantSlug === joinedSlug)) : null;
 
   const handleToggleConsent = async (membershipId: string, currentVal: boolean, kind: "marketing" | "card" = "marketing") => {
     setUpdatingConsent(membershipId);
@@ -392,12 +405,38 @@ export default function CustomerMePage() {
             <h2 className="text-sm sm:text-base font-bold text-zinc-950">Your Active Loyalty Passes</h2>
           </div>
 
-          {memberships.length === 0 ? (
+          {memberships.length === 0 && sharedCards.length === 0 ? (
             <div className="p-8 text-center bg-white border border-zinc-200 rounded-2xl text-zinc-500 text-xs shadow-2xs">
               You have not joined any loyalty programmes yet. Scan a business QR code or visit their hub to join.
             </div>
           ) : (
             <div className="space-y-3.5">
+              {sharedCards.map((c) => (
+                <div key={c.id} className="p-5 bg-white border border-evergreen/30 rounded-2xl shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <BusinessLogo name={c.tenantName} logoUrl={c.logoUrl} brandColor={c.brandPrimaryHex} size="sm" />
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-base text-zinc-950 truncate">{c.tenantName}</h3>
+                        <div className="text-xs text-zinc-600">
+                          Shared card{c.sharedBy ? ` with ${c.sharedBy}` : ""}. You both add to the same points.
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between sm:justify-end gap-3">
+                      <div className="text-xl font-bold text-zinc-950 tabular-nums">{c.balance ?? 0} pts</div>
+                      <Link
+                        href={`/b/${c.tenantSlug}`}
+                        className="p-2.5 rounded-lg border border-zinc-200 hover:bg-zinc-100 text-zinc-700 transition"
+                        title="Open the shared card"
+                        aria-label={`Open the shared ${c.tenantName} card`}
+                      >
+                        <ExternalLink className="w-4 h-4 stroke-[1.8]" />
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
               {memberships.map((m) => (
                 <div
                   key={m.id}

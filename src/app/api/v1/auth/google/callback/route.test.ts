@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { db } from "@/server/db";
-import { users, memberships } from "@/server/db/schema";
+import { users, memberships, householdMembers } from "@/server/db/schema";
+import { joinProgramme } from "@/server/services/member";
+import { getCustomerPrivacyData } from "@/server/services/privacy";
 import { eq } from "drizzle-orm";
 import { createOAuthState, OAUTH_NONCE_COOKIE } from "@/server/auth/oauth-state";
 import { registerOwnerAndTenant } from "@/server/services/tenant";
@@ -65,5 +67,58 @@ describe("Google sign-in for customers", () => {
     // Later, signing in works because the card exists
     const again = await callback(`/b/${tenant.slug}`, "signin");
     expect(again.headers.get("location")).toContain("/me");
+  });
+
+  it("takes someone who shares a friend's card to that shop, and lists the shared card on their own page", async () => {
+    const tag = `${Date.now()}-hh`;
+    const mk = async (n: string) =>
+      (await registerOwnerAndTenant({ email: `o-${n}-${tag}@example.com`, password: "Password123!", name: "Owner", businessName: `S ${n} ${tag}`, slug: `s-${n}-${tag}`, programmeType: "points" })).tenant;
+    const shopA = await mk("a");
+    const shopB = await mk("b");
+
+    // The friend has a card at shop B; the guest already has their own card at shop A
+    const friend = await joinProgramme({ tenantSlug: shopB.slug, email: `friend-${tag}@example.com`, name: "Fiona Friend" });
+    const guestEmail = `guest-${tag}@example.com`;
+    const guest = await joinProgramme({ tenantSlug: shopA.slug, email: guestEmail, name: "Gus Guest" });
+    await db.insert(householdMembers).values({
+      tenantId: shopB.id,
+      membershipId: friend.membership.id,
+      email: guestEmail,
+      userId: guest.membership.userId,
+      status: "active",
+      acceptedAt: new Date(),
+    });
+
+    // Signing in with Google at shop B works (they share a card there) and lands on that shop, not on shop A
+    googleAs(guestEmail);
+    const res = await callback(`/b/${shopB.slug}`, "signin");
+    expect(res.headers.get("location")).toContain(`/b/${shopB.slug}`);
+    expect(res.headers.get("location")).not.toContain("signup_first");
+    // No second card was made for them at shop B
+    expect(await db.select().from(memberships).where(eq(memberships.userId, guest.membership.userId))).toHaveLength(1);
+
+    // Their own page lists their shop A card and the shared shop B card
+    const data = await getCustomerPrivacyData(guest.membership.userId);
+    expect(data.memberships.map((m) => m.tenantSlug)).toEqual([shopA.slug]);
+    expect(data.sharedCards).toHaveLength(1);
+    expect(data.sharedCards[0]).toMatchObject({ tenantSlug: shopB.slug, sharedBy: "Fiona Friend" });
+  });
+
+  it("signs in someone who has an account at another shop but no card here, and offers to add this shop", async () => {
+    const tag = `${Date.now()}-add`;
+    const mk = async (n: string) =>
+      (await registerOwnerAndTenant({ email: `o-${n}-${tag}@example.com`, password: "Password123!", name: "Owner", businessName: `S ${n} ${tag}`, slug: `s-${n}-${tag}`, programmeType: "points" })).tenant;
+    const shopA = await mk("a");
+    const shopB = await mk("b");
+    const email = `invitee-${tag}@example.com`;
+    const card = await joinProgramme({ tenantSlug: shopA.slug, email, name: "Ivy Invitee" });
+
+    googleAs(email);
+    const res = await callback(`/b/${shopB.slug}`, "signin");
+    expect(res.headers.get("location")).toContain(`/b/${shopB.slug}`);
+    expect(res.headers.get("location")).not.toContain("signup_first");
+    expect(res.headers.get("set-cookie")).toBeTruthy();
+    // Nothing was added without their say-so: the shop page asks first
+    expect(await db.select().from(memberships).where(eq(memberships.userId, card.membership.userId))).toHaveLength(1);
   });
 });

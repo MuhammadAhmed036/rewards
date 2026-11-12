@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
 
     // 3. Find or create user in PostgreSQL
     let userId: string;
+    let addShopOnly = false;
     const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
     // "Sign in with Google" on a shop page only works for someone who already has a card at that shop.
@@ -91,6 +92,7 @@ export async function GET(request: NextRequest) {
     if (verified.intent === "signin" && targetRole === "customer" && returnTo.startsWith("/b/")) {
       const shopSlug = returnTo.split("/")[2]?.split("?")[0]?.toLowerCase();
       let hasCard = false;
+      const hasAccount = Boolean(existingUser);
       if (existingUser && shopSlug) {
         const [shop] = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, shopSlug)).limit(1);
         if (shop) {
@@ -102,7 +104,9 @@ export async function GET(request: NextRequest) {
           hasCard = Boolean(card) || Boolean(await householdCardFor(existingUser.id, shop.id));
         }
       }
-      if (!hasCard) {
+      // Someone with an account elsewhere on Rappio but no card here is signed in, then asked to add this shop
+      if (!hasCard && hasAccount) addShopOnly = true;
+      if (!hasCard && !hasAccount) {
         const refused = NextResponse.redirect(new URL(`/b/${shopSlug}?auth=signup_first`, appUrl));
         refused.cookies.delete({ name: OAUTH_NONCE_COOKIE, path: "/api" });
         return refused;
@@ -138,7 +142,7 @@ export async function GET(request: NextRequest) {
 
     // 4. If returnTo is a business hub (/b/[slug]), join the customer to that shop's programme.
     // Owner, staff and admin accounts are never turned into customer cards.
-    if (returnTo.startsWith("/b/") && !(await isBusinessAccount(userId))) {
+    if (!addShopOnly && returnTo.startsWith("/b/") && !(await isBusinessAccount(userId))) {
       const parts = returnTo.split("/");
       const slug = parts[2]?.split("?")[0];
       if (slug) {
@@ -184,9 +188,14 @@ export async function GET(request: NextRequest) {
     // 7. Set session cookie and redirect. A customer lands on their own portal (/me) with all their cards,
     // except when a scanned reward QR still has to be claimed on the shop page.
     let landing = returnTo;
-    if (targetRole === "customer" && returnTo.startsWith("/b/") && !returnTo.includes("claimQr=") && !(await isBusinessAccount(userId))) {
+    if (!addShopOnly && targetRole === "customer" && returnTo.startsWith("/b/") && !returnTo.includes("claimQr=") && !(await isBusinessAccount(userId))) {
       const shop = returnTo.split("/")[2]?.split("?")[0];
       landing = shop ? `/me?joined=${encodeURIComponent(shop)}` : "/me";
+      // Someone who shares a friend's card at this shop goes straight to that shared card, with the same points
+      if (shop) {
+        const [t] = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, shop.toLowerCase())).limit(1);
+        if (t && (await householdCardFor(userId, t.id))) landing = `/b/${shop}`;
+      }
     }
     const response = NextResponse.redirect(new URL(landing, appUrl));
     setSessionCookie(response, session);
