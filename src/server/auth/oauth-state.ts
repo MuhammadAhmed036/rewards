@@ -17,6 +17,8 @@ const sign = (payload: string) => crypto.createHmac("sha256", env.AUTH_SECRET).u
 export interface OAuthState {
   returnTo: string;
   role: "owner" | "customer" | "staff";
+  /** "signin" must match an existing card at the shop; "signup" may create one */
+  intent: "signin" | "signup";
   nonce: string;
 }
 
@@ -24,10 +26,10 @@ export interface OAuthState {
  * The `state` sent to Google is signed, and tied to a cookie set in the same browser, so a sign-in can't be
  * started by one person and finished in another person's browser (login forgery), and its contents can't be edited.
  */
-export function createOAuthState(input: { returnTo: string; role: string }): { state: string; nonce: string } {
+export function createOAuthState(input: { returnTo: string; role: string; intent?: string }): { state: string; nonce: string } {
   const nonce = crypto.randomBytes(16).toString("hex");
   const role = input.role === "customer" || input.role === "staff" ? input.role : "owner";
-  const body = Buffer.from(JSON.stringify({ r: safeReturnTo(input.returnTo), role, n: nonce, t: Date.now() })).toString("base64url");
+  const body = Buffer.from(JSON.stringify({ r: safeReturnTo(input.returnTo), role, i: input.intent === "signin" ? "signin" : "signup", n: nonce, t: Date.now() })).toString("base64url");
   return { state: `${body}.${sign(body)}`, nonce };
 }
 
@@ -39,13 +41,13 @@ export function readOAuthState(state: string | null, cookieNonce: string | null 
   const given = Buffer.from(signature);
   if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) return null;
   try {
-    const parsed = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as { r: string; role: string; n: string; t: number };
+    const parsed = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as { r: string; role: string; i?: string; n: string; t: number };
     if (typeof parsed.t !== "number" || now - parsed.t > MAX_AGE_MS || parsed.t > now + 60_000) return null;
     const a = Buffer.from(parsed.n || "");
     const b = Buffer.from(cookieNonce);
     if (a.length === 0 || a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
     const role = parsed.role === "customer" || parsed.role === "staff" ? parsed.role : "owner";
-    return { returnTo: safeReturnTo(parsed.r), role, nonce: parsed.n };
+    return { returnTo: safeReturnTo(parsed.r), role, intent: parsed.i === "signin" ? "signin" : "signup", nonce: parsed.n };
   } catch {
     return null;
   }

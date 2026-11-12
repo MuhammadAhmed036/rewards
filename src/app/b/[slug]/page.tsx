@@ -137,6 +137,10 @@ export default function BusinessHubPage(props: {
     const role = q.get("role");
     if (role === "owner" || role === "staff") setActivePortalRole(role);
     if (q.get("verified") === "1") setJustVerified(true);
+    if (q.get("auth") === "signup_first") {
+      setCustomerAuthMode("join");
+      setErrorMsg("We couldn't find a card for that Google account at this shop. Sign up first, then you can sign in.");
+    }
   }, []);
 
   // Customer sub-tab: "join" (Sign up) vs "signin" (Existing member)
@@ -1548,7 +1552,7 @@ export default function BusinessHubPage(props: {
                       {/* Google Quick Join Button with PRESERVED COLOURED GOOGLE LOGO */}
                       <div>
                         <a
-                          href={`/api/v1/auth/google?role=customer&returnTo=${encodeURIComponent(
+                          href={`/api/v1/auth/google?role=customer&intent=${customerAuthMode === "signin" ? "signin" : "signup"}&returnTo=${encodeURIComponent(
                             scannedClaimCode ? `/b/${slug}?claimQr=${scannedClaimCode}` : `/b/${slug}`
                           )}`}
                           className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-xl border border-zinc-200 hover:border-zinc-300 bg-white hover:bg-zinc-50 transition-all font-semibold text-xs shadow-2xs text-zinc-800"

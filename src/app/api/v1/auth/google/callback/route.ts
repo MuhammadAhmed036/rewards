@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { users, staffMembers } from "@/server/db/schema";
+import { users, staffMembers, tenants, memberships } from "@/server/db/schema";
+import { householdCardFor } from "@/server/services/household";
 import { createSession, sessionKindForUser } from "@/server/auth";
 import { setSessionCookie } from "@/server/auth/session-response";
 import { joinProgramme } from "@/server/services/member";
 import { isBusinessAccount } from "@/server/auth/portal-access";
 import { registerOwnerAndTenant } from "@/server/services/tenant";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import crypto from "crypto";
 
 import { getBaseUrl } from "@/lib/url";
@@ -84,6 +85,29 @@ export async function GET(request: NextRequest) {
     // 3. Find or create user in PostgreSQL
     let userId: string;
     const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+    // "Sign in with Google" on a shop page only works for someone who already has a card at that shop.
+    // Otherwise nothing is created and they are asked to sign up first.
+    if (verified.intent === "signin" && targetRole === "customer" && returnTo.startsWith("/b/")) {
+      const shopSlug = returnTo.split("/")[2]?.split("?")[0]?.toLowerCase();
+      let hasCard = false;
+      if (existingUser && shopSlug) {
+        const [shop] = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, shopSlug)).limit(1);
+        if (shop) {
+          const [card] = await db
+            .select({ id: memberships.id })
+            .from(memberships)
+            .where(and(eq(memberships.tenantId, shop.id), eq(memberships.userId, existingUser.id)))
+            .limit(1);
+          hasCard = Boolean(card) || Boolean(await householdCardFor(existingUser.id, shop.id));
+        }
+      }
+      if (!hasCard) {
+        const refused = NextResponse.redirect(new URL(`/b/${shopSlug}?auth=signup_first`, appUrl));
+        refused.cookies.delete({ name: OAUTH_NONCE_COOKIE, path: "/api" });
+        return refused;
+      }
+    }
 
     if (existingUser) {
       userId = existingUser.id;

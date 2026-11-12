@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { state, nonce } = createOAuthState({ returnTo, role });
+  const { state, nonce } = createOAuthState({ returnTo, role, intent: searchParams.get("intent") || "signup" });
 
   const googleAuthUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   googleAuthUrl.searchParams.set("client_id", clientId);
