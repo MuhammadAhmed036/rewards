@@ -78,6 +78,12 @@ docker compose -f docker-compose.vm.yml logs -f app
 
 The app is now reachable at `http://<vm-ip>:3000`.
 
+A small `cron` container also starts alongside the app. Vercel's own scheduler normally fires
+the jobs listed in `vercel.json` (expiring unused redemption claims, data retention, balance
+reconciliation, the daily loyalty job, sending queued emails); this container calls the same
+endpoints on the same UTC schedule instead, so nothing needs a separate Vercel account to work
+here. Check it's running with `docker compose -f docker-compose.vm.yml logs -f cron`.
+
 ## 5. Create the platform admin account
 
 Don't use the database seed script in a shared environment — it wipes data and creates demo
@@ -136,3 +142,26 @@ docker compose -f docker-compose.vm.yml up -d --build
 For anything beyond a short-lived lab/test environment, put a reverse proxy (nginx/Caddy) with a
 real TLS certificate in front of port 3000, and restrict the other ports to localhost or close
 them in the VM's firewall.
+
+## 9. What works out of the box here, and what doesn't
+
+This setup is meant to be self-contained — no Vercel account, no managed Postgres, no third-party
+services required. A few things that depend on an external provider behave differently without
+one configured, by design rather than by accident:
+
+- **Email** — with no real SMTP/API key set, every email the app sends (sign-in codes, password
+  resets, welcome emails, campaigns) is caught by Mailpit instead of actually delivered. Set
+  `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS` (or `RESEND_API_KEY`) to a real provider to send
+  real mail.
+- **Google sign-in** — stays off unless you set real `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`.
+  Email/password sign-in works regardless.
+- **Custom domains for a shop's own page** (`owner/domain` settings) — the verification and DNS
+  checks run fine; actually attaching the domain to this host still needs a real reverse proxy or
+  Vercel API token, so without one the owner is told "the platform team adds this by hand."
+- **Rate limiting** — falls back to an in-memory limiter per container instance (fine for one
+  `app` container, as this setup runs). Set `UPSTASH_REDIS_REST_URL`/`_TOKEN` if you scale to
+  multiple app containers behind a load balancer, so limits are shared across them.
+
+Everything else — sign-up, sign-in, staff/owner dashboards, earning and redeeming points, QR
+codes, webhooks, campaigns, member import/export, the scheduled jobs — runs the same as it does
+anywhere else this code is deployed.

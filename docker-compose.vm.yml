@@ -54,5 +54,18 @@ services:
       SMTP_PORT: 1025
       EMAIL_FROM_TRANSACTIONAL: no-reply@${APP_DOMAIN:-example.com}
 
+  # Vercel's own cron scheduler normally triggers the jobs in vercel.json; this does the same
+  # job on the same UTC schedule when running outside Vercel.
+  cron:
+    image: alpine:3.20
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+    volumes:
+      - ./vm-cron.sh:/vm-cron.sh:ro
+    entrypoint: ["/bin/sh", "-c", "apk add --no-cache curl >/dev/null && exec /vm-cron.sh"]
+
 volumes:
   loyalty_vm_pgdata:
