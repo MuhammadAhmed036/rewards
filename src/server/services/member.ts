@@ -348,16 +348,20 @@ export async function resolveMemberQrForStaff(
   if (!ctx.tenantId) throw new Error("Staff must be scoped to a tenant");
 
   const verifyResult = verifyAnyMemberQrToken(token);
-  if (!verifyResult.valid || !verifyResult.membershipPublicId) {
+  // Printed cards from before QR signing was introduced just show the bare member id with no
+  // signature; still accepted here so those older cards don't stop scanning.
+  const legacyPublicId = !verifyResult.valid && /^mem_[0-9a-f]{24}$/.test(token.trim()) ? token.trim() : null;
+  if (!verifyResult.valid && !legacyPublicId) {
     await emitEvent(ctx.tenantId, "qr.validation_failed", { reason: verifyResult.error || "invalid" });
     throw new Error(verifyResult.error || "Invalid Member QR code");
   }
+  const resolvedPublicId = verifyResult.membershipPublicId || legacyPublicId!;
 
   const [membership] = await db
     .select(staffMemberSelect)
     .from(memberships)
     .innerJoin(users, eq(memberships.userId, users.id))
-    .where(eq(memberships.publicId, verifyResult.membershipPublicId))
+    .where(eq(memberships.publicId, resolvedPublicId))
     .limit(1);
 
   if (!membership) {
@@ -367,8 +371,8 @@ export async function resolveMemberQrForStaff(
     throw new Error("Not a member of this business");
   }
 
-  // Revocation check
-  if (membership.qrVersion !== verifyResult.qrVersion) {
+  // Revocation check (only meaningful for a signed code, which is the only kind that carries a version)
+  if (verifyResult.valid && membership.qrVersion !== verifyResult.qrVersion) {
     throw new Error("QR code has expired or was revoked. Please refresh your membership card.");
   }
 

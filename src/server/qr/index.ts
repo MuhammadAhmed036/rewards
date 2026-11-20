@@ -128,6 +128,16 @@ export function verifyMemberQrToken(
   };
 }
 
+/** Same alphabet and length as a member code, but cheaper to generate since a redemption code's
+ * window is short-lived (10 minutes) and single-use. */
+function shortLivedCode(length: number): string {
+  let code = "";
+  for (let i = 0; i < length; i++) {
+    code += CROCKFORD_ALPHABET[Math.floor(Math.random() * CROCKFORD_ALPHABET.length)];
+  }
+  return code;
+}
+
 /**
  * Redemption Code: 8-char random string (Crockford base32)
  * Hash stored in database is SHA-256
@@ -137,7 +147,7 @@ export function generateRedemptionCode(): {
   codeHash: string;
   codeLast4: string;
 } {
-  const code = generateCrockfordCode(8);
+  const code = shortLivedCode(8);
   const codeHash = hashRedemptionCode(code);
   const codeLast4 = code.slice(-4);
   return { code, codeHash, codeLast4 };
