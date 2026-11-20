@@ -7,6 +7,17 @@
 # a bare ":443" with no hostname forces Caddy into on-demand certificate issuance, which it
 # refuses by default for anyone who connects without extra configuration (a security guard
 # rail), and that refusal is what a TLS "internal error" during the handshake usually means here.
+#
+# HTTP/3 (QUIC over UDP) is switched off: a plain TLS handshake with no ALPN (openssl s_client)
+# can work while a real browser or curl (which both negotiate ALPN, and probe for HTTP/3 via
+# Alt-Svc) still gets a TLS "internal error" — Docker's UDP port handling is the usual cause.
+# h1/h2 over plain TCP is all this app needs.
+{
+	servers {
+		protocols h1 h2
+	}
+}
+
 {$CADDY_HOST:localhost} {
 	tls internal
 	reverse_proxy app:3000
