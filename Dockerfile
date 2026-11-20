@@ -5,7 +5,7 @@
 # migrations (tsx) and to serve (next start), so nothing can be missing at runtime.
 
 FROM node:22-alpine AS base
-RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN corepack enable && corepack prepare pnpm@12.11.2 --activate
 WORKDIR /app
 
 # ---- Install dependencies (its own layer so `pnpm install` is only re-run when deps change) ----
