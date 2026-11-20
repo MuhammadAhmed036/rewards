@@ -77,7 +77,9 @@ services:
       CRON_SECRET: ${CRON_SECRET}
     volumes:
       - ./vm-cron.sh:/vm-cron.sh:ro
-    entrypoint: ["/bin/sh", "-c", "apk add --no-cache curl >/dev/null && exec /vm-cron.sh"]
+    # Invoke via `sh vm-cron.sh` rather than executing it directly — a file bind-mounted from the
+    # host doesn't reliably keep its executable bit across checkouts/platforms, this does either way.
+    entrypoint: ["/bin/sh", "-c", "apk add --no-cache curl >/dev/null && exec sh /vm-cron.sh"]
 
 volumes:
   loyalty_vm_pgdata:
