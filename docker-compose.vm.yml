@@ -62,6 +62,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      CADDY_HOST: ${APP_HOST:-localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - loyalty_vm_caddy_data:/data

@@ -2,7 +2,12 @@
 # correctly, without needing a real domain or certificate. Uses Caddy's own local CA, so the
 # first visit shows a "not trusted" browser warning — that's expected for a lab/test VM; the
 # connection is still genuinely HTTPS, which is all the app's cookies need.
-:443 {
+#
+# The site address must name the actual host/IP (set via CADDY_HOST in .env / docker-compose) —
+# a bare ":443" with no hostname forces Caddy into on-demand certificate issuance, which it
+# refuses by default for anyone who connects without extra configuration (a security guard
+# rail), and that refusal is what a TLS "internal error" during the handshake usually means here.
+{$CADDY_HOST:localhost} {
 	tls internal
 	reverse_proxy app:3000
 }

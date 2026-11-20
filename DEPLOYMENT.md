@@ -49,6 +49,10 @@ Edit `.env` and fill in:
   `Secure` and use the `__Host-` prefix; browsers refuse to store those over plain `http://`, so
   sign-in silently wouldn't work without HTTPS. That's what the `caddy` service in
   `docker-compose.vm.yml` is for — see step 4.
+- `APP_HOST` — the same address as `APP_URL` but **without** `https://` and without a path, e.g.
+  just `<vm-ip>`. Caddy needs this on its own to know which exact host/IP to generate its
+  certificate for — leaving it unset (or wrong) is what causes a TLS handshake error when you
+  visit the site, because Caddy then doesn't know what to issue a certificate for.
 - `AUTH_SECRET`, `QR_SIGNING_SECRET`, `CRON_SECRET` — three **different**, random 32+ character
   strings. Generate each with:
 
@@ -160,10 +164,11 @@ docker compose -f docker-compose.vm.yml up -d --build
 | 1025 | Mailpit SMTP |
 
 For anything beyond a short-lived lab/test environment: point a real domain at the VM, set
-`APP_URL` to it, and edit `Caddyfile` to replace `:443 { tls internal ... }` with your domain
-(`yourdomain.example { reverse_proxy app:3000 }`) — Caddy then fetches a real Let's Encrypt
-certificate automatically instead of using its local self-signed one. Also restrict
-5434/8025/1025 to localhost or close them in the VM's firewall.
+`APP_URL` and `APP_HOST` to it, and remove the `tls internal` line from `Caddyfile` — Caddy then
+fetches a real Let's Encrypt certificate automatically for that domain instead of using its local
+self-signed one (`tls internal` is only there so an IP address, which Let's Encrypt can't issue
+for, still gets a certificate at all). Also restrict 5434/8025/1025 to localhost or close them in
+the VM's firewall.
 
 ## 10. What works out of the box here, and what doesn't
 
