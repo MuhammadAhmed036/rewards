@@ -38,6 +38,8 @@ export interface JoinProgrammeInput {
   allowExistingUser?: boolean;
   /** A friend's member number: when given, they both get a bonus after this customer's first purchase. */
   referralCode?: string;
+  /** Instant credit from a signup promo code; the promo-QR flow validates the code and sets this before the request reaches here. */
+  promoCreditPoints?: number;
 }
 
 /**
@@ -196,12 +198,13 @@ export async function joinProgramme(input: JoinProgrammeInput) {
       })
       .returning();
 
-    // Initial Balance (0 points)
+    // Initial balance: 0, unless a signup promo credited some points up front
+    const startingBalance = Math.max(0, Math.trunc(input.promoCreditPoints || 0));
     await tx.insert(membershipBalances).values({
       membershipId: newMembership.id,
       tenantId: tenant.id,
-      balance: 0,
-      lifetimeEarned: 0,
+      balance: startingBalance,
+      lifetimeEarned: startingBalance,
       lifetimeRedeemed: 0,
     });
 

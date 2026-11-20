@@ -1,0 +1,58 @@
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: loyalty_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: loyalty_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - loyalty_vm_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loyalty_app -d loyalty_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # No real SMTP provider is configured for this lab, so outgoing mail (sign-in codes, password
+  # resets, welcome emails) is caught here instead of actually being sent. Open the web UI on
+  # port 8025 to read them.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    environment:
+      MP_MAX_MESSAGES: 500
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://loyalty_app:${POSTGRES_PASSWORD}@postgres:5432/loyalty_db
+      APP_URL: ${APP_URL}
+      NEXT_PUBLIC_APP_URL: ${APP_URL}
+      NEXT_PUBLIC_APP_NAME: ${APP_NAME:-Rappio}
+      AUTH_SECRET: ${AUTH_SECRET}
+      QR_SIGNING_SECRET: ${QR_SIGNING_SECRET}
+      CRON_SECRET: ${CRON_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      EMAIL_FROM_TRANSACTIONAL: no-reply@${APP_DOMAIN:-example.com}
+
+volumes:
+  loyalty_vm_pgdata:

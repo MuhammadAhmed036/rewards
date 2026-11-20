@@ -19,6 +19,8 @@ const joinSchema = z.object({
   locationPublicId: z.string().optional(),
   // A friend's member number, from an invite link
   referralCode: z.string().max(16).optional(),
+  // Set by the signup promo-QR flow once it has checked the code; not part of the normal join form
+  promoCreditPoints: z.number().int().min(0).max(5000).optional(),
 });
 
 export async function POST(request: NextRequest) {
