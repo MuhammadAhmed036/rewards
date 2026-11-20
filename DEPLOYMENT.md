@@ -44,7 +44,11 @@ cp .env.vm.example .env
 Edit `.env` and fill in:
 
 - `POSTGRES_PASSWORD` — any strong password, used only between the app and its database container.
-- `APP_URL` — the address people will use to reach the app, e.g. `http://<vm-ip>:3000`.
+- `APP_URL` — **must be `https://`**, e.g. `https://<vm-ip>` (no port — Caddy serves on the
+  standard 443). The app runs with `NODE_ENV=production`, so its session cookies are marked
+  `Secure` and use the `__Host-` prefix; browsers refuse to store those over plain `http://`, so
+  sign-in silently wouldn't work without HTTPS. That's what the `caddy` service in
+  `docker-compose.vm.yml` is for — see step 4.
 - `AUTH_SECRET`, `QR_SIGNING_SECRET`, `CRON_SECRET` — three **different**, random 32+ character
   strings. Generate each with:
 
@@ -76,7 +80,10 @@ docker compose -f docker-compose.vm.yml ps
 docker compose -f docker-compose.vm.yml logs -f app
 ```
 
-The app is now reachable at `http://<vm-ip>:3000`.
+The app is now reachable at `https://<vm-ip>`. Caddy mints its own local certificate (there's no
+real domain to get a public one for), so the browser will show a "not trusted" / "not private"
+warning the first time — that's expected for a lab VM; click through it ("Advanced" → "Proceed").
+The connection is still genuinely HTTPS underneath, which is all the app needs.
 
 A small `cron` container also starts alongside the app. Vercel's own scheduler normally fires
 the jobs listed in `vercel.json` (expiring unused redemption claims, data retention, balance
@@ -94,9 +101,21 @@ docker compose -f docker-compose.vm.yml exec app node_modules/.bin/tsx scripts/c
   you@example.com "a-strong-password-here" "Your Name"
 ```
 
-Sign in at `http://<vm-ip>:3000/login` with that email and password.
+Sign in at `https://<vm-ip>/login` with that email and password.
 
-## 6. Day-to-day operations
+## 6. Approve a new business
+
+A business that registers through `/signup` doesn't go live immediately — it's created with
+`status: "pending"` until the platform team checks it. As the platform admin:
+
+1. Sign in at `https://<vm-ip>/admin`.
+2. Open the businesses list, filter by "⏳ Pending Approval".
+3. Open the business and approve it (sets its status to `active`).
+
+Until this happens, that business's owner account can't sign in and its page won't accept
+customers. This is normal app behaviour, not specific to this deployment.
+
+## 7. Day-to-day operations
 
 Stop everything:
 
@@ -124,26 +143,29 @@ git pull
 docker compose -f docker-compose.vm.yml up -d --build
 ```
 
-## 7. Health checks
+## 8. Health checks
 
-- `GET /api/health` — basic liveness, no auth required.
-- `GET /api/health/deep` — checks the database connection; requires
+- `GET https://<vm-ip>/api/health` — basic liveness, no auth required.
+- `GET https://<vm-ip>/api/health/deep` — checks the database connection; requires
   `Authorization: Bearer <CRON_SECRET>`.
 
-## 8. Ports used
+## 9. Ports used
 
 | Port | What |
 |---|---|
-| 3000 | The app |
+| 443 | The app (HTTPS, via Caddy) |
+| 80 | Redirects to 443 |
 | 5434 | Postgres (mapped to the host for convenience when debugging from the VM itself) |
 | 8025 | Mailpit web inbox |
 | 1025 | Mailpit SMTP |
 
-For anything beyond a short-lived lab/test environment, put a reverse proxy (nginx/Caddy) with a
-real TLS certificate in front of port 3000, and restrict the other ports to localhost or close
-them in the VM's firewall.
+For anything beyond a short-lived lab/test environment: point a real domain at the VM, set
+`APP_URL` to it, and edit `Caddyfile` to replace `:443 { tls internal ... }` with your domain
+(`yourdomain.example { reverse_proxy app:3000 }`) — Caddy then fetches a real Let's Encrypt
+certificate automatically instead of using its local self-signed one. Also restrict
+5434/8025/1025 to localhost or close them in the VM's firewall.
 
-## 9. What works out of the box here, and what doesn't
+## 10. What works out of the box here, and what doesn't
 
 This setup is meant to be self-contained — no Vercel account, no managed Postgres, no third-party
 services required. A few things that depend on an external provider behave differently without

@@ -37,8 +37,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "3000:3000"
     environment:
       NODE_ENV: production
       DATABASE_URL: postgres://loyalty_app:${POSTGRES_PASSWORD}@postgres:5432/loyalty_db
@@ -53,6 +51,20 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       EMAIL_FROM_TRANSACTIONAL: no-reply@${APP_DOMAIN:-example.com}
+
+  # Terminates HTTPS so the app's session cookies (Secure, __Host- prefixed) actually get stored
+  # by the browser. The app itself is no longer published directly — everything goes through here.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - loyalty_vm_caddy_data:/data
 
   # Vercel's own cron scheduler normally triggers the jobs in vercel.json; this does the same
   # job on the same UTC schedule when running outside Vercel.
@@ -69,3 +81,4 @@ services:
 
 volumes:
   loyalty_vm_pgdata:
+  loyalty_vm_caddy_data:
