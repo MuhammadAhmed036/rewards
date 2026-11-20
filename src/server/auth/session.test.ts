@@ -22,11 +22,17 @@ import { joinProgramme } from "../services/member";
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 
-describe("Encrypted session cookies", () => {
-  it("round-trips an encrypted payload and hides the token", async () => {
+describe("Encrypted JWT session cookies", () => {
+  it("round-trips as a real encrypted JWT (JWE) and hides the token", async () => {
     const exp = Date.now() + HOUR;
     const cookie = await encryptSessionCookie({ t: "secret-token-value", k: "staff", iat: Date.now(), exp });
-    expect(cookie.startsWith("v1.")).toBe(true);
+    // Standard JWE compact serialization: header..iv.ciphertext.tag (5 dot-separated parts;
+    // the 2nd, the wrapped content-encryption key, is empty for "dir" direct encryption).
+    const segments = cookie.split(".");
+    expect(segments).toHaveLength(5);
+    expect(segments[1]).toBe("");
+    const header = JSON.parse(Buffer.from(segments[0], "base64url").toString("utf8"));
+    expect(header).toMatchObject({ alg: "dir", enc: "A256GCM" });
     expect(cookie).not.toContain("secret-token-value");
 
     const payload = await decryptSessionCookie(cookie);
@@ -34,14 +40,14 @@ describe("Encrypted session cookies", () => {
     expect(payload?.k).toBe("staff");
   });
 
-  it("rejects tampered, legacy, foreign and expired cookies", async () => {
+  it("rejects tampered, garbled, foreign-key and expired tokens", async () => {
     const cookie = await encryptSessionCookie({ t: "abc", k: "customer", iat: Date.now(), exp: Date.now() + HOUR });
-    const [v, iv, ct] = cookie.split(".");
-    const flipped = ct.slice(0, -2) + (ct.endsWith("A") ? "BB" : "AA");
+    const [header, ekey, iv, ciphertext, tag] = cookie.split(".");
+    const flipped = ciphertext.slice(0, -2) + (ciphertext.endsWith("A") ? "BB" : "AA");
 
-    expect(await decryptSessionCookie(`${v}.${iv}.${flipped}`)).toBeNull();
-    expect(await decryptSessionCookie("a3f9c2".repeat(10))).toBeNull(); // old raw hex token
-    expect(await decryptSessionCookie(`v2.${iv}.${ct}`)).toBeNull();
+    expect(await decryptSessionCookie(`${header}.${ekey}.${iv}.${flipped}.${tag}`)).toBeNull();
+    expect(await decryptSessionCookie("a3f9c2".repeat(10))).toBeNull(); // not a JWE at all
+    expect(await decryptSessionCookie("not.a.real.jwe.token")).toBeNull();
     expect(await decryptSessionCookie("")).toBeNull();
 
     const expired = await encryptSessionCookie({ t: "abc", k: "customer", iat: 0, exp: Date.now() - 1000 });

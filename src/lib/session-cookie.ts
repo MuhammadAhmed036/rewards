@@ -1,12 +1,22 @@
 /**
- * Encrypted session cookie, shared by the Node server and the Edge middleware
- * (Web Crypto only — no Node-specific APIs).
+ * The session cookie is a real, standards-compliant JWT — specifically an encrypted one (JWE,
+ * RFC 7516), not just a signed one: nobody who intercepts it can read its contents, only verify
+ * and decrypt it with the server's key. Shared by the Node server and the Edge middleware, so it
+ * only uses Web Crypto (via `jose`, which runs on both) — no Node-specific APIs.
  *
- * The cookie carries an AES-256-GCM encrypted, authenticated payload:
- *   { t: random session token, k: session kind, iat: issued at, exp: cookie expiry }
- * The database stores only SHA-256(t), so a leaked sessions table can't be replayed,
- * and a tampered or forged cookie fails decryption.
+ * Claims: { t: random session token, k: session kind, iat, exp } encrypted with AES-256-GCM
+ * using a key derived from AUTH_SECRET (HKDF, so cookie encryption never reuses the raw secret).
+ *
+ * The database stores only SHA-256(t), never the token itself, so a leaked sessions table can't
+ * be replayed. More importantly for logout: the JWT's own `exp` is a ceiling, not the real
+ * authority — every request also looks up the session row by its hash (see `getSessionContext`
+ * in `server/auth/index.ts`). Signing out deletes that row, so the token stops working
+ * immediately, for every role (customer, staff, owner, platform admin), even though the JWT
+ * itself would otherwise still look "valid" until its `exp`. A plain stateless JWT can't do that
+ * on its own — this is why the token is tied to a server-side session, not trusted by itself.
  */
+
+import { EncryptJWT, jwtDecrypt } from "jose";
 
 export type SessionKind = "customer" | "staff" | "admin";
 
@@ -61,21 +71,12 @@ export function sessionCookieOptions(expires: Date) {
 
 // ---------- encoding helpers ----------
 
-const enc = new TextEncoder();
-const dec = new TextDecoder();
+const textEncoder = new TextEncoder();
 
 function toBase64Url(bytes: Uint8Array): string {
   let bin = "";
   for (const b of bytes) bin += String.fromCharCode(b);
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
-  const b64 = value.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((value.length + 3) % 4);
-  const bin = atob(b64);
-  const out = new Uint8Array(new ArrayBuffer(bin.length));
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
 }
 
 function toHex(buf: ArrayBuffer): string {
@@ -84,8 +85,13 @@ function toHex(buf: ArrayBuffer): string {
 
 // ---------- key ----------
 
+// A private header claim that must match on decrypt, the JWE equivalent of the AAD this used
+// before `jose` — it's part of the protected header, which JWE always authenticates, so a token
+// encrypted for something else (or with a future, incompatible claim layout) is rejected outright.
 const COOKIE_VERSION = "v1";
-const AAD = enc.encode(`loyalty-session:${COOKIE_VERSION}`);
+const JWE_ALG = "dir"; // direct encryption: the derived key below *is* the content-encryption key
+const JWE_ENC = "A256GCM";
+
 let keyPromise: Promise<CryptoKey> | null = null;
 
 function getKey(): Promise<CryptoKey> {
@@ -95,10 +101,10 @@ function getKey(): Promise<CryptoKey> {
       throw new Error("AUTH_SECRET must be set (32+ characters) to encrypt session cookies");
     }
     keyPromise = (async () => {
-      const base = await crypto.subtle.importKey("raw", enc.encode(secret), "HKDF", false, ["deriveKey"]);
+      const base = await crypto.subtle.importKey("raw", textEncoder.encode(secret), "HKDF", false, ["deriveKey"]);
       // A dedicated key derived from AUTH_SECRET, so cookie encryption never reuses the raw secret.
       return crypto.subtle.deriveKey(
-        { name: "HKDF", hash: "SHA-256", salt: enc.encode("loyalty-session-cookie"), info: enc.encode(COOKIE_VERSION) },
+        { name: "HKDF", hash: "SHA-256", salt: textEncoder.encode("loyalty-session-cookie"), info: textEncoder.encode(COOKIE_VERSION) },
         base,
         { name: "AES-GCM", length: 256 },
         false,
@@ -117,41 +123,42 @@ export function generateSessionToken(): string {
 
 /** The value stored in sessions.token: SHA-256 of the raw token, never the token itself. */
 export async function hashSessionToken(token: string): Promise<string> {
-  return toHex(await crypto.subtle.digest("SHA-256", enc.encode(token)));
+  return toHex(await crypto.subtle.digest("SHA-256", textEncoder.encode(token)));
 }
 
+/** Issues the encrypted JWT handed to the browser as the session cookie (or returned as a Bearer
+ * token for API clients — see `guardApiRequest`). Same shape and same guarantees for every role. */
 export async function encryptSessionCookie(payload: SessionPayload): Promise<string> {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv, additionalData: AAD },
-    await getKey(),
-    enc.encode(JSON.stringify(payload))
-  );
-  return `${COOKIE_VERSION}.${toBase64Url(iv)}.${toBase64Url(new Uint8Array(ciphertext))}`;
+  return await new EncryptJWT({ t: payload.t, k: payload.k })
+    .setProtectedHeader({ alg: JWE_ALG, enc: JWE_ENC, loy: COOKIE_VERSION })
+    .setIssuedAt(Math.floor(payload.iat / 1000))
+    .setExpirationTime(Math.floor(payload.exp / 1000))
+    .encrypt(await getKey());
 }
 
-/** Returns the payload, or null for a missing, tampered, foreign, legacy or expired cookie. */
+/** Returns the payload, or null for a missing, tampered, foreign, legacy or expired token. */
 export async function decryptSessionCookie(value: string | null | undefined): Promise<SessionPayload | null> {
   if (!value) return null;
-  const parts = value.split(".");
-  if (parts.length !== 3 || parts[0] !== COOKIE_VERSION) return null;
   try {
-    const plaintext = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: fromBase64Url(parts[1]), additionalData: AAD },
-      await getKey(),
-      fromBase64Url(parts[2])
-    );
-    const payload = JSON.parse(dec.decode(plaintext)) as SessionPayload;
+    const { payload, protectedHeader } = await jwtDecrypt(value, await getKey(), {
+      keyManagementAlgorithms: [JWE_ALG],
+      contentEncryptionAlgorithms: [JWE_ENC],
+    });
+    if (protectedHeader.loy !== COOKIE_VERSION) return null;
     if (
       typeof payload.t !== "string" ||
+      typeof payload.k !== "string" ||
       !(payload.k in SESSION_POLICY) ||
-      typeof payload.exp !== "number" ||
-      payload.exp <= Date.now()
+      typeof payload.iat !== "number" ||
+      typeof payload.exp !== "number"
     ) {
       return null;
     }
-    return payload;
+    // jose already rejects an expired token before returning (JWTExpired), this is defence in depth
+    if (payload.exp * 1000 <= Date.now()) return null;
+    return { t: payload.t, k: payload.k as SessionKind, iat: payload.iat * 1000, exp: payload.exp * 1000 };
   } catch {
+    // JWTExpired, JWEDecryptionFailed (tampered/foreign/wrong-key), JWEInvalid (malformed) all land here
     return null;
   }
 }
